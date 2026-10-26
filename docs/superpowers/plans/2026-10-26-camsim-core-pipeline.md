@@ -369,10 +369,13 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```python
 # tests/test_ci_config.py
 from pathlib import Path
-import yaml
 
-def test_ci_workflow_exists_and_has_python_matrix():
-    data = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())
+def test_g0_docs_and_workflows_exist():
+    assert Path(".github/workflows/ci.yml").exists()
+    assert Path(".github/workflows/docs.yml").exists()
+    assert Path("CONTRIBUTING.md").exists()
+    assert Path("docs/validation.md").exists()
+    assert Path("docs/datasheet_mapping.md").exists()
     text = Path(".github/workflows/ci.yml").read_text()
     assert "3.11" in text and "3.12" in text and "3.13" in text
     assert "ruff" in text and "mypy" in text and "pytest" in text
