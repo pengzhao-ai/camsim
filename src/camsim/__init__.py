@@ -16,10 +16,13 @@ from typing import Any, Final
 
 from ._version import __version__
 
-__all__: Final[list[str]] = ["__version__"]
+__all__: Final[list[str]] = ["SpectralIrradiance", "WavelengthGrid", "__version__"]
 
 # Public name -> (module path, attribute name). Populated as public types land.
-_LAZY_EXPORTS: Final[dict[str, tuple[str, str]]] = {}
+_LAZY_EXPORTS: Final[dict[str, tuple[str, str]]] = {
+    "SpectralIrradiance": ("camsim.core.spectral", "SpectralIrradiance"),
+    "WavelengthGrid": ("camsim.core.spectral", "WavelengthGrid"),
+}
 
 
 def __getattr__(name: str) -> Any:
