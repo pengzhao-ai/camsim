@@ -8,20 +8,23 @@ Photon counting instead needs a rate per nanometre of bandwidth::
 
 with ``E_photon(lambda) = h * c / lambda`` in joules. Because both quantities
 are densities *per nanometre*, these helpers never integrate across wavelength;
-the sensor projection in later stages multiplies by the wavelength spacing when
-it turns a spectral cube into electrons. Keeping that integral explicit avoids
-double-counting bandwidth when grids are resampled.
+later stages multiply by wavelength cell widths when turning a spectral cube
+into electrons, using the same trapezoidal weights as the resampler (half-width
+cells at the first and last sample, full width between interior samples).
+Keeping that integral explicit avoids double-counting bandwidth when grids are
+resampled.
 
 Real-world parameter ranges: the visible band spans roughly 360-830 nm. At
-555 nm a photon carries 3.579 x 10^-19 J, corresponding to 2.79 x 10^18
+555 nm a photon carries 3.578 x 10^-19 J, corresponding to 2.79 x 10^18
 photons/s per watt. Daylight scene irradiance is of order 0.1-10 W/m^2/nm, so
 typical photon flux densities are 10^17-10^19 photons/s/m^2/nm.
 
-Failure artefacts: a wavelength inadvertently supplied in nanometres is scaled
-by 10^9 and silently yields absurd photon counts; a spectral cube in per-nm
-units integrated as if it were a total power over the whole band is wrong by
-the grid step; non-positive wavelengths are physically meaningless and produce
-infinities or sign flips, so they are rejected rather than propagated.
+Failure artefacts: supplying a wavelength already in metres to these nm-based
+helpers applies the nm-to-metre factor twice, overestimating photon energy by
+10^9 and underestimating photon flux by the same factor; supplying a total band
+power instead of a per-nm density makes the result wrong by the bandwidth;
+non-positive wavelengths are physically meaningless and produce infinities or
+sign flips, so they are rejected rather than propagated.
 """
 
 from __future__ import annotations
