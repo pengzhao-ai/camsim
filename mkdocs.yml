@@ -26,6 +26,8 @@ nav:
   - Home: index.md
   - Concepts: concepts.md
   - Architecture: architecture.md
+  - Validation: validation.md
+  - Datasheet mapping: datasheet_mapping.md
 
 # Process material and the superseded reference plan stay in the repository for
 # provenance but are not published as part of the documentation site.

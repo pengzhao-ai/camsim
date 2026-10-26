@@ -74,3 +74,13 @@ uses tolerance-based golden tests.
 sensor or ISP. It consumes arrays plus metadata (`ChartLayout`,
 `ColorReference`) and must not import `camsim.sensor`, `camsim.isp`,
 `camsim.scene`, or `camsim.optics`. An import-independence test enforces this.
+
+## Validation contract
+
+Phases end at formal gates: G0 (install, lint, typecheck, tests, docs), G1
+(scene/optics), G2 (sensor), G3 (ISP), G4 (metrics), and G5 (human sign-off).
+A gate is evidence, not a checklist: each one is backed by an analytic
+invariant, a round-trip characterization, a reference-library cross-check, or a
+datasheet plausibility argument. The current status, tolerances, and
+reproduction commands are indexed on the [Validation](validation.md) page.
+Machine-vision experiments do not begin until G5 is signed off.

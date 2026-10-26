@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help setup sync test lint format typecheck docs build notebooks figures clean
+.PHONY: help setup sync test coverage lint format typecheck docs build notebooks figures gate clean
 
 help:  ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -14,6 +14,9 @@ sync:  ## Sync the uv environment with all extras
 
 test:  ## Run the test suite
 	$(UV) run pytest
+
+coverage:  ## Run the test suite with the same coverage command as CI
+	$(UV) run pytest --cov=camsim --cov-report=term-missing
 
 lint:  ## Check lint and formatting
 	$(UV) run ruff check .
@@ -45,6 +48,8 @@ notebooks:  ## Execute every Jupytext notebook headlessly into results/cache
 
 figures:  ## Report the figure-gallery status
 	@echo "No committed figure gallery yet; figures are produced by notebooks and examples."
+
+gate: sync lint typecheck test coverage docs build  ## Run the full G0 quality gate
 
 clean:  ## Remove local caches and build outputs
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .hypothesis htmlcov site dist build

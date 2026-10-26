@@ -1,0 +1,22 @@
+camsim
+Copyright 2026 Peng Zhao
+
+This product includes software, data, and fonts developed by third parties.
+The complete inventory, with copyright notices and licence texts, is in
+THIRD_PARTY.md. The camsim source code itself is licensed under the Apache
+License, Version 2.0; see LICENSE.
+
+Material redistributed with, or embedded in output produced by, this project
+includes:
+
+- DejaVu fonts, bundled with Matplotlib and used for documentation and figure
+  text. Copyright (c) 2003 Bitstream, Inc.; DejaVu changes are in the public
+  domain.
+- ColorChecker 2005 spectral data, distributed by colour-science with the
+  notice "BabelColor ColorChecker data: Copyright (C) 2004-2012 Danny Pascale
+  (www.babelcolor.com); used by permission." The exact dataset used by camsim
+  is finalized in Phase 1 (Task 6).
+
+colour-science is a runtime dependency and is not modified or redistributed by
+this repository; its BSD-3-Clause licence and copyright are reproduced in
+THIRD_PARTY.md for attribution.

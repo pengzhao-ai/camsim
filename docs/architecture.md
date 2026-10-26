@@ -80,6 +80,10 @@ Phase gates validate each layer before the next begins:
   `scikit-image`);
 - import-independence and determinism tests.
 
+The gate definitions, current status, and reproduction commands live in
+[Validation](validation.md). How public datasheet parameters become validated
+preset fields is documented in [Datasheet mapping](datasheet_mapping.md).
+
 Machine-vision work does not begin until the pipeline and metrics pass the G5
 human sign-off.
 
