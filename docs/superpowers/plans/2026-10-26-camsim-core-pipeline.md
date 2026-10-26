@@ -1608,7 +1608,13 @@ def test_linearity_before_tone(sensor_config, isp_config, sensor, raw_frame):
     # Scaling the raw signal scales the linear output before tone.
     isp = camsim.ISP(isp_config)
     a = isp.process(raw_frame, trace=True)
-    scaled = raw_frame.with_data((raw_frame.data.astype(np.float32) - raw_frame.black_level_dn) * 2 + raw_frame.black_level_dn)
+    scaled_data = np.clip(
+        (raw_frame.data.astype(np.float32) - raw_frame.black_level_dn) * 2
+        + raw_frame.black_level_dn,
+        0,
+        2 ** raw_frame.bit_depth - 1,
+    ).astype(np.uint16)
+    scaled = raw_frame.with_data(scaled_data)
     b = isp.process(scaled, trace=True)
     np.testing.assert_allclose(b.stages["ccm"].data, 2 * a.stages["ccm"].data, rtol=1e-3, atol=1e-4)
 
