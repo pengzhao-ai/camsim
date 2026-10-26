@@ -127,8 +127,18 @@ def _as_gain_map(value: Any) -> NDArray[np.float64]:
     supply NumPy arrays; both are accepted. Flat-field gain maps are divisions
     of a reference level by a measured flat field, so a zero or negative entry
     means calibration failed and is rejected instead of producing infinities.
+
+    Conversion errors are re-raised as ``ValueError`` because Pydantic wraps
+    ``ValueError`` from a ``BeforeValidator`` into a ``ValidationError`` but
+    lets ``TypeError`` escape. A JSON object such as ``{"a": 1}`` must become a
+    validation report, not a traceback in the CLI.
     """
-    array = np.asarray(value, dtype=np.float64)
+    try:
+        array = np.asarray(value, dtype=np.float64)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"LSC map must be a rectangular 2-D array of numbers; got {type(value).__name__}"
+        ) from exc
     if array.ndim != 2:
         raise ValueError(f"LSC map must be a 2-D array; got shape {array.shape}")
     if array.size == 0:
@@ -299,14 +309,14 @@ class ADCConfig(ConfigModel):
     """Analog-to-digital converter scale and black level.
 
     ``full_scale_uv`` is the input voltage that produces the largest code;
-    ``black_level_dn`` is the code that represents zero signal and must fit
-    inside the ``2**bits`` code space. ``digital_gain`` multiplies signal codes
-    after conversion and before the black level is re-added.
+    ``black_level_dn`` is the integer code that represents zero signal and must
+    fit inside the ``2**bits`` code space. ``digital_gain`` multiplies signal
+    codes after conversion and before the black level is re-added.
     """
 
     bits: Annotated[int, Field(ge=8, le=16)]
     full_scale_uv: PositiveFloat
-    black_level_dn: NonNegative
+    black_level_dn: NonNegativeInt
     digital_gain: PositiveFloat
 
     @model_validator(mode="after")
@@ -671,8 +681,13 @@ class ISPConfig(ConfigModel):
 
     Stages run in the fixed order ``dpc, blc, lsc, awb, demosaic, ccm,
     denoise, sharpen, tone, output``. Each stage config carries an ``enabled``
-    toggle; the defaults below are neutral (identity) operations so a config
-    that omits an optional stage cannot silently alter pixels.
+    toggle. The defaults form a conventional baseline, not a guarantee of
+    identity: auto white balance estimates and applies per-channel gains, and
+    colour correction either applies a supplied matrix or is fitted by the
+    pipeline when ``matrix`` is ``None``. Callers that need a bit-exact
+    pass-through must disable those stages explicitly. Optional enhancement
+    stages whose numeric strengths default to zero (``denoise``, ``sharpen``)
+    are identity operations until parameters are supplied.
     """
 
     schema_version: SchemaVersion

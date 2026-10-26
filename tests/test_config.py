@@ -173,6 +173,13 @@ def test_adc_black_level_out_of_code_range_rejected(tmp_path: Path) -> None:
         load_sensor(_write_json(tmp_path, data))
 
 
+def test_adc_black_level_must_be_integer(tmp_path: Path) -> None:
+    data = _preset_payload(SENSOR_PRESET)
+    data["adc"]["black_level_dn"] = 64.5
+    with pytest.raises(ValidationError, match="black_level_dn"):
+        load_sensor(_write_json(tmp_path, data, "fractional_black_level.json"))
+
+
 def test_ccm_row_sum_rejected(tmp_path: Path) -> None:
     data = _preset_payload(ISP_PRESET)
     data["ccm"]["matrix"] = [[1.0, 0.1, 0.1], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -264,6 +271,16 @@ def test_validate_config_rejects_mixed_sensor_and_isp_fields(tmp_path: Path) -> 
     report = validate_config(_write_json(tmp_path, data, "mixed.json"))
     assert not report.valid
     assert any("mixes sensor and ISP" in error for error in report.errors)
+
+
+def test_validate_config_reports_object_valued_lsc_map(tmp_path: Path) -> None:
+    # A JSON object here must become a validation error, never a TypeError that
+    # escapes validate_config and crashes the CLI with a traceback.
+    data = _preset_payload(ISP_PRESET)
+    data["lsc"]["map"] = {"a": 1}
+    report = validate_config(_write_json(tmp_path, data, "bad_lsc_map.json"))
+    assert not report.valid
+    assert any("LSC map" in error for error in report.errors)
 
 
 # ---------------------------------------------------------------------------
