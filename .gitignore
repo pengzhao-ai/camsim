@@ -1,11 +1,39 @@
+# macOS
 .DS_Store
+
+# Virtual environments
 .venv/
-.superpowers/
+venv/
+env/
+
+# Python caches and test/lint artefacts
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Jupyter / Jupytext
+.ipynb
+*.ipynb
 .ipynb_checkpoints/
+.jupyter_cache/
+
+# Build artefacts
+build/
+dist/
+site/
+*.egg-info/
+.eggs/
+
+# Generated results and local caches
 results/cache/
+
+# Repository-internal process material and superseded archives
+.superpowers/
 archives/

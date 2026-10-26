@@ -1,0 +1,149 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "camsim"
+dynamic = ["version"]
+description = "Deterministic camera sensor and ISP simulation with image-quality metrics."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11,<3.14"
+authors = [{ name = "camsim contributors" }]
+keywords = [
+    "camera",
+    "image-quality",
+    "isp",
+    "machine-vision",
+    "optics",
+    "sensor",
+    "simulation",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Typing :: Typed",
+]
+dependencies = [
+    "colour-science>=0.4.4",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "pydantic>=2.6",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+ml = [
+    "scikit-learn>=1.4",
+    "torch>=2.2",
+]
+tune = [
+    "optuna>=3.6",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
+dev = [
+    "colour-demosaicing>=0.2",
+    "hypothesis>=6.98",
+    "jupytext>=1.16",
+    "mypy>=1.11",
+    "nbconvert>=7.16",
+    "pandas>=2.2",
+    "pre-commit>=3.7",
+    "pyarrow>=16.0",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "scikit-image>=0.23",
+]
+all = [
+    "colour-demosaicing>=0.2",
+    "hypothesis>=6.98",
+    "jupytext>=1.16",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+    "mypy>=1.11",
+    "nbconvert>=7.16",
+    "optuna>=3.6",
+    "pandas>=2.2",
+    "pre-commit>=3.7",
+    "pyarrow>=16.0",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "scikit-image>=0.23",
+    "scikit-learn>=1.4",
+    "torch>=2.2",
+]
+
+[project.scripts]
+camsim = "camsim.cli:main"
+
+[tool.hatch.version]
+path = "src/camsim/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/camsim"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/docs",
+    "/pyproject.toml",
+    "/src",
+    "/tests",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["camsim"]
+branch = true
+omit = ["*/tests/*"]
+
+[tool.coverage.paths]
+source = ["src", ".venv/*/site-packages"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# The 90% fail-under gate is enabled at G5, once the pipeline modules exist.
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["archives", "docs", "site"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["camsim"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+files = ["src"]

@@ -2,68 +2,86 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repo status: pre-scaffold (Phase 0 not started)
+## Repo status
 
-No code exists yet. The authoritative spec is `iq_for_machine_vision_project_plan_revised.md` at the repo root — read it in full before building anything. The `archives/` folder is superseded material; ignore it.
+Phase 0 is in progress: the repository scaffold is in place — the `camsim` package installs, the CLI skeleton runs, and lint, typecheck, tests, and docs build. Simulation, ISP, metrics, and machine-vision modules are added phase by phase.
 
-The user will clarify phased-implementation details before the build starts — do not begin scaffolding until they confirm. Everything below describes the planned target state; the commands do not exist until Phase 0 creates them.
+- **Authoritative spec:** `docs/superpowers/specs/2026-10-26-camsim-design.md` — read it before building anything.
+- **Implementation plan:** `docs/superpowers/plans/2026-10-26-camsim-core-pipeline.md` — task-by-task requirements and gates.
+- **Superseded plan:** `docs/reference/Only for reference - iq_for_machine_vision_project_plan_revised.md`. Kept for provenance only; do not implement from it.
+- `archives/` is gitignored superseded material. Keep it on disk; do not delete or commit it.
+
+Do not write machine-vision code before the G5 human sign-off.
 
 ## What this repo is
 
-`iq-for-machine-vision` — an educational, fully deterministic Python repo that simulates a camera pipeline from physical scene radiometry to machine-vision inference. It demonstrates how optics, sensor noise, and ISP parameter choices affect downstream ML model accuracy, contrasted against traditional human-perceptual IQ metrics.
+`camsim` — a professional, fully deterministic Python library that simulates a camera from spectral scene irradiance to a rendered image, measures image quality with standard metrics, and studies how optics, sensor noise, and ISP parameters affect machine-vision accuracy.
 
-Architectural split:
+Three clean layers:
 
-- **Core simulation pipeline (Phases 0–3):** standalone, modular package `src/iqlab/` — scene physics, radiometry, optical blur, sensor noise, ISP reconstruction, IQ measurement (e-SFR/MTF, SNR, ΔE2000).
-- **Applied experiments (Phases 4–7):** `tasks/` plus Jupytext notebooks that feed simulated images into a PyTorch CNN to evaluate hardware design trade-offs, machine-centric ISP auto-tuning, and metric-to-task correlations.
+1. **Simulation pipeline** — `scene` and `optics` are supporting helpers; `sensor` (irradiance → RAW) and `isp` (RAW → rendered image) are the reusable core and never depend on them.
+2. **Metrics** — `camsim.metrics` is import-independent: it operates on arrays plus metadata and must not import `camsim.sensor`, `camsim.isp`, `camsim.scene`, or `camsim.optics`.
+3. **Machine vision** — `camsim.tasks` (PyTorch), gated behind G5.
 
-## Commands (planned, per the plan)
+## Commands
 
-- Setup (macOS): `uv sync --all-extras`; the README must also give the pip/venv fallback
-- `make setup` / `make test` / `make lint` / `make notebooks` / `make figures`
-  - `make notebooks` runs every notebook headless (jupytext + nbconvert)
-- Lint/format: `ruff`; tests: `pytest`; single test: `uv run pytest tests/test_units.py::test_name`
-- Python 3.11, managed with `uv`; `pyproject.toml` extras: `[ocr]`, `[tune]`, `[dev]`
-
-## Pipeline architecture (target)
-
-Physics chain in `src/iqlab/`:
-
-- `units.py` — radiometry, PPD, unit conversions
-- `scene.py` — synthetic targets (slanted edge, 24-patch ColorChecker, text glyphs) as linear reflectance on a 4× oversampled grid
-- `illuminant.py` — D65 / 3000K / 4000K
-- `optics.py` — Gaussian PSF plus optional diffraction-limited Airy PSF, box downsampling for pixel-aperture integration, system MTF
-- `sensor.py` — RGGB Bayer or mono (no CFA, higher effective QE), QE, shot/read/dark noise, ADC, gain
-  - default sensor: 1.12 µm pitch, f/2.2, T = 0.9, 10 ms exposure, full well 6000 e⁻, read noise 2 e⁻ rms, 10-bit ADC, black level 64 DN
-
-ISP in `src/iqlab/isp/`; `pipeline.py` holds the `ISPParams` dataclass and the unified `run()` entry point:
-
-```
-RAW → BLC → (LSC) → AWB → Demosaic → CCM → Denoise → Sharpen → Tone/Gamma → sRGB
+```bash
+uv sync --all-extras          # install the package and every extra
+make setup / make test / make lint / make typecheck / make docs
+uv run pytest                 # full suite
+uv run pytest tests/test_package.py::test_import_and_version -v   # single test
+uv run ruff check . && uv run ruff format --check .
+uv run mypy src               # strict, src/ only
+uv run mkdocs build --strict
+uv run jupytext --to ipynb --execute notebooks/NN_name.py --output /tmp/NN.ipynb
 ```
 
-- AWB: Gray-World and White-Patch estimation
-- Demosaic: bilinear and Malvar-He-Cutler (2004)
-- CCM: 3×3 least-squares fit on ColorChecker patches per illuminant, with ridge (L2) regularization and a row-sum constraint (Σrow = 1) to prevent noise explosion at low lux
-- Denoise/sharpen: Gaussian/bilateral split across luma (Y) and chroma (CbCr); unsharp mask (amount, radius, threshold)
+- Python 3.11–3.13, `uv` with a committed `uv.lock`; the pip/venv fallback is documented in the README.
+- `make notebooks` executes every Jupytext notebook headlessly; notebooks must run in under 2 minutes each on Apple Silicon.
+- The CLI entry point is `camsim = "camsim.cli:main"` with `validate`, `schema`, and `info` subcommands.
+- `make figures` will regenerate the committed figure gallery once the plotting layer lands (Phase 4/5); it currently reports that the gallery is empty.
 
-Metrics in `src/iqlab/metrics/`:
+## Package architecture
 
-- `mtf.py` — ISO 12233 slanted-edge e-SFR → MTF50/MTF20 in cycles/pixel and cycles/degree; computed on raw mono/green channels as well as post-demosaic RGB to isolate demosaicing artifacts from optical blur
-- `color.py` — ΔE76 and ΔE2000 per ColorChecker patch via colour-science; `snr.py` — SNR (dB) on flat patches per channel and on luma
-- `summary.py::measure_all(img, chart_layout) -> dict` — the unified harness every downstream notebook uses
+```text
+src/camsim/
+├── __init__.py       # PEP 562 lazy export map (_LAZY_EXPORTS)
+├── _version.py       # single source of the package version
+├── cli.py            # argparse subcommands
+├── core/             # units, spectral cubes, RAW/rendered frames, colour references
+├── config/           # Pydantic schemas, JSON I/O, presets
+├── scene/ optics/    # supporting simulation helpers
+├── sensor/ isp/      # reusable core
+├── characterization/ # EMVA 1288-style measurements
+├── camera/           # convenience orchestration and auto-exposure
+├── metrics/          # independent IQ harness
+├── tasks/            # machine-vision experiments (gated)
+├── viz/ io/          # presentation and file I/O
+```
 
-Tasks live at the repo root in `tasks/` (not under `src/iqlab/`): `text_recog.py` (lightweight 3-layer PyTorch CNN character classifier plus evaluator reporting cross-entropy task loss and top-1 accuracy), `tune.py` (Optuna), `viz.py` (figure helpers).
-
-Phases: 0 scaffold · 1 photons→RAW · 2 ISP engine · 3 metrics harness · 4 CNN task engine + sweeps · 5 mono vs Bayer · 6 auto-tune (NSGA-II Pareto) · 7 metric correlation.
+- `import camsim` must stay cheap. Public names are registered lazily in `_LAZY_EXPORTS` as `name -> (module path, attribute name)`; add new public types there as they land. Do not eagerly import simulation packages from `camsim/__init__.py`.
+- Config uses Pydantic v2 with `extra="forbid"`, units in every field name, cross-field physical validators, and `provenance` in every preset.
+- `RawFrame` carries every piece of metadata the ISP needs; no hidden globals.
 
 ## Non-negotiable conventions
 
-- **Linear-space invariance:** BLC, WB, demosaic, denoise, CCM, and sharpening operate strictly in linear float32 space; the non-linear sRGB OETF and tone curve are applied as the final reconstruction step.
-- **Notebooks:** Jupytext percent format (`# %%` code, `# %% [markdown]` narrative) in `notebooks/*.py`; never commit `.ipynb` files; `jupytext.toml` enables local pairing. Every notebook must execute in under 2 minutes on Apple Silicon.
-- **Determinism:** fixed random seeds for all stochastic routines (noise generation, PyTorch weights); the repo must be fully deterministic.
-- **From scratch first:** core numerical routines (MHC demosaic, e-SFR, ridge CCM, …) are implemented in NumPy first, then validated against reference packages (`colour-science`, `colour-demosaicing`, `scikit-image`) in tests or notebook cells.
-- **Pedagogy:** every source file opens with a docstring covering the physical/mathematical foundation, real-world parameter ranges, and potential failure artifacts. Comments explain engineering intent ("why"), not code mechanics ("what").
-- PyTorch runs on MPS when available, with CPU fallback.
-- **Tests:** one file per module in `tests/`; Phase 1 physics checks include linear electron scaling with lux, Poisson variance in the shot-noise regime, and clipping at full well / ADC max.
-- `results/figures/` holds committed PNG figures used by the README gallery.
+- **Linear-space invariant:** DPC, BLC, LSC, AWB, demosaic, CCM, denoise, and sharpen operate in linear float32. The tone curve and output OETF are the only non-linear steps.
+- **Spectral boundary:** the sensor consumes irradiance at the sensor plane before IR-cut/CFA/microlens. The sensor never resamples implicitly; spatial and wavelength resampling use explicit, energy-conserving helpers.
+- **Determinism:** explicit `numpy.random.Generator` only, no global RNG; seeds and config hashes recorded in outputs. Bit-identical within one environment; tolerance-based across platforms.
+- **From scratch first:** implement core numerics (MHC demosaic, e-SFR, ridge CCM, …) in NumPy, then validate against `colour-science`, `colour-demosaicing`, and `scikit-image` in tests.
+- **Pedagogy:** every source file opens with a docstring covering the physical/mathematical foundation, real-world parameter ranges, and failure artefacts. Comments explain engineering intent, not code mechanics.
+- **Tests:** one file per module in `tests/`; Hypothesis for invariants; deterministic seeds. Import-independence of `camsim.metrics` is enforced by test. Coverage target is ≥ 90% at G5.
+- **Notebooks:** Jupytext percent format (`# %%` code, `# %% [markdown]` narrative) in `notebooks/*.py`; never commit `.ipynb` files.
+- **Machine vision:** PyTorch on MPS when available with CPU fallback; manual seeding; no ML work before G5.
+- `results/figures/` holds committed PNG figures; `results/cache/` is gitignored.
+- **Commits:** end every commit message with `Co-Authored-By: Claude Code <noreply@anthropic.com>`.
+
+## Reference hardware defaults
+
+- Reference lens (design Section 7.1.1): f/1.8, 24 mm full-frame equivalent, ~84° diagonal FOV, T = 0.9, 1/1.3" sensor, ~6.4 mm actual focal length.
+- Flagship preset (plan Global Constraints): LCG 100 µV/e⁻ / 6000 e⁻ full well / 2 e⁻ rms read noise; HCG 300 µV/e⁻ / 2000 e⁻ / 0.7 e⁻ rms; 10-bit ADC, 0.8 V full scale, black level 64 DN.
+- These are overridable presets with provenance, not claims about a commercial part.
+
+## Phases and gates
+
+Phase 0 scaffold (G0: install, lint, typecheck, tests, docs) · Phase 1 scene/optics (G1) · Phase 2 sensor (G2) · Phase 3 ISP (G3) · Phase 4 metrics (G4) · Phase 5 consolidation and human sign-off (G5) · Phases 6–9 machine vision, mono-vs-Bayer, auto-tuning, metric correlation. Each gate's validation criteria are in the design spec, Section 10.

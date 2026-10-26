@@ -1,0 +1,3 @@
+# Notebooks are authored as Jupytext percent-format .py files and paired with
+# local .ipynb files. Only the .py sources are committed; .ipynb is gitignored.
+formats = "ipynb,py:percent"

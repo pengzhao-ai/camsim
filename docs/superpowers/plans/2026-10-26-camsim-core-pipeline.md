@@ -1030,9 +1030,9 @@ def test_per_call_seed_independent_of_call_order(sensor_config):
 
 def test_external_irradiance_wrong_shape_raises(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
+    grid = np.arange(360.0, 831.0, 5.0)  # correct wavelength grid, wrong spatial shape
     irr = SpectralIrradiance.from_array(
-        np.ones((8, 8, 3)), np.array([450., 550., 650.]), "W/m^2/nm",
-        pixel_pitch_um=1.12,
+        np.ones((8, 8, len(grid))), grid, "W/m^2/nm", pixel_pitch_um=1.12,
     )
     with pytest.raises(ValueError, match="sensor grid"):
         sensor.expose(irr, 0.01)
