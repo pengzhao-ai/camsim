@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "name": "default",
+  "provenance": {
+    "source": "camsim baseline ISP profile",
+    "url": null,
+    "retrieved": "2026-10-26",
+    "notes": "Baseline reconstruction used for image-quality metrics. Optional enhancement stages are disabled so measurements reflect optics, the sensor, and the mandatory colour reconstruction rather than denoise or sharpening.",
+    "assumptions": [
+      "Malvar-He-Cutler demosaicing is the default Bayer reconstruction",
+      "the colour-correction matrix is the neutral identity until per-illuminant matrices are fitted",
+      "denoise and sharpening are disabled for the baseline measurement profile",
+      "tone mapping uses the standard sRGB opto-electronic transfer function"
+    ]
+  },
+  "dpc": {
+    "enabled": true,
+    "method": "neighbor"
+  },
+  "blc": {
+    "enabled": true
+  },
+  "lsc": {
+    "enabled": false,
+    "mode": "none"
+  },
+  "awb": {
+    "enabled": true,
+    "method": "gray_world",
+    "p": 6.0
+  },
+  "demosaic": {
+    "enabled": true,
+    "method": "mhc"
+  },
+  "ccm": {
+    "enabled": true,
+    "matrix": [
+      [1.0, 0.0, 0.0],
+      [0.0, 1.0, 0.0],
+      [0.0, 0.0, 1.0]
+    ],
+    "ridge": 0.0001,
+    "row_sum": true
+  },
+  "denoise": {
+    "enabled": false,
+    "method": "gaussian",
+    "luma_strength": 0.0,
+    "chroma_strength": 0.0,
+    "radius": 1.0
+  },
+  "sharpen": {
+    "enabled": false,
+    "amount": 0.0,
+    "radius": 1.0,
+    "threshold": 0.0,
+    "luma_only": true
+  },
+  "tone": {
+    "enabled": true,
+    "color_space": "sRGB",
+    "exposure_compensation_ev": 0.0,
+    "gamma": null
+  },
+  "output": {
+    "color_space": "sRGB",
+    "bit_depth": 8
+  }
+}
