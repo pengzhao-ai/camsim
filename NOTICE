@@ -2,9 +2,9 @@ camsim
 Copyright 2026 Peng Zhao
 
 This product includes software, data, and fonts developed by third parties.
-The complete inventory, with copyright notices and licence texts, is in
-THIRD_PARTY.md. The camsim source code itself is licensed under the Apache
-License, Version 2.0; see LICENSE.
+The complete inventory, with copyright notices, licence names, and links to
+the full licence texts, is in THIRD_PARTY.md. The camsim source code itself is
+licensed under the Apache License, Version 2.0; see LICENSE.
 
 Material redistributed with, or embedded in output produced by, this project
 includes:

@@ -4,7 +4,6 @@ type: software
 title: camsim
 abstract: "Deterministic camera sensor and ISP simulation with image-quality metrics, from spectral irradiance to a rendered image and machine-vision task accuracy."
 version: 0.1.0.dev0
-date-released: 2026-10-26
 authors:
   - family-names: Zhao
     given-names: Peng

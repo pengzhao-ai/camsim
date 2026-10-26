@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Deterministic camera sensor and ISP simulation with image-quality metrics."
 readme = "README.md"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11,<3.14"
 authors = [{ name = "camsim contributors" }]
 keywords = [
@@ -98,8 +98,12 @@ packages = ["src/camsim"]
 
 [tool.hatch.build.targets.sdist]
 include = [
+    "/CHANGELOG.md",
+    "/CITATION.cff",
     "/LICENSE",
+    "/NOTICE",
     "/README.md",
+    "/THIRD_PARTY.md",
     "/docs",
     "/pyproject.toml",
     "/src",
