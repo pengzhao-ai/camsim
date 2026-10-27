@@ -620,7 +620,8 @@ def test_metrics_package_exports_the_chart_types() -> None:
     assert metrics.ChartLayout is ChartLayout
     assert metrics.PatchROI is PatchROI
     assert metrics.extract_patch is extract_patch
-    assert set(metrics.__all__) == {"ChartLayout", "PatchROI", "extract_patch"}
+    # The metrics package is the full public API; the chart types are a subset.
+    assert {"ChartLayout", "PatchROI", "extract_patch"} <= set(metrics.__all__)
 
 
 def test_metrics_chart_does_not_import_simulator_modules() -> None:
