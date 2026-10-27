@@ -447,7 +447,7 @@ def test_colorchecker_has_24_patches():
 def test_lux_normalization_d65():
     e = illuminants.lux_to_spectral_irradiance(1.0, illuminants.illuminant("D65"))
     v = illuminants.photopic_luminous_efficiency(e.wavelengths_nm.nm)
-    luminous = 683.0 * np.trapezoid(e.data[0, 0] * v, e.wavelengths_nm.nm * 1e-9)
+    luminous = 683.0 * np.trapezoid(e.data[0, 0] * v, e.wavelengths_nm.nm)
     assert luminous == pytest.approx(1.0, rel=1e-3)
 
 def test_reference_lab_changes_with_illuminant():
@@ -749,7 +749,7 @@ from camsim.optics.propagation import box_downsample
 def test_g1_lux_normalization():
     e = lux_to_spectral_irradiance(100.0, illuminant("D65"))
     v = photopic_luminous_efficiency(e.wavelengths_nm.nm)
-    assert 683.0 * np.trapezoid(e.data * v, e.wavelengths_nm.nm * 1e-9) == pytest.approx(100.0, rel=1e-3)
+    assert 683.0 * np.trapezoid(e.data[0, 0] * v, e.wavelengths_nm.nm) == pytest.approx(100.0, rel=1e-3)
 
 def test_g1_analytic_mtf():
     assert psf_mtf50(gaussian_psf(1.0, size=31)) == pytest.approx(0.1874, abs=0.01)
