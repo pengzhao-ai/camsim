@@ -4,23 +4,23 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-The `[0.1.0]` heading names the **release candidate**, not the distribution
-version: `src/camsim/_version.py` remains `0.1.0.dev0` until the tag is cut
-after the G5 human sign-off. The candidate is not tagged or published. After
-tagging, the heading is dated and a fresh `Unreleased` section opens.
+The `[0.1.0]` release was approved by the project owner on 2026-10-27 after
+the G5 review recorded in `results/reports/validation_report.md`. The
+distribution version is `0.1.0`. A fresh `Unreleased` section opens for future
+changes.
 
-## [0.1.0] - unreleased candidate
+## [0.1.0] - 2026-10-27
 
-**Status: awaiting G5 human sign-off.** The core pipeline is validated end to
-end; the tag, push, and publication are separate steps performed only after
-the project owner approves `results/reports/validation_report.md`.
+**Status: released.** G1-G4 are PASS and the G5 candidate was signed off. The
+tag `v0.1.0` and the GitHub/PyPI publication are the release steps recorded in
+the validation report and the release checklist.
 
 ### Added
 
 #### Phase 0 — Foundation
 
 - Installable `camsim` package with a `src/` layout, a single version source
-  (`0.1.0.dev0`), lazy (PEP 562) public exports, and a `camsim` console entry
+  (`0.1.0`), lazy (PEP 562) public exports, and a `camsim` console entry
   point with `info`, `schema`, `validate`, `render`, `characterize`, `measure`,
   and `figures` subcommands.
 - Radiometric unit conversions and validated spectral types: `WavelengthGrid`,
@@ -113,4 +113,4 @@ the project owner approves `results/reports/validation_report.md`.
 - **No machine-vision code or claim is included.** `camsim.tasks` remains a
   gated docstring-only namespace.
 
-[0.1.0]: https://github.com/OWNER/camsim/commits/main
+[0.1.0]: https://github.com/pengzhao-ai/camsim/releases/tag/v0.1.0

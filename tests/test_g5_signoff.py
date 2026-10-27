@@ -6,7 +6,7 @@ artifact's contract executable without pretending to be the human decision:
 * every phase gate G1-G4 is present in the consolidated report and its
   committed report and JSON still say PASS;
 * the report contains the required assumptions, limitations, reproduction
-  instructions, and an unsigned human sign-off checklist;
+  instructions, and the completed human sign-off checklist;
 * every Markdown link into the repository resolves, the two G5 figures exist,
   and their ``docs/images`` mirrors are byte-identical;
 * the quality-gate configuration still enforces 90 % coverage and documents
@@ -17,12 +17,12 @@ artifact's contract executable without pretending to be the human decision:
   raise MTF50 and produce measurable overshoot, and camera auto-exposure must
   converge inside the preset's physical limits;
 * ``camsim.tasks`` contains no implementation and imports no PyTorch;
-* the report status says **awaiting human sign-off** and never claims that the
-  owner signed or that ``v0.1.0`` was tagged.
+* the report records the owner's sign-off and the `v0.1.0` release, while
+  keeping machine-vision work deferred.
 
-The tests deliberately do not assert that a git tag exists. A tag before the
-owner's explicit approval would be the failure this gate is meant to prevent,
-not evidence that the gate passed.
+The tests do not create or inspect a git tag. The signed report is the
+human-decision record; the git tag and package publication are release steps
+performed after that record is committed.
 """
 
 from __future__ import annotations
@@ -109,22 +109,27 @@ def _reported_number(label: str) -> float:
     return value / 100.0 if match.group(2) == "%" else value
 
 
-def test_report_exists_and_status_is_awaiting_signoff() -> None:
-    """The report is a candidate, not a completed sign-off."""
+def test_report_records_completed_signoff() -> None:
+    """The report records the owner's explicit G5 sign-off."""
     text = _report()
     heading = "\n".join(text.splitlines()[:8]).lower()
-    assert "awaiting human sign-off" in heading
+    assert "signed off" in heading
+    assert "awaiting human sign-off" not in heading
     assert not re.search(r"status:\s*pass", heading)
-    assert "v0.1.0 has been tagged" not in text.lower()
-    assert "has been signed off" not in text.lower()
-    assert "sign-off is complete" not in text.lower()
 
-    # The gate table must carry the candidate status itself, not only the
-    # opening paragraph. No G5 row may be marked PASS.
+    # The gate table must carry the decision itself. G5 is a human gate, so it
+    # is labelled signed off rather than a machine **PASS**.
     g5_rows = [line for line in text.splitlines() if line.startswith("| G5 |")]
     assert len(g5_rows) == 1, f"expected one G5 gate row, got {g5_rows}"
-    assert "Awaiting human sign-off" in g5_rows[0]
+    assert "Signed off" in g5_rows[0]
+    assert "v0.1.0" in g5_rows[0]
     assert "**PASS**" not in g5_rows[0]
+    assert "awaiting human sign-off" not in g5_rows[0].lower()
+
+    # The checklist and decision block are filled in.
+    assert text.count("- [x]") >= 6
+    assert "Owner: pengzhao-ai" in text
+    assert "Decision:  [x] approve v0.1.0" in text
 
 
 def test_all_phase_gates_are_present_and_pass() -> None:
@@ -148,7 +153,7 @@ def test_all_phase_gates_are_present_and_pass() -> None:
 
 
 def test_required_sections_and_signoff_checklist_exist() -> None:
-    """Assumptions, limitations, reproduction, and the unsigned checklist exist."""
+    """Assumptions, limitations, reproduction, and the signed checklist exist."""
     text = _report()
     lower = text.lower()
     assert "## 6. assumptions" in lower
@@ -434,13 +439,13 @@ def test_rccc_baseline_is_cited_with_its_caveat() -> None:
     assert "advanced RCCC demosaicing is deferred" in text
 
 
-def test_report_does_not_claim_a_tag_or_a_completed_signoff() -> None:
-    """The candidate must not manufacture the human decision or a release."""
+def test_report_records_release_and_deferred_machine_vision() -> None:
+    """The signed report records v0.1.0 and keeps Phase 6+ deferred."""
     lower = _report().lower()
-    assert "v0.1.0 has been tagged" not in lower
-    assert "has been signed off" not in lower
-    assert "sign-off is complete" not in lower
-    assert "does not create the `v0.1.0` tag" in lower
-    assert "awaiting human sign-off" in lower
-    # No git tag assertion: creating a tag before approval is the failure this
-    # gate prevents, so the test never requires one to exist.
+    assert "awaiting human sign-off" not in lower
+    assert "release record" in lower
+    assert "v0.1.0" in lower
+    assert "signed off" in lower
+    assert "phase 6+ remains deferred" in lower
+    assert "no machine-vision code is authorized" in lower
+    # The report is the human-decision record; the tests never create the tag.

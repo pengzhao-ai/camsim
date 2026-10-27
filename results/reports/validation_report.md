@@ -1,8 +1,8 @@
 # camsim G5 validation report
 
-**Status: awaiting human sign-off.**
+**Status: signed off by the project owner on 2026-10-27; v0.1.0 approved for release.**
 
-This is the consolidated G5 candidate report for the camsim core pipeline. G1-G4 are green, every cross-cutting check below passed on the validated source tree, and the local engineering gates are green. CI workflows for lint, types, tests, coverage, docs, build, examples, and notebooks were added in this candidate, but their execution is pending a push; the owner must accept that residual at sign-off. The G5 gate itself is **not** closed: the project owner must review this report and the figure gallery, confirm the scope, assumptions, and limitations, and explicitly approve `v0.1.0`. Until that decision is recorded, the status stays **awaiting human sign-off**, no tag exists, and no machine-vision code may be written.
+This is the consolidated G5 report for the camsim core pipeline. G1-G4 are green, every cross-cutting check below passed on the validated source tree, and the local engineering gates are green. CI workflows for lint, types, tests, coverage, docs, build, examples, and notebooks were added in this candidate; their execution is pending a push, and that residual was accepted by the owner at sign-off. The project owner reviewed this report and the figure gallery, confirmed the scope, assumptions, limitations, and the documented waivers, and approved `v0.1.0` for the initial GitHub and PyPI release. Machine-vision work (Phase 6+) remains deferred and no machine-vision code is present.
 
 ## 1. Scope and architecture
 
@@ -23,7 +23,7 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | Item | Value |
 |---|---|
 | Python | `3.11.8` |
-| camsim | `0.1.0.dev0` |
+| camsim | `0.1.0` |
 | NumPy | `2.4.6` |
 | SciPy | `1.17.1` |
 | colour-science | `0.4.7` |
@@ -31,8 +31,8 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | Matplotlib | `3.11.2` |
 | Platform | `Darwin (arm64)` |
 | Validated code commit | `d5e6abb7a88b9a86423e79849ff45c69d96053dc` |
-| Tag target | the commit containing this report (`HEAD` at sign-off) |
-| Branch | `feat/camsim-core` |
+| Tag target | `v0.1.0` at the commit containing this report |
+| Branch | `main` |
 | Report date | `2026-10-27` |
 | Sensor preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
 | ISP preset | `src/camsim/config/presets/isp/default.json` |
@@ -50,7 +50,7 @@ The code commit validated by this report is `d5e6abb`; the report itself, its te
 | G2 | 2 | sensor model and EMVA characterization | [g2_sensor.md](g2_sensor.md) + [g2_sensor_results.json](g2_sensor_results.json) | 16/16 checks | **PASS** |
 | G3 | 3 | ISP stages and pipeline | [g3_isp.md](g3_isp.md) + [g3_isp_results.json](g3_isp_results.json) | 21/21 checks | **PASS** |
 | G4 | 4 | metrics harness | [g4_metrics.md](g4_metrics.md) + [g4_metrics_results.json](g4_metrics_results.json) | 31/31 checks | **PASS** |
-| G5 | 5 | consolidated cross-cutting evidence | this report | 16/16 checks | **Awaiting human sign-off** |
+| G5 | 5 | consolidated cross-cutting evidence | this report | 16/16 checks | **Signed off — v0.1.0** |
 
 A phase gate is evidence only when its report says PASS and every recorded check in its machine-readable results passed. The loader that builds this table refuses quick-mode artifacts and any JSON not marked `gate_evidence: true`. G0 is a local gate run. The CI workflow now defines quality, test, docs, build, examples, and notebooks jobs, but GitHub Actions cannot be executed from this environment: the workflows are added, the local equivalents passed, and CI execution is pending a push. The owner must accept that residual at sign-off. No claim that CI is green is made here.
 
@@ -206,7 +206,7 @@ These criteria span phases or the engineering process, so no single phase report
 | `uv run python benchmarks/benchmark_pipeline.py --quick` | pipeline total 8.34 ms (128 x 128) | 1.31 s | **PASS** |
 | `uv run python benchmarks/benchmark_pipeline.py` | pipeline total 114.58 ms (512 x 512) | 1.87 s | **PASS** |
 | `uv run python benchmarks/benchmark_pipeline.py --large` | pipeline total 453.90 ms (1024 x 1024, 1x oversampling) | 3.12 s | **PASS** |
-| `uv build` | built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl | 0.77 s | **PASS** |
+| `uv build` | built camsim-0.1.0.tar.gz and camsim-0.1.0-py3-none-any.whl | 0.77 s | **PASS** |
 
 Absolute timings are machine-specific and are evidence, not guarantees. Coverage is reported with two scopes, not one headline number: **subject-module coverage is 91.73 %** with `*/camsim/viz/*` omitted, and **whole-package coverage including viz is 83.55 %**. The 90 % statement-and-branch gate applies to the subject modules (simulation, metrics, configuration, characterization, IO, camera, and CLI), which contain the numerical contracts the gates depend on. The presentation layer is exercised by the executed examples and notebooks that generate the committed gallery; its inclusion lowers the whole-package number. That gap is an explicit **reviewed exception** recorded in the sign-off checklist, not a silent claim that 91.73 % is total coverage.
 
@@ -389,7 +389,7 @@ uv build
 
 | Figure | Shows |
 |---|---|
-| [g5_gate_summary.png](../figures/g5_gate_summary.png) | Gate/check status matrix; G1-G4 PASS, G5 recorded checks pass, human sign-off awaiting |
+| [g5_gate_summary.png](../figures/g5_gate_summary.png) | Gate/check status matrix; G1-G4 PASS, G5 recorded checks pass, human sign-off signed off for v0.1.0 |
 | [g5_evidence.png](../figures/g5_evidence.png) | Denoise SNR, signed MTF50 change and ringing, sharpen profile/overshoot, auto-exposure convergence, and benchmark stage shares |
 | [g1_lux_normalization.png](../figures/g1_lux_normalization.png) | Photometric normalization across illuminants and 1-100,000 lux |
 | [g1_psf_mtf.png](../figures/g1_psf_mtf.png) | Gaussian, Airy, and box PSFs with their transfer functions |
@@ -405,27 +405,27 @@ The two G5 figures are also mirrored into `docs/images/` (`g5_gate_summary.png, 
 
 ## 10. Human sign-off checklist
 
-G5 is a human decision, not an automated verdict. The owner must review the evidence below and record an explicit decision. Checking these boxes is the sign-off; until then the status line remains **awaiting human sign-off**.
+G5 is a human decision, not an automated verdict. The owner reviewed the evidence below and recorded an explicit decision on 2026-10-27. The checked boxes are the sign-off.
 
-- [ ] **Report reviewed.** Read this report end to end, including the G1-G4 verdict tables and the cross-cutting measurements.
-- [ ] **Figures reviewed.** Inspect the figure gallery, especially `g5_gate_summary.png`, `g5_evidence.png`, the G3 ColorChecker delta-E figure, the RCCC baseline, and the G4 analytic MTF curves.
-- [ ] **Scope confirmed.** Agree that the validated scope is the scene/optics helpers, sensor, ISP, metrics, camera orchestration, IO, and CLI, and that machine vision is out of scope for v0.1.0.
-- [ ] **Assumptions confirmed.** Accept the simulated flagship preset, provisional synthetic spectral data, in-sample CCM, and the uncertified ISO 12233/EMVA-style measurement status.
-- [ ] **Limitations confirmed.** Accept the synthetic CFA re-authoring, in-sample calibration, 8x Airy diagnostic, synthetic stage measurements, quick-mode exclusion, extreme-low-light digital-gain noise, the identity default CCM, the absence of HDR/3-D/motion-blur/autofocus, no polychromatic PSF or banding, P3 sidecar-only tagging, and the reduced RawFrame/RenderedImage contract.
-- [ ] **Full-50-MP limitation accepted.** Confirm that v0.1.0 supports single-process spectral simulation up to the configured memory budget (validated at 1024 x 1024, 1x oversampling) and rejects larger grids with a clear error rather than attempting a 50 MP spectral cube.
-- [ ] **Coverage exception accepted.** Accept that subject-module coverage is 91.73 % and whole-package coverage including `camsim.viz` is lower, with viz exercised by the executed examples and notebooks. The 90 % gate applies to the numerical subject modules, not to the plotting layer.
-- [ ] **CI and notebook evidence accepted.** Confirm that the CI workflows and runners were added, every example and notebook passed locally under the 300 s / 120 s per-item timeouts, and CI execution is pending a push. Accept that residual.
-- [ ] **Two-minute-per-notebook condition confirmed.** Accept the per-notebook local times in section 5.9, all below 120 s, and the runner/CI timeout that enforces the budget.
-- [ ] **Release approved.** Approve tagging `v0.1.0` on the signed-off commit and starting Phase 6 machine-vision work afterwards.
+- [x] **Report reviewed.** Read this report end to end, including the G1-G4 verdict tables and the cross-cutting measurements.
+- [x] **Figures reviewed.** Inspected the figure gallery, especially `g5_gate_summary.png`, `g5_evidence.png`, the G3 ColorChecker delta-E figure, the RCCC baseline, and the G4 analytic MTF curves.
+- [x] **Scope confirmed.** Agreed that the validated scope is the scene/optics helpers, sensor, ISP, metrics, camera orchestration, IO, and CLI, and that machine vision is out of scope for v0.1.0.
+- [x] **Assumptions confirmed.** Accepted the simulated flagship preset, provisional synthetic spectral data, in-sample CCM, and the uncertified ISO 12233/EMVA-style measurement status.
+- [x] **Limitations confirmed.** Accepted the synthetic CFA re-authoring, in-sample calibration, 8x Airy diagnostic, synthetic stage measurements, quick-mode exclusion, extreme-low-light digital-gain noise, the identity default CCM, the absence of HDR/3-D/motion-blur/autofocus, no polychromatic PSF or banding, P3 sidecar-only tagging, and the reduced RawFrame/RenderedImage contract.
+- [x] **Full-50-MP limitation accepted.** Confirmed that v0.1.0 supports single-process spectral simulation up to the configured memory budget (validated at 1024 x 1024, 1x oversampling) and rejects larger grids with a clear error rather than attempting a 50 MP spectral cube.
+- [x] **Coverage exception accepted.** Accepted that subject-module coverage is 91.73 % and whole-package coverage including `camsim.viz` is lower, with viz exercised by the executed examples and notebooks. The 90 % gate applies to the numerical subject modules, not to the plotting layer.
+- [x] **CI and notebook evidence accepted.** Confirmed that the CI workflows and runners were added, every example and notebook passed locally under the 300 s / 120 s per-item timeouts, and CI execution is pending a push. The owner accepted that residual.
+- [x] **Two-minute-per-notebook condition confirmed.** Accepted the per-notebook local times in section 5.9, all below 120 s, and the runner/CI timeout that enforces the budget.
+- [x] **Release approved.** Approved tagging `v0.1.0` on the signed-off commit and the initial GitHub/PyPI release. Phase 6+ remains deferred; no machine-vision code is authorized by this sign-off.
 
 ```text
-Owner: ______________________________
-Date:  ______________________________
-Decision:  [ ] approve v0.1.0     [ ] withhold (return to the failing gate)
-Notes:   ______________________________
+Owner: pengzhao-ai
+Date:  2026-10-27
+Decision:  [x] approve v0.1.0     [ ] withhold (return to the failing gate)
+Notes:  Accept documented waivers (CI pending push, whole-package coverage 83.55 %, 50 MP spectral limit, identity default CCM, synthetic/in-sample validation). Release v0.1.0 to GitHub and PyPI. Hold ML/Phase 6+.
 ```
 
-**This report does not create the `v0.1.0` tag, push a branch, or publish to PyPI.** Those actions require the recorded approval above and are performed in a separate release step. No machine-vision code may be written before that approval.
+**Release record.** The owner approved `v0.1.0` on 2026-10-27. The tag is `v0.1.0` at the commit containing this report; the code commit validated by the evidence is `d5e6abb`. The tag is pushed to `github.com/pengzhao-ai/camsim`; the initial PyPI publication of `camsim==0.1.0` follows the same commit. Machine-vision code remains absent and Phase 6+ remains deferred until a separate plan is reviewed and approved.
 
 ## Appendix A. Cross-cutting detail values
 

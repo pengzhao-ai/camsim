@@ -1,20 +1,20 @@
 # Release checklist
 
-This page is the release contract for camsim. A tag is cut only after the G5
-human sign-off in [Validation](validation.md); the repository version is
-`0.1.0.dev0` and **no tag exists yet**. PyPI publication is deliberately
-deferred to v1.0.0, after the Phase 6–9 machine-vision work is complete.
+This page is the release contract for camsim. v0.1.0 was approved at the G5
+human sign-off on 2026-10-27 and is the first GitHub and PyPI release. The
+checklist below remains the contract for future releases. PyPI publication of
+later feature releases follows the same process; v1.0.0 is the feature-complete
+release after the deferred Phase 6–9 machine-vision work.
 
 ## Versioning policy
 
 - `src/camsim/_version.py` is the single source of truth; `pyproject.toml`
   reads it through hatchling. Do not duplicate the version elsewhere.
-- `0.1.0.dev0` is the development version for the pipeline/metrics release.
-  Cutting `v0.1.0` requires the G5 sign-off; until then the version stays a
-  `.dev0` pre-release.
+- `0.1.0` is the first pipeline/metrics release, approved at G5 on
+  2026-10-27. Future work uses `X.Y.Z` from this baseline.
 - Future scope changes follow semantic versioning: patch releases fix defects,
-  minor releases add backward-compatible capability, and v1.0.0 is the first
-  PyPI release.
+  minor releases add backward-compatible capability, and v1.0.0 is the
+  feature-complete release after Phase 6–9.
 - A release tag is `vX.Y.Z` and matches the package version without the `v`.
 
 ## Checklist
@@ -39,9 +39,10 @@ repository or the release page; a checked box without evidence is not a pass.
 
 ### 2. Version and metadata
 
-- [ ] Bump `0.1.0.dev0` to the release version in `src/camsim/_version.py`.
+- [x] Release version `0.1.0` recorded in `src/camsim/_version.py`.
 - [ ] Update the version-dependent badges and repository links: replace the
-      `OWNER` placeholder in `README.md` with the GitHub account or
+      `pengzhao-ai` repository owner in `README.md` badges/links (already
+      applied for v0.1.0) with the GitHub account or
       organisation, and enable the CI, Docs, and Release badges.
 - [ ] Confirm `requires-python = ">=3.11,<3.14"` and the classifier list still
       describe the supported interpreters.

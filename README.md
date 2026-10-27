@@ -1,9 +1,8 @@
 # camsim
 
-<!-- Replace OWNER with the GitHub account/org before the public release. -->
-[![CI](https://github.com/OWNER/camsim/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/camsim/actions/workflows/ci.yml)
-[![Docs](https://github.com/OWNER/camsim/actions/workflows/docs.yml/badge.svg)](https://github.com/OWNER/camsim/actions/workflows/docs.yml)
-[![Release](https://github.com/OWNER/camsim/actions/workflows/release.yml/badge.svg)](https://github.com/OWNER/camsim/actions/workflows/release.yml)
+[![CI](https://github.com/pengzhao-ai/camsim/actions/workflows/ci.yml/badge.svg)](https://github.com/pengzhao-ai/camsim/actions/workflows/ci.yml)
+[![Docs](https://github.com/pengzhao-ai/camsim/actions/workflows/docs.yml/badge.svg)](https://github.com/pengzhao-ai/camsim/actions/workflows/docs.yml)
+[![Release](https://github.com/pengzhao-ai/camsim/actions/workflows/release.yml/badge.svg)](https://github.com/pengzhao-ai/camsim/actions/workflows/release.yml)
 [![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
@@ -22,13 +21,13 @@ notebook-only demo.
        width="900">
 </p>
 
-> **Status: validated sensor/ISP/metrics core; G5 sign-off pending.** G1–G4
-> are PASS with committed validation reports, all G5 cross-cutting checks pass,
-> and the consolidated candidate is
+> **Status: v0.1.0 released; G5 signed off.** G1–G4 are PASS, all G5
+> cross-cutting checks pass, and the signed validation report is
 > [`results/reports/validation_report.md`](results/reports/validation_report.md).
-> The library is version `0.1.0.dev0` and is not yet tagged or published.
-> Machine-vision code (`camsim.tasks`) is deliberately gated behind G5 and is
-> not implemented.
+> The core sensor/ISP/metrics library is version `0.1.0`; the tag is `v0.1.0`.
+> The initial PyPI publication is the release step in progress. Machine-vision
+> code (`camsim.tasks`) is deliberately gated behind G5 and is not implemented;
+> Phase 6+ is deferred.
 
 ## The pipeline
 
@@ -124,7 +123,7 @@ Python 3.11–3.13 is required.
 With [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
-git clone https://github.com/OWNER/camsim.git
+git clone https://github.com/pengzhao-ai/camsim.git
 cd camsim
 uv sync --all-extras
 ```
@@ -231,7 +230,7 @@ phase reports; this README deliberately does not restate them.
 | G2 | sensor model and EMVA characterization | **PASS** | [`results/reports/g2_sensor.md`](results/reports/g2_sensor.md) |
 | G3 | ISP stages and pipeline | **PASS** | [`results/reports/g3_isp.md`](results/reports/g3_isp.md) |
 | G4 | metrics harness | **PASS** | [`results/reports/g4_metrics.md`](results/reports/g4_metrics.md) |
-| G5 | consolidated human sign-off | **Awaiting human sign-off** | [`results/reports/validation_report.md`](results/reports/validation_report.md) |
+| G5 | consolidated human sign-off | **Signed off — v0.1.0** | [`results/reports/validation_report.md`](results/reports/validation_report.md) |
 
 The validation is simulated: it is not a certified ISO 12233 or EMVA 1288
 measurement, and the flagship preset is a representative engineering design
@@ -306,14 +305,17 @@ reviewed exception, not a hidden metric. See
 
 ## Release status
 
-- Version: `0.1.0.dev0` (`src/camsim/_version.py` is the single source).
-- No tag exists yet. `v0.1.0` is cut only after the G5 human sign-off.
-- PyPI publication is deferred to v1.0.0; distribution builds are produced by
-  `uv build` and checked with `twine check`.
-- Tagged releases upload a wheel, sdist, and `SHA256SUMS` to a GitHub release
-  through `.github/workflows/release.yml`.
-- Before public release, replace the `OWNER` placeholder in the badges and
-  repository links; the [release checklist](docs/release.md) tracks this item.
+- Version: `0.1.0` (`src/camsim/_version.py` is the single source).
+- G5 was signed off by the project owner on 2026-10-27; the tag is `v0.1.0`.
+- The initial `0.1.0` PyPI publication is in progress; verify it at
+  [pypi.org/project/camsim](https://pypi.org/project/camsim/). The release also
+  uploads a wheel, sdist, and `SHA256SUMS` to the GitHub release through
+  `.github/workflows/release.yml`.
+- Machine-vision/Phase 6+ work is deferred; no machine-vision code is in
+  `0.1.0`.
+- The `pengzhao-ai/camsim` repository and badges are the public release
+  location; the [release checklist](docs/release.md) records the remaining
+  operational steps.
 
 ## Repository conventions
 

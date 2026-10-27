@@ -39,7 +39,7 @@ comparisons use tolerances because floating-point reduction order may differ.
 | G2 | 2 | sensor model and EMVA characterization | `results/reports/g2_sensor.md` + `g2_sensor_results.json` | 16/16 checks | **PASS** |
 | G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 21/21 checks | **PASS** |
 | G4 | 4 | metrics harness | `results/reports/g4_metrics.md` + `g4_metrics_results.json` | 31/31 checks | **PASS** |
-| G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 16/16 cross-cutting checks; sign-off pending | **Awaiting human sign-off** |
+| G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 16/16 cross-cutting checks; signed off 2026-10-27 | **Signed off — v0.1.0** |
 
 ## Coverage policy
 
@@ -91,7 +91,7 @@ tolerances.
 | G2 | ![Sensor SNR](images/g2_snr_vs_irradiance.png) *SNR versus irradiance across the shot- and read-noise regimes.* |
 | G3 | ![ISP checks](images/g3_check_summary.png) *G3 check summary with tolerances.* |
 | G4 | ![Metrics checks](images/g4_check_summary.png) *G4 check summary with analytic references.* |
-| G5 | ![Gate summary](images/g5_gate_summary.png) *Gate/check status matrix; G5 remains awaiting human sign-off.* |
+| G5 | ![Gate summary](images/g5_gate_summary.png) *Gate/check status matrix; G5 signed off for v0.1.0.* |
 | G5 | ![Cross-cutting evidence](images/g5_evidence.png) *Denoise, sharpen, auto-exposure, and benchmark evidence.* |
 
 ## G0 — Foundation
@@ -111,7 +111,7 @@ uv run python -c "import camsim; print(camsim.__version__)"
 
 Expected: the suite passes, lint and formatting are clean, mypy reports no
 issues under `strict`, the documentation builds with warnings treated as
-errors, and the version prints `0.1.0.dev0`. The executable form of this gate
+errors, and the version prints `0.1.0`. The executable form of this gate
 is `tests/test_ci_config.py` plus the CI workflows, and `make gate` runs the
 same commands locally.
 
@@ -527,7 +527,7 @@ documented luma placeholder, and the Bayer colour and MTF gates do not apply.
 | `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.34 ms total (128 × 128) |
 | `uv run python benchmarks/benchmark_pipeline.py` | 114.58 ms total (512 × 512) |
 | `uv run python benchmarks/benchmark_pipeline.py --large` | 453.90 ms total (1024 × 1024, 1× oversampling) |
-| `uv build` | wheel and sdist for `0.1.0.dev0` |
+| `uv build` | wheel and sdist for `0.1.0` |
 
 CI runs the same commands on Ubuntu and macOS across Python 3.11, 3.12, and
 3.13, and adds `examples` and `notebooks` jobs. **Those workflows were added in

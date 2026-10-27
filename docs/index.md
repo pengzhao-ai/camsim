@@ -15,11 +15,11 @@ balance, demosaicing, colour correction, denoise, sharpen, and tone. The figure
 mirrors `results/figures/02_isp_stage_contact_sheet.png` in the repository.*
 
 !!! note "Project status"
-    Validated sensor/ISP/metrics core; **G5 sign-off pending.** G1–G4 are
-    PASS with committed validation reports, all G5 cross-cutting checks pass,
-    and the consolidated candidate is `results/reports/validation_report.md`
-    in the repository. The version is `0.1.0.dev0`; no release tag exists yet.
-    Machine-vision code is gated behind G5 and is not implemented.
+    **v0.1.0 released; G5 signed off.** G1–G4 are PASS with committed
+    validation reports, all G5 cross-cutting checks pass, and the signed
+    report is `results/reports/validation_report.md` in the repository. The
+    version is `0.1.0` and the tag is `v0.1.0`. Machine-vision code is gated
+    behind G5 and is not implemented; Phase 6+ is deferred.
 
 ## Three clean layers
 
