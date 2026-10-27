@@ -34,7 +34,7 @@ The new commands map input and validation failures to exit status ``2`` with a
 message on stderr; a gallery example that exits non-zero maps to ``1`` so a
 batch caller can tell a bad argument from a failed run. Handlers import the
 simulation layers lazily, so ``camsim info`` stays cheap and does not import
-NumPy or Pillow.
+Pillow or the simulation packages.
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ import os
 import platform
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, cast
@@ -188,28 +189,99 @@ def _reference_lens() -> LensConfig:
     )
 
 
-def _chart_layout(scene: SceneResult, pixel_pitch_um: float, focal_length_mm: float) -> ChartLayout:
-    """Convert a rendered scene's sensor-grid regions into a metrics layout."""
+def _chart_layout(
+    scene: SceneResult,
+    *,
+    binning_factor: int,
+    output_shape: tuple[int, int],
+    pixel_pitch_um: float,
+    focal_length_mm: float,
+) -> ChartLayout:
+    """Map a rendered scene's native-grid regions onto the output sensor grid.
+
+    The scene renderer always paints on the preset's native pixel grid, but
+    :meth:`camsim.sensor.Sensor.expose` may bin internally (for example 2x2).
+    The ROI coordinates therefore describe the scene grid, not the binned frame.
+    Each half-open region is divided by the integer binning factor, rounding
+    its start and end down so a region that covers output pixel ``k`` still
+    does after scaling. A region is kept at a minimum extent of one output
+    pixel.
+
+    Raises
+    ------
+    ValueError
+        If a scaled region falls outside the output grid, or the scaled chart
+        regions overlap because the chart no longer survives the binning. The
+        caller maps this to exit status 2 with a message naming the factor.
+    """
     from camsim.metrics.chart import ChartLayout, PatchROI
 
-    def convert(roi: Any) -> Any:
-        return PatchROI(name=roi.name, x=roi.x, y=roi.y, width=roi.width, height=roi.height)
+    if (
+        isinstance(binning_factor, bool)
+        or not isinstance(binning_factor, int)
+        or binning_factor < 1
+    ):
+        raise ValueError(f"binning factor must be a positive integer; got {binning_factor!r}")
+    height, width = output_shape
+    if height <= 0 or width <= 0:
+        raise ValueError(f"output shape must be positive; got {output_shape!r}")
 
-    return ChartLayout(
-        name=scene.layout.name,
-        patches=tuple(convert(patch) for patch in scene.layout.patches),
-        edge_roi=None if scene.layout.edge_roi is None else convert(scene.layout.edge_roi),
-        reference=scene.reference,
-        pixel_pitch_um=pixel_pitch_um,
-        focal_length_mm=focal_length_mm,
-    )
+    def convert(roi: Any) -> Any:
+        x0 = roi.x // binning_factor
+        y0 = roi.y // binning_factor
+        x1 = (roi.x + roi.width) // binning_factor
+        y1 = (roi.y + roi.height) // binning_factor
+        scaled_width = max(1, x1 - x0)
+        scaled_height = max(1, y1 - y0)
+        if x0 < 0 or y0 < 0 or x0 + scaled_width > width or y0 + scaled_height > height:
+            raise ValueError(
+                f"chart region {roi.name!r} maps outside the {width}x{height} output "
+                f"grid at binning factor {binning_factor}; render a larger --shape or "
+                "use an unbinned sensor preset"
+            )
+        return PatchROI(
+            name=roi.name,
+            x=x0,
+            y=y0,
+            width=scaled_width,
+            height=scaled_height,
+        )
+
+    patches = tuple(convert(patch) for patch in scene.layout.patches)
+    edge_roi = None if scene.layout.edge_roi is None else convert(scene.layout.edge_roi)
+    try:
+        return ChartLayout(
+            name=scene.layout.name,
+            patches=patches,
+            edge_roi=edge_roi,
+            reference=scene.reference,
+            pixel_pitch_um=pixel_pitch_um,
+            focal_length_mm=focal_length_mm,
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"the {scene.layout.name!r} layout does not survive binning factor "
+            f"{binning_factor} on a {width}x{height} grid: {exc}; render a larger "
+            "--shape or use an unbinned sensor preset"
+        ) from exc
 
 
 def _write_json_file(path: Path, payload: Mapping[str, Any]) -> None:
-    """Write deterministic JSON to a human-readable artifact path."""
+    """Write deterministic JSON through an atomic temp-file replacement."""
     text = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False)
+    data = (text + "\n").encode("utf-8")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text + "\n", encoding="utf-8")
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+        os.replace(temporary_path, path)
+    except BaseException:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
@@ -222,7 +294,20 @@ def _cmd_render(args: argparse.Namespace) -> int:
 
 
 def _render_capture(args: argparse.Namespace) -> int:
-    """Implement ``camsim render`` after the input-validation boundary."""
+    """Implement ``camsim render`` after the input-validation boundary.
+
+    Notes
+    -----
+    The default 200 lux capture with the shipped ISP preset (identity colour-
+    correction matrix, gray-world auto white balance) is a capture, IO, and
+    provenance demonstration, not a calibrated colour rendering. A colour
+    validation needs a fitted CCM and a reference matched to the illuminant.
+
+    A binned sensor preset is supported: the scene is rendered on the native
+    grid, the sensor bins to the output grid, and the chart layout is scaled by
+    the same integer factor so ``camsim measure`` sees regions inside the saved
+    RAW frame.
+    """
     from camsim.camera import Camera
     from camsim.config.io import load_isp, load_sensor
     from camsim.io.images import save_image
@@ -290,7 +375,23 @@ def _render_capture(args: argparse.Namespace) -> int:
     # The rendered image gets a distinct stem so its sidecar cannot overwrite
     # the RAW sidecar that shares the frame's name.
     image_path = save_image(image, out_dir / f"{raw_path.stem}_render.png")
-    layout = _chart_layout(scene, raw.pixel_pitch_um, float(lens.focal_length_mm))
+    # The scene layout lives on the native grid; binning divides the total
+    # pixel count per axis, so the pitch ratio is the exact integer factor.
+    sensor_pitch_um = float(sensor.config.pixel.pitch_um)
+    pitch_ratio = raw.pixel_pitch_um / sensor_pitch_um
+    binning_factor = round(pitch_ratio)
+    if binning_factor < 1 or not math.isclose(pitch_ratio, binning_factor, rel_tol=1e-6):
+        raise ValueError(
+            f"RAW pixel pitch {raw.pixel_pitch_um:g} um is not an integer multiple of "
+            f"the sensor grid pitch {sensor_pitch_um:g} um; cannot map the chart layout"
+        )
+    layout = _chart_layout(
+        scene,
+        binning_factor=binning_factor,
+        output_shape=(int(raw.data.shape[0]), int(raw.data.shape[1])),
+        pixel_pitch_um=raw.pixel_pitch_um,
+        focal_length_mm=float(lens.focal_length_mm),
+    )
     layout_path = out_dir / "layout.json"
     _write_json_file(layout_path, layout.to_dict())
 
@@ -581,7 +682,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target chart (default: colorchecker).",
     )
     render_parser.add_argument(
-        "--lux", type=float, default=200.0, help="Scene illuminance in lux (default: 200)."
+        "--lux",
+        type=float,
+        default=200.0,
+        help=(
+            "Scene illuminance in lux (default: 200). The default capture is a "
+            "capture/IO/provenance demonstration; the preset's identity CCM and "
+            "gray-world AWB are not colour-calibrated."
+        ),
     )
     render_parser.add_argument(
         "--out",

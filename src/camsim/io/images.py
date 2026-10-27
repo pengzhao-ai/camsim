@@ -134,6 +134,9 @@ def _json_safe(value: object, where: str = "metadata") -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, np.ndarray):
+        if value.ndim == 0:
+            # A zero-dimensional array is a scalar; enumerate() would raise.
+            return _json_safe(value.item(), where)
         return [_json_safe(item, f"{where}[{index}]") for index, item in enumerate(value.tolist())]
     if isinstance(value, Mapping):
         return {str(key): _json_safe(item, f"{where}.{key}") for key, item in value.items()}
@@ -351,8 +354,12 @@ def load_image(path: str | Path) -> RenderedImage:
         )
     if array.dtype == np.uint8:
         bit_depth = 8
-    elif array.dtype == np.uint16:
+    elif array.dtype.kind == "u" and array.dtype.itemsize == 2:
+        # Pillow reports big-endian 16-bit TIFFs as mode I;16B/I;16L, whose
+        # NumPy dtype is ">u2" or "<u2", not the native uint16 alias. Accept
+        # any two-byte unsigned type and normalise it before scaling.
         bit_depth = 16
+        array = np.ascontiguousarray(array.astype(np.uint16, copy=False))
     else:
         raise ValueError(
             f"{source}: unsupported pixel dtype {array.dtype}; expected uint8 or uint16"

@@ -301,7 +301,16 @@ def _load_masks(
         )
     loaded: dict[str, NDArray[np.bool_]] = {}
     try:
-        with np.load(archive_path, allow_pickle=False) as archive:
+        archive = np.load(archive_path, allow_pickle=False)
+    except (ValueError, EOFError) as exc:
+        raise ValueError(f"{archive_path}: cannot open the RAW mask archive: {exc}") from exc
+    if isinstance(archive, np.ndarray):
+        raise ValueError(
+            f"{archive_path}: the RAW mask archive must be a compressed .npz container; "
+            "the file is a plain .npy array"
+        )
+    try:
+        with archive:
             available = set(archive.files)
             for name in names:
                 if name not in available:

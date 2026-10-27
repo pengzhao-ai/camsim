@@ -103,6 +103,19 @@ def _artifacts(out: Path) -> tuple[Path, Path, Path, Path]:
     return raw_path, raw_sidecar, image_path, image_sidecar
 
 
+def _write_binned_preset(tmp_path: Path, factor: int) -> Path:
+    """Write the flagship preset with an analog binning factor for tests."""
+    source = (
+        REPO_ROOT / "src" / "camsim" / "config" / "presets" / "sensors" / "flagship_phone_50mp.json"
+    )
+    payload = _read_json(source)
+    payload["name"] = f"flagship_phone_50mp_binned_{factor}x{factor}"
+    payload["binning"] = {"factor": factor, "mode": "analog"}
+    path = tmp_path / f"binned_{factor}.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
 # ---------------------------------------------------------------------------
 # render
 # ---------------------------------------------------------------------------
@@ -127,6 +140,7 @@ def test_cli_render_layout_connects_scene_to_metrics(tmp_path: Path) -> None:
     assert restored.name == "colorchecker"
     assert len(restored.patches) == 24
     assert restored.reference is not None
+    assert not list(out.glob(".*.tmp"))  # layout.json is written atomically
 
 
 def test_cli_render_raw_and_image_share_one_exposure(tmp_path: Path) -> None:
@@ -179,6 +193,110 @@ def test_cli_render_writes_a_slanted_edge_layout(tmp_path: Path) -> None:
     assert layout["name"] == "slanted_edge"
     assert layout["edge_roi"]["name"] == "edge"
     assert layout["patches"] == []
+
+
+def test_cli_render_scales_the_layout_for_a_binned_sensor(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A 2x2 binned preset shrinks the output grid; the layout must follow it."""
+    preset = _write_binned_preset(tmp_path, 2)
+    out = tmp_path / "binned"
+    code = main(
+        [
+            "render",
+            "--scene",
+            "colorchecker",
+            "--lux",
+            "2000",
+            "--out",
+            str(out),
+            "--shape",
+            "64x64",
+            "--oversampling",
+            "2",
+            "--sensor-preset",
+            str(preset),
+        ]
+    )
+    assert code == EXIT_OK, capsys.readouterr().err
+
+    raw_path = next(out.glob("raw_*.npy"))
+    raw = _read_json(raw_path.with_suffix(".json"))
+    assert raw["data"]["shape"] == [32, 32]
+    assert raw["frame"]["pixel_pitch_um"] == pytest.approx(2.24)
+
+    layout = _read_json(out / "layout.json")
+    assert layout["pixel_pitch_um"] == pytest.approx(2.24)
+    assert layout["patches"]
+    for patch in layout["patches"]:
+        assert patch["x"] >= 0
+        assert patch["y"] >= 0
+        assert patch["x"] + patch["width"] <= 32
+        assert patch["y"] + patch["height"] <= 32
+        assert patch["width"] >= 1
+        assert patch["height"] >= 1
+
+    image_path = next(out.glob("*_render.png"))
+    report_path = tmp_path / "binned_metrics.json"
+    code = main(
+        [
+            "measure",
+            "--image",
+            str(image_path),
+            "--layout",
+            str(out / "layout.json"),
+            "--out",
+            str(report_path),
+        ]
+    )
+    assert code == EXIT_OK, capsys.readouterr().err
+    report = _read_json(report_path)
+    assert report["layout_id"] == "colorchecker"
+    assert report["snr"] is not None
+
+
+def test_cli_render_rejects_a_layout_collapsed_by_binning(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """When the chart cannot survive the binning factor, the CLI fails clearly."""
+    preset = _write_binned_preset(tmp_path, 16)
+    code = main(
+        [
+            "render",
+            "--scene",
+            "colorchecker",
+            "--lux",
+            "2000",
+            "--out",
+            str(tmp_path / "collapsed"),
+            "--shape",
+            "96x96",
+            "--oversampling",
+            "2",
+            "--sensor-preset",
+            str(preset),
+        ]
+    )
+    assert code == EXIT_UNREADABLE
+    error = capsys.readouterr().err.lower()
+    assert "binning" in error
+    assert "layout" in error
+
+
+def test_cli_chart_layout_reports_a_collapsed_binned_layout() -> None:
+    """A chart that does not survive binning fails with a binning message."""
+    from camsim.cli import _chart_layout
+    from camsim.scene.targets import render
+
+    scene = render("colorchecker", lux=200, shape=(96, 96), oversampling=2, pixel_pitch_um=1.12)
+    with pytest.raises(ValueError, match="binning"):
+        _chart_layout(
+            scene,
+            binning_factor=16,
+            output_shape=(6, 6),
+            pixel_pitch_um=17.92,
+            focal_length_mm=6.4,
+        )
 
 
 def test_cli_render_auto_exposure_uses_the_measured_settings(tmp_path: Path) -> None:

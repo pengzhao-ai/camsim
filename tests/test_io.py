@@ -29,6 +29,7 @@ import shutil
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -391,6 +392,16 @@ def test_load_raw_rejects_a_corrupt_mask_archive(tmp_path: Path, raw_frame) -> N
         load_raw(data_path)
 
 
+def test_load_raw_rejects_a_plain_npy_as_the_mask_archive(tmp_path: Path, raw_frame) -> None:
+    """An .npz name holding NPY bytes must fail cleanly, not raise TypeError."""
+    data_path = save_raw(raw_frame, tmp_path)
+    mask_path = data_path.with_name(f"{data_path.stem}_masks.npz")
+    with open(mask_path, "wb") as handle:
+        np.save(handle, np.zeros(raw_frame.data.shape, dtype=bool), allow_pickle=False)
+    with pytest.raises(ValueError, match=r"\.npz"):
+        load_raw(data_path)
+
+
 # ---------------------------------------------------------------------------
 # Rendered images
 # ---------------------------------------------------------------------------
@@ -718,3 +729,55 @@ def test_load_image_accepts_null_metadata(tmp_path: Path) -> None:
 
     _corrupt_image_sidecar(path, mutate)
     assert load_image(path).metadata == {}
+
+
+def test_save_image_serializes_zero_dimensional_metadata_arrays(tmp_path: Path) -> None:
+    """0-d arrays are scalars; iterating them raises TypeError, not ValueError."""
+    image = RenderedImage(
+        data=np.full((4, 4, 3), 0.5, dtype=np.float32),
+        color_space="sRGB",
+        channels="RGB",
+        metadata={"scalar": np.array(3.5), "flag": np.array(True)},
+    )
+    path = save_image(image, tmp_path / "scalar.png")
+    payload = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+    assert payload["metadata"] == {"scalar": 3.5, "flag": True}
+
+
+class _FakeBigEndianImage:
+    """Minimal Pillow-image stand-in exposing a big-endian 16-bit TIFF frame."""
+
+    format = "TIFF"
+    mode = "I;16B"
+
+    def __init__(self, array: np.ndarray) -> None:
+        self._array = array
+
+    def __enter__(self) -> _FakeBigEndianImage:
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+    def load(self) -> None:
+        return None
+
+    def __array__(self, dtype: np.dtype[Any] | None = None, copy: bool | None = None) -> np.ndarray:
+        return self._array if dtype is None else self._array.astype(dtype)
+
+
+def test_load_image_accepts_big_endian_16_bit_tiff(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """I;16B/I;16L arrays are two-byte unsigned, not the native uint16 dtype."""
+    import camsim.io.images as images_module
+
+    path = tmp_path / "big_endian.tif"
+    path.write_bytes(b"placeholder")
+    values = np.array([[0, 65535], [32768, 1000]], dtype=np.dtype(">u2"))
+    monkeypatch.setattr(images_module.Image, "open", lambda source: _FakeBigEndianImage(values))
+
+    loaded = load_image(path)
+    assert loaded.channels == "MONO"
+    assert loaded.data.dtype == np.float32
+    np.testing.assert_allclose(loaded.data[..., 0], values.astype(np.float32) / 65535.0, atol=1e-7)
