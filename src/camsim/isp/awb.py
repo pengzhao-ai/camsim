@@ -32,7 +32,7 @@ about scene content:
   so sensitivity to highlights increases.
 
 Real-world white-balance gains are typically 0.5-4. Tungsten light near 2800 K
-can require a red gain several times the blue gain, while shade near 8000 K
+can require a blue gain several times the red gain, while shade near 8000 K
 inverts that direction. Gain spread therefore spans roughly one stop for a
 near-neutral source to more than two stops for extreme illuminants. The
 confidence reported here is ``1 - (max_gain - min_gain) / (max_gain + min_gain)``
@@ -99,9 +99,8 @@ AWBMethod: TypeAlias = Literal[
 supplied through :class:`~camsim.config.schema.AWBConfig`.
 """
 
-# Canonical channel order shared by the gains tuple and every statistic.
-_CHANNELS: Final[tuple[str, str, str]] = ("R", "G", "B")
-
+# Estimators implemented by estimate_awb. Manual and no-op results use separate
+# method labels rather than one of these config-selected estimators.
 _ESTIMATION_METHODS: Final[tuple[str, ...]] = (
     "gray_world",
     "white_patch",
@@ -173,10 +172,11 @@ def estimate_awb(
         the spatial mosaic has already been interpolated away.
     config:
         Validated :class:`~camsim.config.schema.AWBConfig`. ``enabled=False``
-        returns the identity result. When ``gains`` is supplied it takes
-        precedence over ``method`` and is recorded as ``"manual"``; the values
-        are rescaled so green is one. Otherwise ``method`` selects gray-world,
-        white-patch, or shades-of-gray, using ``p`` for the last.
+        returns the identity result once the input has been validated; image and
+        CFA requirements still apply to every call. When ``gains`` is supplied it
+        takes precedence over ``method`` and is recorded as ``"manual"``; the
+        values are rescaled so green is one. Otherwise ``method`` selects
+        gray-world, white-patch, or shades-of-gray, using ``p`` for the last.
 
     Returns
     -------
@@ -335,7 +335,8 @@ def _as_float32_image(image: Any, field: str) -> NDArray[np.float32]:
         raise ValueError(
             f"{field} values must be finite; NaN or infinity is not a linear intensity"
         )
-    converted = np.ascontiguousarray(array, dtype=np.float32)
+    with np.errstate(over="ignore", invalid="ignore"):
+        converted = np.ascontiguousarray(array, dtype=np.float32)
     if not np.all(np.isfinite(converted)):
         raise ValueError(
             f"{field} values must fit in float32; conversion produced a non-finite value"

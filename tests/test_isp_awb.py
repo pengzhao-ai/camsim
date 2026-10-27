@@ -21,11 +21,15 @@ layouts, gain normalisation, scale invariance and linearity, the documented
 confidence range, mono/disabled no-ops, manual gains, and the validation of
 malformed images, CFA patterns, configs, and gains. Failure artefacts guarded
 here include mixing CFA colours, applying gains to a demosaiced image as though
-it were a mosaic, zero channel statistics (infinite gains), gamma-encoded input,
-and clipping large values after gain.
+it were a mosaic, zero channel statistics (infinite gains), and clipping large
+values after gain. Gamma-encoded input is a caller-side caution rather than
+something the stage can detect: no test can infer a transfer function from
+array values, so the API documents the linear-domain requirement instead.
 """
 
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 import pytest
@@ -122,6 +126,23 @@ def test_shades_of_gray_p1_matches_gray_world() -> None:
     shades = estimate_awb(img, cfa=None, config=AWBConfig(method="shades_of_gray", p=1.0))
     np.testing.assert_allclose(shades.gains, gray_world.gains, rtol=1e-9)
     assert shades.illuminant_estimate == pytest.approx(gray_world.illuminant_estimate)
+
+
+def test_shades_of_gray_p100_is_overflow_safe_near_float32_max() -> None:
+    # A naive x**100 on these samples overflows float64 to infinity; the
+    # maximum-scaled p-norm must stay finite and return the same statistic.
+    img = _rgb(3.0e38, 2.0e38, 1.0e38)
+    img[0, 0] = [1.0e38, 2.0e38, 3.0e37]
+    res = estimate_awb(img, cfa=None, config=AWBConfig(method="shades_of_gray", p=100.0))
+    assert np.all(np.isfinite(res.gains))
+    statistics = []
+    for channel in range(3):
+        data = img[..., channel].astype(np.float64)
+        peak = float(data.max())
+        mean_power = float(np.mean((data / peak) ** 100.0))
+        statistics.append(peak * mean_power ** (1.0 / 100.0))
+    expected = (statistics[1] / statistics[0], 1.0, statistics[1] / statistics[2])
+    np.testing.assert_allclose(res.gains, expected, rtol=1e-6)
 
 
 @pytest.mark.parametrize("method", ["gray_world", "white_patch", "shades_of_gray"])
@@ -222,6 +243,14 @@ def test_manual_gains_are_used_and_normalized_to_green() -> None:
     # The implied illuminant is the reciprocal of the gains, mean-normalised.
     reciprocal = 1.0 / np.asarray(res.gains)
     np.testing.assert_allclose(res.illuminant_estimate, reciprocal / reciprocal.mean(), rtol=1e-12)
+
+
+def test_estimate_rejects_normalized_manual_gains_outside_float32() -> None:
+    # Both raw values fit float32's normal range, but normalising to green
+    # divides by 1.2e-38 and pushes the red gain far above float32's maximum.
+    config = AWBConfig(gains=(3.0e38, 1.2e-38, 1.0))
+    with pytest.raises(ValueError, match="representable in float32"):
+        estimate_awb(_rgb(1.0, 1.0, 1.0), cfa=None, config=config)
 
 
 def test_illuminant_estimate_is_normalized_channel_statistics() -> None:
@@ -337,6 +366,17 @@ def test_estimate_rejects_non_finite_input() -> None:
         img = _rgb(1.0, 1.0, 1.0)
         img[0, 0, 0] = bad_value
         with pytest.raises(ValueError, match="finite"):
+            estimate_awb(img, cfa=None, config=AWBConfig())
+
+
+def test_estimate_rejects_float64_overflow_without_a_cast_warning() -> None:
+    # A finite float64 sample above float32's range must raise the documented
+    # ValueError, not leak a RuntimeWarning from the narrowing cast.
+    img = _rgb(1.0, 1.0, 1.0).astype(np.float64)
+    img[0, 0, 0] = 1e40
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(ValueError, match="fit in float32"):
             estimate_awb(img, cfa=None, config=AWBConfig())
 
 
