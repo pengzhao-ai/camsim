@@ -24,14 +24,21 @@ a figure path whose parent does not exist; and Matplotlib's environment-
 dependent metadata, which would make repeated runs differ byte for byte.
 
 The public surface covers the Phase 1 optics figures (spectrum, PSF profile,
-MTF) and the Phase 2 sensor figures (spectral response, photon transfer curve,
-SNR, dark current, dual-gain comparison, DSNU/PRNU histograms), plus a
-deterministic figure saver. Later phases extend the same namespace with ISP,
-colour, and metric plots without changing these entry points.
+MTF), the Phase 2 sensor figures (spectral response, photon transfer curve,
+SNR, dark current, dual-gain comparison, DSNU/PRNU histograms), and Phase 3's
+ISP stage gallery (pipeline trace, zoomed stage crops, and the bilinear/MHC
+demosaic comparison), plus a deterministic figure saver. Later phases extend
+the same namespace with metric and experiment plots without changing these
+entry points.
 """
 
 from __future__ import annotations
 
+from camsim.viz.pipeline import (
+    plot_demosaic_comparison,
+    plot_pipeline_trace,
+    plot_zoom_crops,
+)
 from camsim.viz.sensor import (
     plot_dark_current_vs_temperature,
     plot_fixed_pattern_histograms,
@@ -47,14 +54,17 @@ __all__ = [
     "PALETTE",
     "figure_dir",
     "plot_dark_current_vs_temperature",
+    "plot_demosaic_comparison",
     "plot_fixed_pattern_histograms",
     "plot_mode_comparison",
     "plot_mtf",
+    "plot_pipeline_trace",
     "plot_psf",
     "plot_ptc",
     "plot_sensor_spectral_response",
     "plot_snr_vs_irradiance",
     "plot_spectrum",
+    "plot_zoom_crops",
     "save_figure",
     "set_style",
 ]

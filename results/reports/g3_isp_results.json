@@ -1,0 +1,1154 @@
+{
+  "awb": {
+    "flat_reflectance": 0.5,
+    "illuminants": {
+      "3000K": {
+        "confidence": 0.4101131791332183,
+        "expected_gains": [
+          0.8047659405867169,
+          1.0,
+          3.118487281438804
+        ],
+        "exposure_s": 0.04608466819221968,
+        "measured_gains": [
+          0.8009232590071679,
+          1.0,
+          3.1049412669753114
+        ],
+        "method": "gray_world",
+        "relative_errors": [
+          0.004774905827584552,
+          0.0,
+          0.004343777364146484
+        ]
+      },
+      "D65": {
+        "confidence": 0.6810649752340454,
+        "expected_gains": [
+          0.9565332464753182,
+          1.0,
+          1.8528044526926342
+        ],
+        "exposure_s": 0.04683488372093023,
+        "measured_gains": [
+          0.9518995177272601,
+          1.0,
+          1.8434270732493008
+        ],
+        "method": "gray_world",
+        "relative_errors": [
+          0.004844294503230984,
+          0.0,
+          0.005061181405142556
+        ]
+      }
+    },
+    "injected_scaling": {
+      "illuminants": {
+        "3000K": {
+          "confidence": 0.20266085868017436,
+          "expected_gains": [
+            0.502978712866698,
+            1.0,
+            4.4549818306268625
+          ],
+          "measured_gains": [
+            0.5005793702987228,
+            1.0,
+            4.439490197734669
+          ],
+          "method": "gray_world",
+          "relative_errors": [
+            0.004770266626792918,
+            0.0,
+            0.003477372856089511
+          ]
+        },
+        "D65": {
+          "confidence": 0.36854362167572163,
+          "expected_gains": [
+            0.5978332790470738,
+            1.0,
+            2.6468635038466206
+          ],
+          "measured_gains": [
+            0.5949324177176555,
+            1.0,
+            2.6336266061100937
+          ],
+          "method": "gray_world",
+          "relative_errors": [
+            0.0048522914850812615,
+            0.0,
+            0.005000974820684956
+          ]
+        }
+      },
+      "injection": [
+        1.6,
+        1.0,
+        0.7
+      ],
+      "max_relative_error": 0.005000974820684956
+    }
+  },
+  "checks": [
+    {
+      "measured": 5.580148988110565,
+      "measured_text": "5.58015",
+      "name": "ColorChecker mean deltaE2000 (D65)",
+      "notes": "In-sample 3x3 ridge CCM on the same 24 patches; rendered sRGB display decoded with the sRGB EOTF to XYZ D65 and CIE Lab; mean CIEDE2000 against the spectrally computed reference.",
+      "pass": false,
+      "tolerance": {
+        "maximum": 2.0
+      },
+      "tolerance_text": "< 2"
+    },
+    {
+      "measured": 6.626273126825211,
+      "measured_text": "6.62627",
+      "name": "ColorChecker mean deltaE2000 (3000 K)",
+      "notes": "In-sample 3x3 ridge CCM on the same 24 patches; rendered sRGB display decoded with the sRGB EOTF to XYZ D65 and CIE Lab; mean CIEDE2000 against the spectrally computed reference.",
+      "pass": false,
+      "tolerance": {
+        "maximum": 4.0
+      },
+      "tolerance_text": "< 4"
+    },
+    {
+      "measured": 0.004844294503230984,
+      "measured_text": "0.00484429",
+      "name": "AWB gain relative error, R (D65)",
+      "notes": "Expected gain from the analytic spectral response to a perfect diffuser; gray-world estimate on a 50 % neutral flat field; green is normalised to 1.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.05
+      },
+      "tolerance_text": "< 0.05"
+    },
+    {
+      "measured": 0.005061181405142556,
+      "measured_text": "0.00506118",
+      "name": "AWB gain relative error, B (D65)",
+      "notes": "Expected gain from the analytic spectral response to a perfect diffuser; gray-world estimate on a 50 % neutral flat field; green is normalised to 1.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.05
+      },
+      "tolerance_text": "< 0.05"
+    },
+    {
+      "measured": 0.004774905827584552,
+      "measured_text": "0.00477491",
+      "name": "AWB gain relative error, R (3000 K)",
+      "notes": "Expected gain from the analytic spectral response to a perfect diffuser; gray-world estimate on a 50 % neutral flat field; green is normalised to 1.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.05
+      },
+      "tolerance_text": "< 0.05"
+    },
+    {
+      "measured": 0.004343777364146484,
+      "measured_text": "0.00434378",
+      "name": "AWB gain relative error, B (3000 K)",
+      "notes": "Expected gain from the analytic spectral response to a perfect diffuser; gray-world estimate on a 50 % neutral flat field; green is normalised to 1.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.05
+      },
+      "tolerance_text": "< 0.05"
+    },
+    {
+      "measured": 0.005000974820684956,
+      "measured_text": "0.00500097",
+      "name": "AWB injected-cast recovery (max relative error)",
+      "notes": "A known per-CFA scaling (R x1.6, G x1.0, B x0.7) is injected into a neutral flat frame; the gray-world estimate must invert it on top of the illuminant cast.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.05
+      },
+      "tolerance_text": "< 0.05"
+    },
+    {
+      "measured": 1.1920928955078125e-07,
+      "measured_text": "1.192e-07",
+      "name": "Bilinear demosaic vs colour-demosaicing (max abs)",
+      "notes": "Full-frame max absolute difference on a Siemens-star RGB mosaic; the reference uses symmetric-reflection borders, the same rule the implementation follows.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 1e-05
+      },
+      "tolerance_text": "< 1e-05"
+    },
+    {
+      "measured": 2.1606683731079102e-07,
+      "measured_text": "2.161e-07",
+      "name": "MHC demosaic vs colour-demosaicing (max abs)",
+      "notes": "Malvar-He-Cutler full-frame max absolute difference against the reference implementation on the same star mosaic.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.0001
+      },
+      "tolerance_text": "< 0.0001"
+    },
+    {
+      "measured": 2.976925617126369e-08,
+      "measured_text": "2.977e-08",
+      "name": "sRGB OETF vs colour.cctf_encoding (max abs)",
+      "notes": "1001 linear samples in [0, 1] encoded by camsim.isp.tone.linear_to_srgb and compared with colour.cctf_encoding(function='sRGB').",
+      "pass": true,
+      "tolerance": {
+        "maximum": 1e-07
+      },
+      "tolerance_text": "< 1e-07"
+    },
+    {
+      "measured": 0.0,
+      "measured_text": "0",
+      "name": "Stage trace tone reproduction (max abs)",
+      "notes": "apply_tone on the last linear trace stage (pre-tone) against RenderedImage.data with +0.5 EV and Display P3 output.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 1e-06
+      },
+      "tolerance_text": "< 1e-06"
+    },
+    {
+      "measured": 0.0,
+      "measured_text": "0",
+      "name": "Stage trace linear_rgb reproduction (Display P3, max abs)",
+      "notes": "The pre-tone linear stage scaled by 2**0.5 and converted with linear_srgb_to_p3 against RenderedImage.linear_rgb, before clipping.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 1e-06
+      },
+      "tolerance_text": "< 1e-06"
+    },
+    {
+      "measured": 0.0,
+      "measured_text": "0",
+      "name": "Linear pre-tone scaling invariance (max relative error)",
+      "notes": "Doubling the black-level-corrected RAW signal must double the last linear trace stage exactly; tone is excluded.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 1e-05
+      },
+      "tolerance_text": "< 1e-05"
+    },
+    {
+      "measured": 0.006183140445500612,
+      "measured_text": "0.00618314",
+      "name": "LSC flat-field residual after correction",
+      "notes": "A gain map calibrated from one noisy flat field is applied to an independent flat field; residual is (max - min) / mean. The Task 18 focused test test_lsc_flat_field_corrects_vignetting is the exact-reciprocal check.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.02
+      },
+      "tolerance_text": "< 0.02"
+    },
+    {
+      "measured": 13.055647776433482,
+      "measured_text": "13.0556",
+      "name": "Denoise SNR gain (dB)",
+      "notes": "Bilateral luma/chroma denoise on a noisy flat region; SNR is 20 log10(|mean| / std) of BT.709 luma. Formal MTF is deferred to G4.",
+      "pass": true,
+      "tolerance": {
+        "minimum": 3.0
+      },
+      "tolerance_text": "> 3"
+    },
+    {
+      "measured": 4.3330746351655236e-05,
+      "measured_text": "4.333e-05",
+      "name": "Denoise edge-contrast preservation",
+      "notes": "Relative change of the step-edge contrast between flat regions away from the edge; the bilateral range gate must preserve it within 10 percent.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.1
+      },
+      "tolerance_text": "< 0.1"
+    },
+    {
+      "measured": 0.5872285432323827,
+      "measured_text": "0.587229",
+      "name": "Sharpen edge-contrast gain",
+      "notes": "Thresholded unsharp mask on a clean step edge; the full-profile contrast must increase. Formal ISO 12233 MTF50 validation is deferred to G4 because the metrics harness does not exist yet.",
+      "pass": true,
+      "tolerance": {
+        "minimum": 0.0
+      },
+      "tolerance_text": "> 0"
+    },
+    {
+      "measured": 0.11744570732116699,
+      "measured_text": "0.117446",
+      "name": "Sharpen overshoot",
+      "notes": "The bright-side profile maximum must exceed the unsharpened plateau, i.e. the stage produces measurable positive overshoot.",
+      "pass": true,
+      "tolerance": {
+        "minimum": 0.0
+      },
+      "tolerance_text": "> 0"
+    },
+    {
+      "measured": 3.0,
+      "measured_text": "3",
+      "name": "RCCC baseline output channels",
+      "notes": "RCCC is reconstructed with the documented baseline demosaic; AWB and CCM are skipped by the pipeline. Output must be a finite (H, W, 3) image. The Bayer \u0394E and MTF thresholds do not apply; advanced RCCC demosaicing is deferred.",
+      "pass": true,
+      "tolerance": {
+        "absolute": 0.0,
+        "target": 3.0
+      },
+      "tolerance_text": "= 3 +/- 0"
+    }
+  ],
+  "colorchecker": {
+    "illuminants": {
+      "3000K": {
+        "awb_gains": [
+          0.8047659405867169,
+          1.0,
+          3.118487281438804
+        ],
+        "awb_measured_gains": [
+          0.8047659405867169,
+          1.0,
+          3.118487281438804
+        ],
+        "awb_method": "manual",
+        "camera_rgb": [
+          [
+            0.07662218986925753,
+            0.06650859712989944,
+            0.04505428004389008
+          ],
+          [
+            0.26589498083946134,
+            0.2321260648448605,
+            0.1758801930945767
+          ],
+          [
+            0.10945253782282191,
+            0.11628905859244756,
+            0.15960566453204666
+          ],
+          [
+            0.07311571469484282,
+            0.07264449090258149,
+            0.06209025113296903
+          ],
+          [
+            0.16272733945491885,
+            0.1551149969012284,
+            0.1948328040355493
+          ],
+          [
+            0.21077931096607988,
+            0.23618714127576712,
+            0.295175919704365
+          ],
+          [
+            0.24789364319859128,
+            0.20696191828359256,
+            0.07606110840358517
+          ],
+          [
+            0.07556770726545783,
+            0.08112461470867977,
+            0.14229470109644016
+          ],
+          [
+            0.1999281696544206,
+            0.1527277440571588,
+            0.07308420643579862
+          ],
+          [
+            0.06016074776772625,
+            0.04738399358697174,
+            0.05261233667573653
+          ],
+          [
+            0.2327316680476685,
+            0.236879768327248,
+            0.17768459219085284
+          ],
+          [
+            0.3031577616930008,
+            0.26655413007194345,
+            0.11580471231630354
+          ],
+          [
+            0.038965545199585686,
+            0.04640715954486619,
+            0.09429783492603085
+          ],
+          [
+            0.10887377752252847,
+            0.11862588393663571,
+            0.12329701980776038
+          ],
+          [
+            0.17244496448966098,
+            0.1083884960240569,
+            0.033402617447355315
+          ],
+          [
+            0.38909644947564304,
+            0.3551909238838952,
+            0.18866094725191102
+          ],
+          [
+            0.22212539490096825,
+            0.16409899442156484,
+            0.12161774256012657
+          ],
+          [
+            0.10033449993440599,
+            0.11888513561676849,
+            0.20573373421123534
+          ],
+          [
+            0.5630401499343641,
+            0.5636662795688167,
+            0.5495512810620394
+          ],
+          [
+            0.36081091049781516,
+            0.35985225623796796,
+            0.3601293606945306
+          ],
+          [
+            0.2206337030761498,
+            0.2184427640408524,
+            0.22134598917212367
+          ],
+          [
+            0.11712978441606868,
+            0.11751235097893013,
+            0.11718739889377405
+          ],
+          [
+            0.05407356800249785,
+            0.05496111139655113,
+            0.05467696290863447
+          ],
+          [
+            0.019674872908967012,
+            0.01981577317399735,
+            0.01928130168270207
+          ]
+        ],
+        "ccm": [
+          [
+            3.694046198972591,
+            -2.080470730713007,
+            -0.613575468259584
+          ],
+          [
+            -2.3844262630475654,
+            3.810019257397103,
+            -0.4255929943495375
+          ],
+          [
+            2.195640321637467,
+            -3.598880767342065,
+            2.403240445704598
+          ]
+        ],
+        "ccm_residual": 0.04146132292046847,
+        "ccm_row_sums": [
+          1.0,
+          0.9999999999999998,
+          1.0
+        ],
+        "clip_fraction": 0.003851996527777778,
+        "delta_e2000": [
+          1.9624660560008982,
+          6.836944757155749,
+          7.166057656742033,
+          8.71832899088266,
+          8.394458910559091,
+          11.30975124661203,
+          9.363773775873774,
+          8.091576826039333,
+          2.4512644651003,
+          8.617233185933552,
+          5.4456629172350315,
+          6.173926393181019,
+          7.079103165287619,
+          13.439756780946169,
+          15.83038998839811,
+          2.8940109867498145,
+          4.509209072648758,
+          13.137002088155455,
+          2.6499595941384633,
+          2.5684741134359594,
+          5.545125486667365,
+          0.93477461338312,
+          3.0665079963192343,
+          2.8447959763595536
+        ],
+        "delta_e2000_max": 15.83038998839811,
+        "delta_e2000_mean": 6.626273126825211,
+        "delta_e2000_preclip_max": 15.830389817677624,
+        "delta_e2000_preclip_mean": 6.62507594298616,
+        "exposure_s": 0.04608466819221968,
+        "patch_names": [
+          "dark skin",
+          "light skin",
+          "blue sky",
+          "foliage",
+          "blue flower",
+          "bluish green",
+          "orange",
+          "purplish blue",
+          "moderate red",
+          "purple",
+          "yellow green",
+          "orange yellow",
+          "blue",
+          "green",
+          "red",
+          "yellow",
+          "magenta",
+          "cyan",
+          "white 9.5 (.05 D)",
+          "neutral 8 (.23 D)",
+          "neutral 6.5 (.44 D)",
+          "neutral 5 (.70 D)",
+          "neutral 3.5 (1.05 D)",
+          "black 2 (1.5 D)"
+        ],
+        "saturated_fraction": 0.0,
+        "target_rgb": [
+          [
+            0.18935237638087005,
+            0.08646344778141628,
+            0.057080335715021226
+          ],
+          [
+            0.6244645002068656,
+            0.2933641644572594,
+            0.22616945723031415
+          ],
+          [
+            0.10114694487494558,
+            0.19108500164507503,
+            0.33560289106604485
+          ],
+          [
+            0.09482796527453993,
+            0.1493908314518045,
+            0.05145175894618785
+          ],
+          [
+            0.23918146496530995,
+            0.21277886089275175,
+            0.4291041589444434
+          ],
+          [
+            0.07963037531384118,
+            0.4949919754034469,
+            0.42216985596197415
+          ],
+          [
+            0.7897353269399711,
+            0.22370445893945776,
+            0.02209372205451693
+          ],
+          [
+            0.05862260467629771,
+            0.10445141171043064,
+            0.3891639336555951
+          ],
+          [
+            0.6528986905200547,
+            0.08999120466344572,
+            0.1205369621552989
+          ],
+          [
+            0.1217719769100594,
+            0.04411760362568476,
+            0.13430585939855152
+          ],
+          [
+            0.3178316024641706,
+            0.5079915371709833,
+            0.05132008310638407
+          ],
+          [
+            0.8197887150390846,
+            0.3841731436323921,
+            0.01233591695231473
+          ],
+          [
+            0.017308427310537472,
+            0.048667973223825226,
+            0.289710275015865
+          ],
+          [
+            0.037383299090239686,
+            0.28854634017610514,
+            0.07276382181751648
+          ],
+          [
+            0.5568499342916853,
+            0.023826839235527305,
+            0.04285276297314117
+          ],
+          [
+            0.8846955541927499,
+            0.5953641428907408,
+            0.004401071693822534
+          ],
+          [
+            0.621638242687584,
+            0.08575914205155713,
+            0.29936881806076127
+          ],
+          [
+            -0.0381841025396529,
+            0.22263336696947114,
+            0.40096283946470224
+          ],
+          [
+            0.9211518090634245,
+            0.9136449379428656,
+            0.8755760119735825
+          ],
+          [
+            0.5797117793640101,
+            0.5909628301735053,
+            0.5852304620503841
+          ],
+          [
+            0.35260344105918523,
+            0.36132362454752903,
+            0.35924703861597834
+          ],
+          [
+            0.18562831713734051,
+            0.19258012890737994,
+            0.1918236752217362
+          ],
+          [
+            0.08596936544169259,
+            0.0901710346310387,
+            0.09078171218205792
+          ],
+          [
+            0.03200399198436271,
+            0.031972941057378766,
+            0.0325176515610113
+          ]
+        ],
+        "tone_exposure_ev": 0.6955362768908442,
+        "white_fraction": 0.6987486965589156,
+        "white_level": 0.6174797470582901
+      },
+      "D65": {
+        "awb_gains": [
+          0.9565332464753182,
+          1.0,
+          1.8528044526926342
+        ],
+        "awb_measured_gains": [
+          0.9565332464753182,
+          1.0,
+          1.8528044526926342
+        ],
+        "awb_method": "manual",
+        "camera_rgb": [
+          [
+            0.0759321034349727,
+            0.06697249443580706,
+            0.0487804185514423
+          ],
+          [
+            0.27395569810197373,
+            0.2424418659003313,
+            0.19706774619985218
+          ],
+          [
+            0.15055357313845769,
+            0.16171933907615252,
+            0.204357840921268
+          ],
+          [
+            0.08392879132889519,
+            0.08040436994561478,
+            0.06329179087207337
+          ],
+          [
+            0.20251256018138128,
+            0.2049995026558884,
+            0.2536290515799168
+          ],
+          [
+            0.29674426511381613,
+            0.3148305596727313,
+            0.3399677847822507
+          ],
+          [
+            0.21889381088090665,
+            0.17477285139488452,
+            0.06768548466039426
+          ],
+          [
+            0.11393988994527454,
+            0.13014497275441145,
+            0.1992236159064553
+          ],
+          [
+            0.17340923205387493,
+            0.13539563605854335,
+            0.08666161786426198
+          ],
+          [
+            0.06362645709810179,
+            0.05840947091086837,
+            0.07343642770751449
+          ],
+          [
+            0.26561756949286813,
+            0.2516587248518447,
+            0.16245946903859287
+          ],
+          [
+            0.2807065149148305,
+            0.23709894852204758,
+            0.1018051432840752
+          ],
+          [
+            0.06788464404191032,
+            0.08270847904637005,
+            0.13845218170547124
+          ],
+          [
+            0.14232513111484937,
+            0.14253637699548863,
+            0.12081507248573067
+          ],
+          [
+            0.1326529421220141,
+            0.08422879548358524,
+            0.03556649219860469
+          ],
+          [
+            0.3812032307475066,
+            0.3330920114497508,
+            0.16173903681029958
+          ],
+          [
+            0.20632784130159487,
+            0.1687472442950099,
+            0.16628461300341552
+          ],
+          [
+            0.1645627168543411,
+            0.18659080508531947,
+            0.2579626279572646
+          ],
+          [
+            0.6690084333672668,
+            0.6665087753173077,
+            0.6503423565264904
+          ],
+          [
+            0.4313966257513062,
+            0.42938051982359454,
+            0.43110286204282905
+          ],
+          [
+            0.2635662623427131,
+            0.2615055599488503,
+            0.2622184730019451
+          ],
+          [
+            0.13941999838864508,
+            0.14006195691498843,
+            0.14122076418774188
+          ],
+          [
+            0.06552204111021412,
+            0.06575946285089185,
+            0.06565378760257043
+          ],
+          [
+            0.023974655845174282,
+            0.023509925189004702,
+            0.0233163377411212
+          ]
+        ],
+        "ccm": [
+          [
+            6.027350242829079,
+            -4.846582040752277,
+            -0.1807682020768015
+          ],
+          [
+            -3.1164633991493313,
+            5.446549635730825,
+            -1.3300862365814943
+          ],
+          [
+            1.715268944386976,
+            -3.079093347853979,
+            2.363824403467003
+          ]
+        ],
+        "ccm_residual": 0.043249997037748504,
+        "ccm_row_sums": [
+          1.0000000000000004,
+          0.9999999999999998,
+          1.0000000000000002
+        ],
+        "clip_fraction": 0.00537109375,
+        "delta_e2000": [
+          1.9984463354639657,
+          7.487897990912964,
+          1.9665832372273986,
+          10.3262758573712,
+          3.1603888642138735,
+          12.243936511006469,
+          9.705216457296592,
+          5.565920240788915,
+          3.755755307686937,
+          4.035902869599447,
+          8.375516984519205,
+          5.430148474680096,
+          7.650204624308657,
+          14.314476524935312,
+          7.758606786162661,
+          1.9883307352136979,
+          1.6008572737292683,
+          11.648537707302765,
+          1.0207307621934418,
+          4.625977878217216,
+          4.892120693811628,
+          0.43299813189416014,
+          0.8721379914744655,
+          3.0666074746432384
+        ],
+        "delta_e2000_max": 14.314476524935312,
+        "delta_e2000_mean": 5.580148988110565,
+        "delta_e2000_preclip_max": 14.3144761141477,
+        "delta_e2000_preclip_mean": 5.581805743090382,
+        "exposure_s": 0.04683488372093023,
+        "patch_names": [
+          "dark skin",
+          "light skin",
+          "blue sky",
+          "foliage",
+          "blue flower",
+          "bluish green",
+          "orange",
+          "purplish blue",
+          "moderate red",
+          "purple",
+          "yellow green",
+          "orange yellow",
+          "blue",
+          "green",
+          "red",
+          "yellow",
+          "magenta",
+          "cyan",
+          "white 9.5 (.05 D)",
+          "neutral 8 (.23 D)",
+          "neutral 6.5 (.44 D)",
+          "neutral 5 (.70 D)",
+          "neutral 3.5 (1.05 D)",
+          "black 2 (1.5 D)"
+        ],
+        "saturated_fraction": 0.0,
+        "target_rgb": [
+          [
+            0.17238805207484836,
+            0.0838330633350218,
+            0.057599080161428465
+          ],
+          [
+            0.5479264022063021,
+            0.29886253269606755,
+            0.2171643708937299
+          ],
+          [
+            0.1103359137134288,
+            0.1968747753562207,
+            0.335610453511722
+          ],
+          [
+            0.10408451182914716,
+            0.1499421288051986,
+            0.0522281265939758
+          ],
+          [
+            0.22449178164016553,
+            0.21807493968041225,
+            0.4296827364266943
+          ],
+          [
+            0.12403197820923448,
+            0.5184773806844928,
+            0.4046943157104699
+          ],
+          [
+            0.7156051949176852,
+            0.1995314991693085,
+            0.027196104115604317
+          ],
+          [
+            0.06484282225486224,
+            0.10665642954619295,
+            0.39157836493059367
+          ],
+          [
+            0.5411691607952789,
+            0.08902186161825744,
+            0.12018625380357094
+          ],
+          [
+            0.10443936958583284,
+            0.043936203334204144,
+            0.13946819297679147
+          ],
+          [
+            0.35528477010123594,
+            0.5068450098530226,
+            0.04892542915156563
+          ],
+          [
+            0.7796299287148213,
+            0.3540442846281434,
+            0.02170718326087944
+          ],
+          [
+            0.0231546328105538,
+            0.04955944553888658,
+            0.2906021977558284
+          ],
+          [
+            0.06599253177624291,
+            0.3012098386027699,
+            0.06501999546706845
+          ],
+          [
+            0.4299375556088504,
+            0.032313495596464584,
+            0.04013216150821786
+          ],
+          [
+            0.8566639154159319,
+            0.5747563277128451,
+            0.00849047659129043
+          ],
+          [
+            0.5033713191280317,
+            0.08962940890824309,
+            0.3051627522186013
+          ],
+          [
+            -0.02806697974466879,
+            0.24900318326684226,
+            0.3827585844419058
+          ],
+          [
+            0.9161070608378147,
+            0.9155884674765614,
+            0.8697921845460512
+          ],
+          [
+            0.5817549366753285,
+            0.5911850906188615,
+            0.5836348764871417
+          ],
+          [
+            0.35510896994634383,
+            0.3609858792888858,
+            0.3588442218820778
+          ],
+          [
+            0.1875065999265263,
+            0.1923715901846026,
+            0.19170857211784284
+          ],
+          [
+            0.08704155248757006,
+            0.09007059629612052,
+            0.09083153770158012
+          ],
+          [
+            0.032062839952217356,
+            0.03193442148363852,
+            0.03259573573156725
+          ]
+        ],
+        "tone_exposure_ev": 0.4420427028041166,
+        "white_fraction": 0.6993048314216197,
+        "white_level": 0.7360916429434533
+      }
+    }
+  },
+  "demosaic": {
+    "bilinear_max_abs": 1.1920928955078125e-07,
+    "bilinear_mean_abs": 2.8023821899867573e-09,
+    "height": 96,
+    "mhc_max_abs": 2.1606683731079102e-07,
+    "mhc_mean_abs": 8.601325660559018e-09,
+    "shape": [
+      96,
+      96
+    ],
+    "source": "synthetic Siemens-star RGB mosaic (RGGB), independent R/G/B structure",
+    "width": 96
+  },
+  "denoise": {
+    "chroma_strength": 1.0,
+    "edge_contrast_after": 0.40026109960117984,
+    "edge_contrast_before": 0.4002784439649053,
+    "edge_preservation_error": 4.3330746351655236e-05,
+    "luma_strength": 1.0,
+    "method": "bilateral",
+    "noise_sigma": 0.02,
+    "radius": 1.5,
+    "snr_after_db": 35.80275450021205,
+    "snr_before_db": 22.747106723778572,
+    "snr_gain_db": 13.055647776433482
+  },
+  "environment": {
+    "camsim": "0.1.0.dev0",
+    "colour_demosaicing": "0.2.7",
+    "colour_science": "0.4.7",
+    "numpy": "2.4.6",
+    "platform": "Darwin",
+    "python": "3.11.8",
+    "scipy": "1.17.1"
+  },
+  "gate_evidence": true,
+  "kind": "camsim G3 ISP validation",
+  "linearity": {
+    "max_relative_error": 0.0,
+    "pixels_compared": 27648,
+    "scale": 2.0,
+    "source": "synthetic RGGB gradient frame; signal doubled after BLC"
+  },
+  "lsc": {
+    "map_max": 1.4305216073989868,
+    "map_min": 1.0,
+    "noise_sigma": 0.0005,
+    "residual_after": 0.006183140445500612,
+    "residual_before": 0.3340778675880792,
+    "same_frame_residual": 0.0,
+    "size": 96
+  },
+  "presets": {
+    "isp": "src/camsim/config/presets/isp/default.json",
+    "isp_config_hash": "790c97d8f00b352fe31f2ffd26fd46e89c47caf308622db51d397308ed49a627",
+    "isp_name": "default",
+    "sensor": "src/camsim/config/presets/sensors/flagship_phone_50mp.json",
+    "sensor_config_hash": "e6b3f6a5162d60b805cfba2651aa5e9c705d86bf84a534ba8dcde4a09f42d4a2",
+    "sensor_name": "flagship_phone_50mp"
+  },
+  "quick": false,
+  "rccc": {
+    "channels": 3,
+    "finite": true,
+    "max": 0.8541364669799805,
+    "min": 0.2531287372112274,
+    "shape": [
+      64,
+      64,
+      3
+    ],
+    "stages": [
+      "dpc",
+      "blc",
+      "demosaic",
+      "tone",
+      "output"
+    ]
+  },
+  "scene": {
+    "colorchecker_shape": [
+      96,
+      128
+    ],
+    "exposures_s": {
+      "3000K": 0.04608466819221968,
+      "D65": 0.04683488372093023
+    },
+    "lux": 300.0,
+    "oversampling": 2,
+    "target_white_fraction": 0.7,
+    "white_fractions": {
+      "3000K": 0.6987486965589156,
+      "D65": 0.6993048314216197
+    },
+    "white_patch": "white 9.5 (.05 D)"
+  },
+  "schema_version": "1.0",
+  "sensor_colorimetry": {
+    "channel_correlation": [
+      [
+        1.0,
+        0.9403098678688608,
+        0.43398092810154226
+      ],
+      [
+        0.9403098678688608,
+        0.9999999999999998,
+        0.652181329407785
+      ],
+      [
+        0.4339809281015423,
+        0.6521813294077851,
+        1.0
+      ]
+    ],
+    "condition_number": 12.811198289808747,
+    "interpretation": "A large Luther residual means the CFA sensitivities are not a linear combination of the CIE observer; a 3x3 CCM then cannot reproduce saturated patches exactly, no matter how it is fitted.",
+    "luther_relative_residual": 0.456200107993897,
+    "projection_singular_values": [
+      5.93245946359026,
+      1.8349596632759007,
+      0.4630682727243014
+    ]
+  },
+  "sharpen": {
+    "amount": 0.8,
+    "contrast_gain": 0.5872285432323827,
+    "edge_contrast_after": 0.6348914504051208,
+    "edge_contrast_before": 0.40000002086162567,
+    "luma_only": true,
+    "overshoot": 0.11744570732116699,
+    "radius": 1.5,
+    "threshold": 0.0
+  },
+  "status": "FAIL",
+  "tone": {
+    "domain": [
+      0.0,
+      1.0
+    ],
+    "max_abs": 2.976925617126369e-08,
+    "sample_count": 1001
+  },
+  "trace": {
+    "color_space": "DisplayP3",
+    "exposure_ev": 0.5,
+    "linear_rgb_max_abs": 0.0,
+    "stage_names": [
+      "dpc",
+      "blc",
+      "awb",
+      "demosaic",
+      "ccm",
+      "tone",
+      "output"
+    ],
+    "tone_max_abs": 0.0
+  }
+}
