@@ -1,9 +1,9 @@
 # Architecture
 
-camsim is in Phase 5 consolidation: the simulation pipeline (G1–G4) is
-implemented and green, and the G5 human sign-off is pending. Machine-vision
-code is gated behind G5. This page describes the package layout, data
-contracts, and dependency rules that the code enforces.
+camsim has completed Phase 5 consolidation: the simulation pipeline (G1–G4),
+camera orchestration, IO, and CLI are implemented, and the G5 human sign-off
+is pending. Machine-vision code is gated behind G5. This page describes the
+package layout, data contracts, and dependency rules that the code enforces.
 
 ## Layers and dependency rules
 
@@ -13,10 +13,10 @@ contracts, and dependency rules that the code enforces.
 | Simulation | `camsim.scene`, `camsim.optics`, `camsim.sensor`, `camsim.isp` | Core contracts | implemented |
 | Characterization | `camsim.characterization` | Sensor, ISP, core contracts | implemented |
 | Metrics | `camsim.metrics` | Core contracts only | implemented |
-| Orchestration | `camsim.camera` | Scene, optics, sensor, ISP | scaffold only |
+| Orchestration | `camsim.camera` | Scene, optics, sensor, ISP | implemented |
 | Machine vision | `camsim.tasks` | PyTorch | gated behind G5 |
 | Presentation | `camsim.viz`, `camsim.config` | Core types | implemented |
-| File I/O | `camsim.io` | Core types | scaffold only |
+| File I/O | `camsim.io` | Core types | implemented |
 
 Two rules are non-negotiable:
 
@@ -48,15 +48,14 @@ src/camsim/
 ├── characterization/    # EMVA 1288-style measurements and reports
 ├── metrics/             # e-SFR/MTF, SNR, colour, acutance, measure_all()
 ├── viz/                 # plotting helpers
-├── camera/              # scaffold placeholder; no public API yet
-├── io/                  # scaffold placeholder; no public API yet
+├── camera/              # capture orchestration and auto-exposure
+├── io/                  # RAW and rendered-image IO with sidecars
 └── tasks/               # machine-vision experiments (gated)
 ```
 
-The implemented public API is indexed in the [API reference](api.md). Do not
-infer a contract from a scaffold package: `camsim.camera` and `camsim.io`
-currently contain only their package docstrings, and `camsim.tasks` does not
-exist as working code until G5 is signed off.
+The implemented public API is indexed in the [API reference](api.md).
+`camsim.camera` and `camsim.io` are implemented and covered by the validation
+gates; `camsim.tasks` does not exist as working code until G5 is signed off.
 
 ## Data contracts
 

@@ -1,9 +1,11 @@
 # Validation
 
-This page is the public index of camsim's phase-gate evidence. The project is
-in Phase 5 consolidation: **G1–G4 are PASS** with committed reports, and the
-**G5 human sign-off is pending**. A gate is not marked green until its report is
-reproducible from a clean checkout.
+This page is the public index of camsim's phase-gate evidence. The
+**sensor/ISP/metrics core is validated**: G1–G4 are PASS with committed reports,
+all G5 cross-cutting checks pass, and the **G5 human sign-off is pending**. A
+gate is not marked green until its report is reproducible from a clean
+checkout; the consolidated candidate is
+`results/reports/validation_report.md` in the repository.
 
 ## Lines of evidence
 
@@ -30,14 +32,14 @@ comparisons use tolerances because floating-point reduction order may differ.
 
 ## Gate status
 
-| Gate | Phase | Scope | Report | Status |
-|---|---|---|---|---|
-| G0 | 0 | install, lint, typecheck, tests, docs build | this page | Green locally; CI runs the same commands |
-| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | **PASS** |
-| G2 | 2 | sensor model and characterization | `results/reports/g2_sensor.md` | **PASS** |
-| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` | **PASS** |
-| G4 | 4 | metrics harness | `results/reports/g4_metrics.md` | **PASS** |
-| G5 | 5 | consolidated human sign-off | `results/reports/validation_report.md` | **Pending review** |
+| Gate | Phase | Scope | Evidence | Measured / passed | Status |
+|---|---|---|---|---|---|
+| G0 | 0 | install, lint, typecheck, tests, docs build | this page; `.github/workflows/ci.yml` | 9/9 commands | **PASS** (local gate run) |
+| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | 7/7 checks | **PASS** |
+| G2 | 2 | sensor model and EMVA characterization | `results/reports/g2_sensor.md` + `g2_sensor_results.json` | 16/16 checks | **PASS** |
+| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 19/19 checks | **PASS** |
+| G4 | 4 | metrics harness | `results/reports/g4_metrics.md` + `g4_metrics_results.json` | 31/31 checks | **PASS** |
+| G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 13/13 cross-cutting checks; sign-off pending | **Awaiting human sign-off** |
 
 ## Coverage policy
 
@@ -76,6 +78,8 @@ tolerances.
 | G2 | ![Sensor SNR](images/g2_snr_vs_irradiance.png) *SNR versus irradiance across the shot- and read-noise regimes.* |
 | G3 | ![ISP checks](images/g3_check_summary.png) *G3 check summary with tolerances.* |
 | G4 | ![Metrics checks](images/g4_check_summary.png) *G4 check summary with analytic references.* |
+| G5 | ![Gate summary](images/g5_gate_summary.png) *Gate/check status matrix; G5 remains awaiting human sign-off.* |
+| G5 | ![Cross-cutting evidence](images/g5_evidence.png) *Denoise, sharpen, auto-exposure, and benchmark evidence.* |
 
 ## G0 — Foundation
 
@@ -450,29 +454,86 @@ Each phase report contains:
 A report is appended to this page only when it has been regenerated against
 the current commit. Changes that invalidate a report require a re-run.
 
-## G5 — Human sign-off (blocks machine-vision work)
+## G5 — Consolidated evidence and human sign-off (blocks machine-vision work)
 
-The G5 gate closes Phase 5 and opens the way to Phase 6. It requires:
+G5 closes Phase 5 and opens the way to Phase 6. The consolidated candidate is
+`results/reports/validation_report.md`; its status is **awaiting human
+sign-off**. G1–G4 are green, every cross-cutting check passes, and the
+engineering gates below are green. The G5 gate is still open until the project
+owner records an explicit approval.
 
-- G1–G4 green;
-- continuous integration green across Ubuntu and macOS on Python 3.11, 3.12,
-  and 3.13;
-- test coverage of at least 90%, enforced by
-  `--cov-fail-under=90` in the Makefile and CI (see the coverage policy
-  above);
-- a strict documentation build (`uv run mkdocs build --strict`);
-- the documentation smoke tests passing, including the README gallery paths,
-  the self-contained `docs/images` mirror, the nav, the API/release pages, the
-  quickstart pipeline, and the benchmark's `--quick` mode;
-- examples and notebooks executing headless within their runtime budgets
-  (notebooks under two minutes each, examples under five minutes each);
-- a `results/reports/validation_report.md` with figures, tolerances,
-  assumptions, and known limitations, reviewed by the project owner;
-- a successful `uv build` and `uvx twine check dist/*` dry run of the release
-  workflow, without tagging or publishing.
+### Cross-cutting evidence
 
-The G5 status is **pending** until the project owner reviews the consolidated
-report. `v0.1.0` is tagged only after that sign-off; see
+These criteria span phases or the engineering process and are measured by
+`benchmarks/g5_validation_report.py` with direct calls to the public stages
+and metrics. The full derivation and raw values are in the report.
+
+| Check | Measured | Bound | Result |
+|---|---|---|---|
+| Denoise luma SNR gain | +10.61 dB (25.946 → 36.558 dB) | > 0 dB | PASS |
+| Denoise MTF50 preservation | 0.189840 → 0.217722 cycles/pixel (+14.69%) | loss ≤ 10% | PASS |
+| Sharpen MTF50 gain | 0.187328 → 0.249291 cycles/pixel (+33.08%) | after > before | PASS |
+| Sharpen positive overshoot | max normalized profile 1.002107 (+0.21% of contrast) | > 1.001 | PASS |
+| Camera AE convergence | 2000/20/0.01 lux: 1/4/5 probes, metered 0.1930/0.1634/0.1786 | converged, \|metered − 0.18\| ≤ 0.02 | PASS |
+| Camera AE physical limits | exposure ≤ 100 ms, analog ≤ 24 dB, digital 1.00–44.34× | preset windows | PASS |
+| RCCC baseline | (32, 48, 3), finite, R = 0.25, G = B = 0.60, linear | shape / DC / linearity | PASS |
+| Determinism | RAW and rendered arrays bit-identical | same seeds, same environment | PASS |
+| Metrics import independence | sensor/ISP/scene/optics absent from `sys.modules` | no forbidden imports | PASS |
+| CLI render → measure | both commands exit 0; MTF50 0.433778 cycles/pixel; acutance 0.0768 | finite report | PASS |
+| Quick-mode isolation | no `*_quick*` artifacts in `results/reports` | full-run JSON only | PASS |
+| Machine-vision scope | `camsim.tasks` is its docstring only; no torch import | gated until sign-off | PASS |
+
+The denoise MTF50 measurement rises rather than falls: the full-strength
+bilateral filter suppresses the noise floor and sharpens the transition, so
+the check is a *loss* bound (no resolution lost), and the measured sign is
+reported honestly. The sharpen overshoot is small but measurable (0.21% of
+edge contrast), as expected at radius 1. The RCCC result is a shape,
+constant-preservation, and linearity check only: its clear channel is a
+documented luma placeholder, and the Bayer colour and MTF gates do not apply.
+
+### Engineering gates
+
+| Gate | Recorded result |
+|---|---|
+| `uv run pytest -q` | 1749 passed |
+| `uv run pytest --cov=camsim --cov-fail-under=90` | 1749 passed; 91.82% coverage (required 90%) |
+| `uv run ruff check .` / `ruff format --check .` | clean; 140 files formatted |
+| `uv run mypy src` | no issues in 68 source files |
+| `uv run mkdocs build --strict` | built in 1.67 s |
+| `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.25 ms total (128 × 128) |
+| `uv run python benchmarks/benchmark_pipeline.py` | 114.71 ms total (512 × 512) |
+| `uv build` | wheel and sdist for `0.1.0.dev0` |
+
+CI runs the same commands on Ubuntu and macOS across Python 3.11, 3.12, and
+3.13. Timings are machine-specific evidence, not guarantees. `make notebooks`
+executes every Jupytext notebook headlessly under a two-minute-per-notebook
+budget, and `make figures` regenerates the committed gallery from examples
+01–04 full mode. Quick-mode artifacts are smoke tests and never overwrite the
+committed full-run JSON or Markdown.
+
+### Sign-off checklist
+
+- [ ] Owner reviewed `results/reports/validation_report.md` end to end,
+      including the G1–G4 verdict tables and the cross-cutting measurements.
+- [ ] Owner reviewed the figure gallery, including `g5_gate_summary.png`,
+      `g5_evidence.png`, the G3 ColorChecker ΔE figure, the RCCC baseline, and
+      the G4 analytic MTF curves.
+- [ ] Owner confirmed the validated scope: scene/optics helpers, sensor, ISP,
+      metrics, camera orchestration, IO, and CLI; machine vision is out of
+      scope for `v0.1.0`.
+- [ ] Owner confirmed the assumptions: simulated flagship preset, provisional
+      synthetic spectral data, in-sample CCM, and uncertified ISO 12233/EMVA-
+      style measurement status.
+- [ ] Owner confirmed the limitations: synthetic CFA re-authoring, in-sample
+      calibration, 8× Airy diagnostic, synthetic stage measurements,
+      quick-mode exclusion, extreme-low-light digital-gain noise, and the
+      absence of HDR/3-D/motion blur/autofocus.
+- [ ] Owner approved tagging `v0.1.0` on the signed-off commit and starting
+      Phase 6 afterwards.
+
+The sign-off is recorded in the report's checklist block. **No tag exists, no
+push or PyPI publication has occurred, and no machine-vision code has been
+written.** `v0.1.0` is tagged only after the approval above; see
 [Release](release.md).
 
 **No machine-vision code is written before this sign-off.** The CNN task

@@ -5,10 +5,11 @@ embedded; every module's opening docstring states its physical/mathematical
 basis, parameter ranges, and the failure artefacts it guards against.
 
 !!! note "Scope"
-    `camsim.camera` and `camsim.io` are scaffold placeholders in this version
-    and have no public API yet. `camsim.tasks` is gated behind the G5 human
-    sign-off and is not documented or advertised as implemented. A module that
-    appears here is importable, tested, and used by the validation gates.
+    `camsim.camera`, `camsim.io`, and the `render`, `characterize`, `measure`,
+    and `figures` CLI commands are implemented and exercised by the validation
+    gates. `camsim.tasks` is gated behind the G5 human sign-off and is not
+    documented or advertised as implemented. A module that appears here is
+    importable, tested, and used by the validation gates.
 
 ## Top-level package
 
@@ -200,6 +201,32 @@ difference, acutance, and the unified report. See [Metrics](metrics.md) for
 the definitions and limitations.
 
 ::: camsim.metrics
+
+## Camera
+
+Fixed-exposure capture and the opt-in auto-exposure policy. The camera binds a
+lens, sensor, and ISP; see the G5 report for the convergence and limit
+evidence.
+
+::: camsim.camera
+
+## I/O
+
+RAW frames and rendered images, with mandatory sidecars and strict validation.
+
+::: camsim.io
+
+::: camsim.io.raw
+    options:
+      members:
+        - load_raw
+        - save_raw
+
+::: camsim.io.images
+    options:
+      members:
+        - load_image
+        - save_image
 
 ## Visualisation
 

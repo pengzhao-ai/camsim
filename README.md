@@ -22,10 +22,13 @@ notebook-only demo.
        width="900">
 </p>
 
-> **Status: Phase 5 consolidation.** G1–G4 are green locally with committed
-> validation reports; the G5 human sign-off is pending. The library is version
-> `0.1.0.dev0` and is not yet tagged or published. Machine-vision code
-> (`camsim.tasks`) is deliberately gated behind G5 and is not implemented.
+> **Status: validated sensor/ISP/metrics core; G5 sign-off pending.** G1–G4
+> are PASS with committed validation reports, all G5 cross-cutting checks pass,
+> and the consolidated candidate is
+> [`results/reports/validation_report.md`](results/reports/validation_report.md).
+> The library is version `0.1.0.dev0` and is not yet tagged or published.
+> Machine-vision code (`camsim.tasks`) is deliberately gated behind G5 and is
+> not implemented.
 
 ## The pipeline
 
@@ -210,7 +213,7 @@ phase reports; this README deliberately does not restate them.
 | G2 | sensor model and EMVA characterization | **PASS** | [`results/reports/g2_sensor.md`](results/reports/g2_sensor.md) |
 | G3 | ISP stages and pipeline | **PASS** | [`results/reports/g3_isp.md`](results/reports/g3_isp.md) |
 | G4 | metrics harness | **PASS** | [`results/reports/g4_metrics.md`](results/reports/g4_metrics.md) |
-| G5 | consolidated human sign-off | **Pending** | [Validation](docs/validation.md) |
+| G5 | consolidated human sign-off | **Awaiting human sign-off** | [`results/reports/validation_report.md`](results/reports/validation_report.md) |
 
 The validation is simulated: it is not a certified ISO 12233 or EMVA 1288
 measurement, and the flagship preset is a representative engineering design
