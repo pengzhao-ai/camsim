@@ -67,8 +67,6 @@ C-contiguous float32 arrays of the input shape; the input is never mutated.
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
@@ -76,6 +74,7 @@ from camsim.config.schema import SharpenConfig
 from camsim.isp.denoise import (
     _as_checked_float32,
     _as_float32_image,
+    _validate_bool,
     _validate_non_negative,
     _validate_radius,
     gaussian_blur,
@@ -138,8 +137,9 @@ def unsharp_mask(image: ArrayLike, config: SharpenConfig) -> NDArray[np.float32]
     radius = _validate_radius(config.radius, "config.radius")
     threshold = _validate_non_negative(config.threshold, "config.threshold")
     luma_only = _validate_bool(config.luma_only, "config.luma_only")
+    enabled = _validate_bool(config.enabled, "config.enabled")
 
-    if not config.enabled or amount == 0.0:
+    if not enabled or amount == 0.0:
         return values.copy()
 
     if values.ndim == 3 and luma_only:
@@ -182,10 +182,3 @@ def _scaled_detail(
         scaled,
         "unsharp_mask produced non-finite values; the amount or input exceeds float32 range",
     )
-
-
-def _validate_bool(value: Any, field: str) -> bool:
-    """Return a strict bool, rejecting strings and numbers that merely coerce."""
-    if not isinstance(value, (bool, np.bool_)):
-        raise ValueError(f"{field} must be a bool; got {value!r}")
-    return bool(value)

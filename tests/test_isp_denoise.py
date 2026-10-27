@@ -255,12 +255,17 @@ def test_denoise_linearity(method: str) -> None:
     image = (0.1 + 0.8 * rng.random((24, 24, 3))).astype(np.float32)
     config = DenoiseConfig(method=method, luma_strength=0.7, chroma_strength=0.4, radius=1.2)
     scale = 2.0
-    np.testing.assert_allclose(
-        denoise(scale * image, config),
-        scale * denoise(image, config),
-        rtol=1e-6,
-        atol=1e-6,
-    )
+    scaled_output = denoise(scale * image, config)
+    expected = scale * denoise(image, config)
+    if method == "gaussian":
+        # A power-of-two scale is exact through every linear step (opponent
+        # transform, blur, blend), so the Gaussian method is bit-exact.
+        np.testing.assert_array_equal(scaled_output, expected)
+    else:
+        # The bilateral range sigma follows the signal, so the filter is scale
+        # equivariant by construction; the percentile and exp arithmetic are
+        # not required to be bit-exact.
+        np.testing.assert_allclose(scaled_output, expected, rtol=1e-6, atol=1e-6)
 
 
 def test_bilateral_edge_preservation() -> None:
@@ -288,6 +293,25 @@ def test_denoise_bilateral_reduces_flat_patch_noise() -> None:
         DenoiseConfig(method="bilateral", luma_strength=1.0, chroma_strength=1.0, radius=1.0),
     )
     assert output.std() < image.std()
+
+
+def test_bilateral_reduces_neutral_chroma_noise() -> None:
+    # Regression: a neutral chroma plane centres on zero, so gating it on its
+    # own 99th percentile (which is just the chroma noise) would leave that
+    # noise essentially untouched. Chroma references the luma amplitude, so a
+    # noisy neutral patch must lose at least a fifth of its chroma deviation.
+    rng = np.random.default_rng(30)
+    image = np.full((64, 64, 3), 0.5, np.float32) + rng.normal(0.0, 0.02, (64, 64, 3)).astype(
+        np.float32
+    )
+    before = rgb_to_opponent(image)
+    output = denoise(
+        image,
+        DenoiseConfig(method="bilateral", luma_strength=0.0, chroma_strength=1.0, radius=1.0),
+    )
+    after = rgb_to_opponent(output)
+    assert after[..., 1].std() < 0.8 * before[..., 1].std()
+    assert after[..., 2].std() < 0.8 * before[..., 2].std()
 
 
 def test_denoise_strength_above_one_is_accepted() -> None:
@@ -362,6 +386,7 @@ def test_denoise_requires_a_denoise_config(config: object) -> None:
         {"chroma_strength": "high"},
         {"radius": "wide"},
         {"method": "median"},
+        {"enabled": "yes"},
     ],
 )
 def test_denoise_rejects_mutated_config(update: dict[str, object]) -> None:

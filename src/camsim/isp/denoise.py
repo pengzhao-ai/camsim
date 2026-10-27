@@ -26,11 +26,12 @@ opponent space::
 
 ``Y`` is luma (the BT.709 weights sum to one, so a neutral input has ``Y`` equal
 to its level), ``Cb`` and ``Cr`` are blue-difference and red-difference chroma.
-The divisors 1.8556 and 1.5748 put chroma on a scale of roughly +/-0.54 and
-+/-0.64 for unit RGB, different from luma, which is exactly why one strength
-cannot serve all three: chroma can be smoothed much harder than luma before
-visible detail is lost. The transform is linear, exactly invertible, and does
-not clip; negative linear values from earlier stages round-trip unchanged.
+The divisors 1.8556 and 1.5748 are the reciprocals of the BT.709 chroma scale
+factors: for unit RGB both chroma channels stay within roughly +/-0.5, a
+different scale from luma, which is exactly why one strength cannot serve all
+three: chroma can be smoothed much harder than luma before visible detail is
+lost. The transform is linear, exactly invertible, and does not clip; negative
+linear values from earlier stages round-trip unchanged.
 
 Two filters are provided:
 
@@ -40,11 +41,20 @@ Two filters are provided:
   as noise.
 * ``bilateral`` -- an edge-preserving filter. Each neighbour is weighted by a
   spatial Gaussian of ``sigma = radius`` and a range Gaussian whose sigma is
-  ``0.1 * percentile(|channel|, 99)`` (floored at float32 epsilon). Neighbours
-  whose intensity differs by much more than a tenth of the channel's bright
-  range receive almost no weight, so a plateau is averaged but an edge is not
-  crossed. Because the range sigma follows the signal scale, the filter is
-  scale equivariant: ``denoise(a * x) == a * denoise(x)`` for any real ``a``.
+  set per channel (floored at float32 epsilon):
+
+  * luma: ``0.1 * percentile(|Y|, 99)``;
+  * chroma: ``0.1 * max(percentile(|Y|, 99), percentile(|channel|, 99))``.
+
+  Neighbours whose intensity differs by much more than a tenth of the reference
+  amplitude receive almost no weight, so a plateau is averaged but an edge is
+  not crossed. Chroma references the luma amplitude because Cb and Cr centre on
+  zero: on a neutral scene a chroma channel's own percentile is its own noise,
+  and a purely self-referential gate would preserve exactly the noise this
+  stage exists to remove. Genuine colour edges, whose chroma differences are
+  large relative to the luma scale, are still excluded. Every reference
+  amplitude follows the signal scale, so the filter is scale equivariant:
+  ``denoise(a * x) == a * denoise(x)`` for any real ``a``.
 
 Both methods blend the filtered result with the original::
 
@@ -78,12 +88,11 @@ directly using ``luma_strength`` and ``chroma_strength`` is ignored, because
 there is no chroma to treat independently. The pipeline keeps mono
 single-channel through the whole ISP.
 
-One consequence of the scale-following range sigma deserves attention: a chroma
-channel centred on zero (a neutral scene) has a 99th percentile equal to its
-own noise, so the bilateral range gate treats that noise as structure and
-preserves most of it. The bilateral method is therefore primarily a
-luma-edge-preserving smoother; the Gaussian method is the right tool when
-near-neutral chroma noise must actually be removed.
+The chroma reference scale is a deliberate compromise, not a pure
+self-reference. In a near-black scene the luma amplitude itself is tiny, so
+chroma variation comparable to the residual luma level is treated as structure
+and left alone; gating chroma on its own magnitude instead is strictly worse,
+because on a neutral patch that magnitude is the noise itself.
 
 Failure artefacts guarded or documented here: over-smoothing and the plastic
 look (too large a radius or strength), chroma bleeding and loss of colour
@@ -340,8 +349,9 @@ def denoise(image: ArrayLike, config: DenoiseConfig) -> NDArray[np.float32]:
     luma_strength = _validate_non_negative(config.luma_strength, "config.luma_strength")
     chroma_strength = _validate_non_negative(config.chroma_strength, "config.chroma_strength")
     radius = _validate_radius(config.radius, "config.radius")
+    enabled = _validate_bool(config.enabled, "config.enabled")
 
-    if not config.enabled:
+    if not enabled:
         return values.copy()
     if values.ndim == 2:
         # A mono sensor has no chroma; luma_strength is the whole operation.
@@ -353,10 +363,19 @@ def denoise(image: ArrayLike, config: DenoiseConfig) -> NDArray[np.float32]:
         return values.copy()
 
     opponent = _rgb_to_opponent(values)
+    # Chroma is gated against the luma scale as well as its own, so near-neutral
+    # chroma (whose own percentile is just its noise) is actually smoothed.
+    chroma_reference: float | None = None
+    if method == "bilateral" and chroma_strength != 0.0:
+        chroma_reference = _percentile_amplitude(opponent[..., 0])
     filtered = np.empty_like(opponent)
     filtered[..., 0] = _filter_channel(opponent[..., 0], method, radius, luma_strength)
-    filtered[..., 1] = _filter_channel(opponent[..., 1], method, radius, chroma_strength)
-    filtered[..., 2] = _filter_channel(opponent[..., 2], method, radius, chroma_strength)
+    filtered[..., 1] = _filter_channel(
+        opponent[..., 1], method, radius, chroma_strength, chroma_reference
+    )
+    filtered[..., 2] = _filter_channel(
+        opponent[..., 2], method, radius, chroma_strength, chroma_reference
+    )
     return _opponent_to_rgb(filtered)
 
 
@@ -397,15 +416,22 @@ def _filter_channel(
     method: DenoiseMethod,
     radius: float,
     strength: float,
+    reference_amplitude: float | None = None,
 ) -> NDArray[np.float32]:
-    """Filter one channel and blend it with the original at ``strength``."""
+    """Filter one channel and blend it with the original at ``strength``.
+
+    ``reference_amplitude`` is the additional scale reference used by the
+    bilateral range gate; chroma channels pass the luma 99th percentile so a
+    near-neutral chroma plane is still smoothed. It is ignored by the Gaussian
+    method, whose kernel does not depend on intensity.
+    """
     if strength == 0.0:
         # Do not even blur: a zero blend must be an exact identity.
         return np.array(channel, dtype=np.float32, copy=True)
     if method == "gaussian":
         filtered = gaussian_blur(channel, radius)
     else:
-        filtered = _bilateral_filter(channel, radius)
+        filtered = _bilateral_filter(channel, radius, reference_amplitude)
     return _blend(channel, filtered, strength)
 
 
@@ -430,22 +456,35 @@ def _blend(
     )
 
 
-def _bilateral_filter(channel: NDArray[np.float32], radius: float) -> NDArray[np.float32]:
+def _percentile_amplitude(channel: NDArray[np.float32] | NDArray[np.float64]) -> float:
+    """Return the 99th percentile of ``|channel|``, the bilateral range scale."""
+    return float(np.percentile(np.abs(np.asarray(channel, dtype=np.float64)), _RANGE_PERCENTILE))
+
+
+def _bilateral_filter(
+    channel: NDArray[np.float32],
+    radius: float,
+    reference_amplitude: float | None = None,
+) -> NDArray[np.float32]:
     """Filter one channel with a scale-adaptive bilateral kernel.
 
     The weight of neighbour ``j`` for centre ``i`` is the product of a spatial
     Gaussian ``exp(-||p_j - p_i||^2 / (2 radius^2))`` and a range Gaussian
     ``exp(-(x_j - x_i)^2 / (2 sigma_r^2))`` with
-    ``sigma_r = 0.1 * percentile(|channel|, 99)``. Scaling the channel scales
-    ``sigma_r`` by the same factor and leaves the intensity ratios unchanged,
-    so the weights (and therefore the output) scale with the signal -- the
-    filter is scale equivariant. The window spans ``ceil(3 * radius)`` pixels
-    in each direction and borders are extended by symmetric reflection, the
-    same rule as the Gaussian blur.
+    ``sigma_r = 0.1 * max(percentile(|channel|, 99), reference_amplitude)`` and
+    a float32-epsilon floor. Luma passes no reference and uses its own
+    percentile; chroma passes the luma percentile, because a neutral chroma
+    channel's own percentile is just its noise. Every reference amplitude
+    scales with the signal, so the weights (and therefore the output) scale
+    with it -- the filter is scale equivariant. The window spans
+    ``ceil(3 * radius)`` pixels in each direction and borders are extended by
+    symmetric reflection, the same rule as the Gaussian blur.
     """
     working = np.asarray(channel, dtype=np.float64)
     height, width = working.shape
-    amplitude = float(np.percentile(np.abs(working), _RANGE_PERCENTILE))
+    amplitude = _percentile_amplitude(working)
+    if reference_amplitude is not None:
+        amplitude = max(amplitude, reference_amplitude)
     sigma_range = _RANGE_SIGMA_FRACTION * max(amplitude, _RANGE_EPS)
     window = max(1, math.ceil(_WINDOW_SIGMAS * radius))
 
@@ -511,7 +550,9 @@ def _as_float32_image(image: Any, field: str) -> NDArray[np.float32]:
             f"{field} values must be finite; NaN or infinity is not a linear intensity"
         )
     with np.errstate(over="ignore", invalid="ignore"):
-        converted = np.ascontiguousarray(array, dtype=np.float32)
+        # A real copy, not ascontiguousarray: a C-contiguous float32 input would
+        # otherwise be returned as an alias despite the documented contract.
+        converted = np.array(array, dtype=np.float32, order="C", copy=True)
     if not np.all(np.isfinite(converted)):
         raise ValueError(
             f"{field} values must fit in float32; conversion produced a non-finite value"
@@ -572,6 +613,18 @@ def _validate_radius(value: Any, field: str) -> float:
     if not math.isfinite(resolved) or resolved <= 0.0:
         raise ValueError(message)
     return resolved
+
+
+def _validate_bool(value: Any, field: str) -> bool:
+    """Return a strict bool, rejecting strings and numbers that merely coerce.
+
+    Shared by both stages for ``enabled`` and ``luma_only``: a mutated config
+    with, say, ``enabled="false"`` must raise rather than run the stage because
+    a non-empty string is truthy.
+    """
+    if not isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{field} must be a bool; got {value!r}")
+    return bool(value)
 
 
 def _validate_sigma(value: Any) -> float:

@@ -245,6 +245,7 @@ def test_sharpen_requires_a_sharpen_config(config: object) -> None:
         {"threshold": "none"},
         {"radius": "wide"},
         {"luma_only": "yes"},
+        {"enabled": "yes"},
     ],
 )
 def test_sharpen_rejects_mutated_config(update: dict[str, object]) -> None:
