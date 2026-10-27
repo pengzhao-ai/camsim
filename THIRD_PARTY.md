@@ -146,7 +146,7 @@ is self-contained.
   consistent spectral responses for simulation and the G2 characterization.
 - Shape: smooth representative QE (peak 0.82), conventional RGGB Bayer
   colour-filter passbands (blue ~448 nm, green ~542 nm, red ~610 nm) with
-  moderate out-of-band leakage and peak transmittance 0.86-0.90, and an IR-cut
+  moderate out-of-band leakage and peak transmittance 0.86-0.91 (R 0.905, G 0.903, B 0.864), and an IR-cut
   roll-off near 650 nm, interpolated by the sensor onto the preset's
   360-830 nm, 5 nm grid.
 - Provenance: the assumptions are repeated in each CSV's comment header and in

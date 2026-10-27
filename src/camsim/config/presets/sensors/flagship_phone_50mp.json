@@ -7,7 +7,7 @@
     "assumptions": [
       "pixel pitch, full well, conversion gain, read noise, ADC scale, and gain range are representative values inside published phone-sensor ranges, not vendor measurements of one part",
       "QE curve is a synthetic backside-illuminated silicon estimate peaking near 0.82; it is not digitized from a vendor plot",
-      "CFA curves are synthetic conventional Bayer passbands (blue ~448 nm, green ~542 nm, red ~610 nm) with moderate out-of-band leakage and peak transmittance 0.86-0.90; representative, not a vendor measurement",
+      "CFA curves are synthetic conventional Bayer passbands (blue ~448 nm, green ~542 nm, red ~610 nm) with moderate out-of-band leakage and peak transmittance 0.86-0.91 (R 0.905, G 0.903, B 0.864); representative, not a vendor measurement",
       "IR-cut curve is a synthetic blue-glass/interference model with a 650 nm cut-on",
       "fill factor 0.85 and microlens gain 1.15 are engineering assumptions",
       "dark current is specified at the 25 C reference temperature with a 7 K doubling interval",

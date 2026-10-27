@@ -177,6 +177,8 @@ DENOISE_EDGE_MAX: Final[float] = 0.10
 _PROBE_SEED: Final[int] = 100
 _SCENE_SEED: Final[int] = 101
 _FLAT_SEED: Final[int] = 111
+_LSC_SEED: Final[int] = 61
+_DENOISE_SEED: Final[int] = 62
 
 _SENSOR_PRESET: Final[Path] = PRESETS_DIR / "sensors" / "flagship_phone_50mp.json"
 _ISP_PRESET: Final[Path] = PRESETS_DIR / "isp" / "default.json"
@@ -287,6 +289,18 @@ def measure_g3(*, quick: bool = False) -> dict[str, Any]:
         "quick": quick,
         "status": status,
         "environment": _environment(),
+        "seeds": {
+            "probe": _PROBE_SEED,
+            "scene": _SCENE_SEED,
+            "flat": _FLAT_SEED,
+            "lsc": _LSC_SEED,
+            "denoise": _DENOISE_SEED,
+            "note": (
+                "Each illuminant reuses the scene and flat seeds with its own "
+                "spectrum; LSC and denoise use explicit numpy Generator seeds; "
+                "sharpen and the star/RCCC targets are deterministic without RNG."
+            ),
+        },
         "presets": {
             "sensor": _relative_preset(_SENSOR_PRESET),
             "isp": _relative_preset(_ISP_PRESET),
@@ -301,6 +315,7 @@ def measure_g3(*, quick: bool = False) -> dict[str, Any]:
             "colorchecker_shape": list(colorchecker_shape),
             "white_patch": COLORCHECKER_WHITE_PATCH,
             "target_white_fraction": TARGET_WHITE_FRACTION,
+            "exposure_ceiling_s": float(sensor_config.exposure.max_s),
             "exposures_s": {name: run["exposure_s"] for name, run in runs.items()},
             "white_fractions": {name: run["white_fraction"] for name, run in runs.items()},
         },
@@ -600,22 +615,25 @@ def _calibrate_exposure(
     target_fraction: float,
     probe_s: float,
     seed: int,
-) -> float:
+) -> tuple[float, bool]:
     """Scale a probe exposure so the brightest white-patch channel hits a target.
 
     The sensor is linear below saturation, so one proportional step from a
     deliberately dim probe is enough. The result is clamped to the preset's
-    exposure limits; the caller records the actually achieved white fraction so
-    a clipped calibration cannot masquerade as the requested one.
+    exposure limits; the returned flag records whether the requested exposure
+    was outside those limits, and the caller records the actually achieved
+    white fraction so a clipped calibration cannot masquerade as the requested
+    one.
     """
     patch = _find_patch(scene, patch_name)
     probe = sensor.expose(scene.irradiance, probe_s, mode="LCG", seed=seed)
     means = _channel_means(probe, patch)
     brightest = max(means.values())
-    exposure = probe_s * target_fraction / brightest
+    requested = probe_s * target_fraction / brightest
     minimum = float(sensor.config.exposure.min_s)
     maximum = float(sensor.config.exposure.max_s)
-    return float(min(max(exposure, minimum), maximum))
+    clamped = requested > maximum + 1e-12 or requested < minimum - 1e-12
+    return float(min(max(requested, minimum), maximum)), clamped
 
 
 def _render_scene(
@@ -768,7 +786,7 @@ def _colorchecker_run(
     if len(scene.layout.patches) != 24:
         raise RuntimeError("the ColorChecker scene must expose 24 patch ROIs")
     sensor = Sensor(sensor_config, seed=_SCENE_SEED)
-    exposure = _calibrate_exposure(
+    exposure, exposure_clamped = _calibrate_exposure(
         sensor,
         scene,
         patch_name=COLORCHECKER_WHITE_PATCH,
@@ -860,6 +878,7 @@ def _colorchecker_run(
         "frame": frame,
         "flat_frame": flat_frame,
         "exposure_s": float(exposure),
+        "exposure_clamped": bool(exposure_clamped),
         "white_fraction": float(white_fraction),
         "white_level": float(white_level),
         "saturated_fraction": saturated_fraction,
@@ -903,6 +922,7 @@ def _measure_colorchecker(
         delta_e = run["delta_e"]
         sections[name] = {
             "exposure_s": run["exposure_s"],
+            "exposure_clamped": run["exposure_clamped"],
             "white_fraction": run["white_fraction"],
             "white_level": run["white_level"],
             "tone_exposure_ev": run["tone_ev"],
@@ -914,6 +934,7 @@ def _measure_colorchecker(
             "ccm": _matrix_as_list(run["matrix"]),
             "ccm_row_sums": [float(value) for value in run["matrix"].sum(axis=1)],
             "ccm_residual": run["ccm_residual"],
+            "calibration_isp_config_hash": run["isp_config_hash"],
             "patch_names": [patch.name for patch in run["scene"].layout.patches],
             "camera_rgb": run["camera_patch"].tolist(),
             "target_rgb": run["target_patch"].tolist(),
@@ -1368,7 +1389,7 @@ def _measure_lsc(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Calibrate LSC on one noisy flat and correct an independent flat."""
     vignette = _vignette_field(size)
-    rng = np.random.default_rng(61)
+    rng = np.random.default_rng(_LSC_SEED)
     noise_sigma = 0.0005
     flat_one = vignette * (1.0 + noise_sigma * rng.standard_normal(vignette.shape))
     flat_two = vignette * (1.0 + noise_sigma * rng.standard_normal(vignette.shape))
@@ -1423,7 +1444,7 @@ def _measure_denoise(
     size: int,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Measure denoise SNR gain and step-edge contrast preservation."""
-    rng = np.random.default_rng(62)
+    rng = np.random.default_rng(_DENOISE_SEED)
     noise_sigma = 0.02
     clean = _step_image(size)
     noisy = clean + noise_sigma * rng.standard_normal(clean.shape).astype(np.float32)

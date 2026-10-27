@@ -318,6 +318,7 @@
           3.7385521072505665
         ],
         "awb_method": "manual",
+        "calibration_isp_config_hash": "ced5532a47a6e26ad151e15bf55ea72f01748bb525f67dd2b0ff96977ff12e81",
         "camera_rgb": [
           [
             0.07252460458513463,
@@ -494,6 +495,7 @@
         "delta_e2000_mean": 3.8342226534246144,
         "delta_e2000_preclip_max": 13.208346483013917,
         "delta_e2000_preclip_mean": 3.834222649686602,
+        "exposure_clamped": false,
         "exposure_s": 0.0911266968325792,
         "patch_names": [
           "dark skin",
@@ -660,6 +662,7 @@
           1.7815092434238975
         ],
         "awb_method": "manual",
+        "calibration_isp_config_hash": "e7790aa9efd05c51a43d4ec2cd7bc799572f1ff5e2794e0af9acfa97a05e2043",
         "camera_rgb": [
           [
             0.08901378060832169,
@@ -836,6 +839,7 @@
         "delta_e2000_mean": 0.9189314114222918,
         "delta_e2000_preclip_max": 2.15694226055358,
         "delta_e2000_preclip_mean": 0.9189314718951732,
+        "exposure_clamped": true,
         "exposure_s": 0.1,
         "patch_names": [
           "dark skin",
@@ -1049,7 +1053,7 @@
     "isp_config_hash": "790c97d8f00b352fe31f2ffd26fd46e89c47caf308622db51d397308ed49a627",
     "isp_name": "default",
     "sensor": "src/camsim/config/presets/sensors/flagship_phone_50mp.json",
-    "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55",
+    "sensor_config_hash": "dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591",
     "sensor_name": "flagship_phone_50mp"
   },
   "quick": false,
@@ -1076,6 +1080,7 @@
       96,
       128
     ],
+    "exposure_ceiling_s": 0.1,
     "exposures_s": {
       "3000K": 0.0911266968325792,
       "D65": 0.1
@@ -1090,6 +1095,14 @@
     "white_patch": "white 9.5 (.05 D)"
   },
   "schema_version": "1.0",
+  "seeds": {
+    "denoise": 62,
+    "flat": 111,
+    "lsc": 61,
+    "note": "Each illuminant reuses the scene and flat seeds with its own spectrum; LSC and denoise use explicit numpy Generator seeds; sharpen and the star/RCCC targets are deterministic without RNG.",
+    "probe": 100,
+    "scene": 101
+  },
   "sensor_colorimetry": {
     "channel_correlation": [
       [

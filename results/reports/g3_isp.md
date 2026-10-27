@@ -13,12 +13,12 @@ stale report is detectable.
 
 **All measured G3 checks pass.** The design ColorChecker gate is mean
 ΔE2000 < 2.0 under D65 and < 4.0 under 3000 K after an in-sample 3x3
-CCM. The measured means are 0.919 and 3.834, below
-the limits. The shipped sensor preset now uses synthetic conventional
-Bayer bands (blue ~448 nm, green ~542 nm, red ~610 nm) with moderate
-out-of-band leakage; the original broad, nearly collinear CFA curves
-were replaced after the G3 gate showed that no 3x3 matrix could
-colour-correct them. The Luther-condition residual is now 12.6 %, versus 45.6 % for
+CCM. The measured means are 0.919 and 3.834, below the limits. The shipped
+sensor preset uses synthetic conventional Bayer bands (blue ~448 nm,
+green ~542 nm, red ~610 nm) with moderate out-of-band leakage; the
+original broad, nearly collinear CFA curves were replaced after the G3
+gate showed that no 3x3 matrix could colour-correct them. The
+Luther-condition residual is now 12.6 %, versus 45.6 % for
 the superseded curves. The CCM is still fitted and evaluated in-sample;
 that is stated under limitations. The ΔE thresholds were not changed.
 
@@ -39,8 +39,10 @@ design point rather than a measurement of one commercial part.
 | Platform | `Darwin` |
 | Sensor preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
 | ISP preset | `src/camsim/config/presets/isp/default.json` |
-| Sensor config hash | `bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55` |
-| ISP config hash | `790c97d8f00b352fe31f2ffd26fd46e89c47caf308622db51d397308ed49a627` |
+| Sensor config hash | `dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591` |
+| ISP config hash (base preset) | `790c97d8f00b352fe31f2ffd26fd46e89c47caf308622db51d397308ed49a627` |
+| Calibration ISP hash (D65) | `e7790aa9efd05c51a43d4ec2cd7bc799572f1ff5e2794e0af9acfa97a05e2043` |
+| Calibration ISP hash (3000 K) | `ced5532a47a6e26ad151e15bf55ea72f01748bb525f67dd2b0ff96977ff12e81` |
 | Artifact generator | `uv run python examples/02_isp_stage_gallery.py` |
 | Machine-readable results | `results/reports/g3_isp_results.json` |
 | Gate tests | `uv run pytest tests/test_example_02.py -v` |
@@ -48,10 +50,9 @@ design point rather than a measurement of one commercial part.
 
 The full run uses a 128 x 96 ColorChecker at 300 lux with 2x
 oversampling, the shipped flagship sensor at LCG, and the D65 and 3000 K
-illuminants. Exposures are calibrated from a dim probe so the brightest
-white-patch channel reaches about 70 % of the ADC white span:
-D65 100.00 ms and 3000 K 91.13 ms. The achieved white
-fractions are 60.8 % and 68.7 %.
+illuminants. The exposure calibration requests 70 % of the ADC white span but is bounded by the preset's 0.100 s ceiling. D65 reaches the preset ceiling at 100.00 ms and achieves 60.8 %; 3000K uses 91.13 ms and achieves 68.7 %.
+
+Seeds: probe 100, scene 101, flat 111, LSC 61, denoise 62. Each illuminant reuses the scene and flat seeds with its own spectrum; LSC and denoise use explicit numpy Generator seeds; sharpen and the star/RCCC targets are deterministic without RNG.
 
 ## ISP chain and linear-space invariant
 
@@ -172,25 +173,26 @@ computed reference:
 | neutral 3.5 (1.05 D) | 0.519 | 0.739 |
 | black 2 (1.5 D) | 1.345 | 1.141 |
 
-The means are 0.919 (D65) and
-3.834 (3000 K), below the 2.0 and 4.0
-limits. The pre-clip means are
-0.919 and
-3.834; display clipping is
+The means are 0.919 (D65) and 3.834 (3000 K); both means are below the 2.0 and 4.0 limits. The pre-clip means are
+0.919 and 3.834; display clipping is
 negligible. The CCM fit RMS residuals are 0.0081 and 0.0064 linear RGB,
 and the matrix rows sum to one to machine precision. The fitted
 coefficients and per-patch values are recorded in the JSON.
 
-**CFA rationale.** The preset now uses conventional Bayer passbands
+The 3000 K mean is 3.834, 4.14 % below the 4.0 limit (quick smoke: 3.914, 2.16 % below; not gate evidence). The gate is mean-only; per-patch maxima reach 13.208 (blue) and 11.077 (purplish blue).
+
+**CFA rationale.** The preset uses conventional Bayer passbands
 centred near 448 nm (blue), 542 nm (green), and 610 nm (red) with
-moderate out-of-band leakage and peak transmittance 0.86-0.90. The
-Luther-condition relative residual is 0.126; the CFA projection
-condition number is 1.56 and the R/G correlation is 0.187. The superseded broad
-curves left a 45.6 % residual and could not be colour-corrected by
-any 3x3 matrix; the conventional bands reduce the residual and the
-in-sample CCM meets both ΔE gates. The fit remains in-sample: it
-measures calibration-scene representability, not generalisation to
-a held-out chart or a different illuminant.
+moderate out-of-band leakage and peak transmittance 0.86-0.91
+(R 0.905, G 0.903, B 0.864). The Luther-condition relative residual
+is 0.126; the CFA projection
+condition number is 1.56 and the R/G
+correlation is 0.187. The
+superseded broad curves left a 45.6 % residual and could not be
+colour-corrected by any 3x3 matrix; the conventional bands reduce the
+residual and the in-sample CCM meets both ΔE gates. The fit remains
+in-sample: it measures calibration-scene representability, not
+generalisation to a held-out chart or a different illuminant.
 
 ![ColorChecker delta E](../figures/g3_delta_e.png)
 
@@ -290,12 +292,17 @@ ties the BLC contract to the rendered output.
   same 24 patches. It measures calibration-scene representability,
   not held-out generalisation or colour constancy under a different
   illuminant.
-- **CFA design point.** The shipped preset now uses synthetic
-  conventional Bayer bands (blue ~448 nm, green ~542 nm, red ~610 nm)
-  with moderate out-of-band leakage; the original broad, nearly
-  collinear curves were replaced after the G3 gate showed that no 3x3
-  matrix could colour-correct them. The in-sample CCM passes both ΔE
-  gates. A future measured CFA replacement must record its provenance
+- **Manual analytic AWB for the CCM calibration.** The ColorChecker
+  run uses perfect-diffuser analytic gains so the row-sum CCM is
+  neutral-preserving; the default gray-world estimator is validated
+  separately on neutral flat fields and under an injected cast.
+- **CFA design point.** The preset uses synthetic conventional Bayer
+  bands (blue ~448 nm, green ~542 nm, red ~610 nm) with moderate
+  out-of-band leakage; the original broad, nearly collinear curves
+  were replaced after the G3 gate showed that no 3x3 matrix could
+  colour-correct them. The in-sample CCM passes both ΔE gates. A
+  future measured CFA replacement must record its provenance in this
+  report and in the preset.
 - **Quick mode is not gate evidence.** `--quick` uses a smaller chart
   and star and writes `g3_isp_results_quick.json`; it never writes or
   overwrites the committed `g3_isp_results.json` or `g3_isp.md`.

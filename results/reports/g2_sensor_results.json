@@ -100,7 +100,7 @@
       "saturation_level_appended": true,
       "saturation_source": "clipped_flat_field",
       "seed_policy": "every measured frame uses seed base_seed + global_frame_index; probe frames use base_seed + 1000000 + attempt and do not advance the sequence",
-      "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55",
+      "sensor_config_hash": "dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591",
       "sensor_config_name": "flagship_phone_50mp",
       "snr_curve_definition": "mean signal and measured temporal noise per unsaturated level. The primary noise fields are row-demeaned pixel-temporal noise (ADC quantization included, common-mode row noise removed); the *_total fields are raw-frame noise including row noise. snr_db = 20 log10(mean_signal_e / noise_e)",
       "standard": "EMVA Standard 1288 (release 4.0) style",
@@ -332,7 +332,7 @@
       "saturation_level_appended": false,
       "saturation_source": "clipped_flat_field",
       "seed_policy": "every measured frame uses seed base_seed + global_frame_index; probe frames use base_seed + 1000000 + attempt and do not advance the sequence",
-      "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55",
+      "sensor_config_hash": "dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591",
       "sensor_config_name": "flagship_phone_50mp",
       "snr_curve_definition": "mean signal and measured temporal noise per unsaturated level. The primary noise fields are row-demeaned pixel-temporal noise (ADC quantization included, common-mode row noise removed); the *_total fields are raw-frame noise including row noise. snr_db = 20 log10(mean_signal_e / noise_e)",
       "standard": "EMVA Standard 1288 (release 4.0) style",
@@ -625,7 +625,7 @@
   "preset": {
     "name": "flagship_phone_50mp",
     "path": "src/camsim/config/presets/sensors/flagship_phone_50mp.json",
-    "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55"
+    "sensor_config_hash": "dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591"
   },
   "schema_version": "1.0"
 }

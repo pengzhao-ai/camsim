@@ -31,7 +31,7 @@ commercial part.
 | SciPy | `1.17.1` |
 | Platform | `Darwin` |
 | Preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
-| Preset hash | `bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55` |
+| Preset hash | `dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591` |
 | Artifact generator | `uv run python examples/04_emva_characterization.py` |
 | Machine-readable results | `results/reports/g2_sensor_results.json` |
 | Gate tests | `uv run pytest tests/test_sensor.py tests/test_noise.py tests/test_defects.py tests/test_gain.py tests/test_adc.py tests/test_characterization.py tests/test_preset_validation.py -v` |

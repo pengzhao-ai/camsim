@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from .emva import characterize_sensor
 from .isp import G3Gallery, build_gallery, measure_g3
-from .report import EMVAReport, SNRPoint
+from .report import EMVAReport, SNRPoint, render_g3_report
 
 __all__ = [
     "EMVAReport",
@@ -24,4 +24,5 @@ __all__ = [
     "build_gallery",
     "characterize_sensor",
     "measure_g3",
+    "render_g3_report",
 ]

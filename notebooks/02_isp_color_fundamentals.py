@@ -22,12 +22,13 @@ The physics in the figures:
   camera channels. Gray-world equalises per-CFA channel means; the expected
   gains here come from the analytic spectral response to a perfect diffuser,
   not from the estimator under test.
-* **Colour correction.** The camera filters are broader than the CIE observer.
-  A 3x3 matrix fitted on 24 ColorChecker patches maps camera RGB to linear
-  sRGB; CIEDE2000 against the spectrally computed reference measures what the
-  matrix cannot fix. The shipped synthetic CFA is deliberately broad, so the
-  in-sample ΔE2000 gate fails for saturated patches; the notebook reports that
-  number rather than hiding it.
+* **Colour correction.** The camera filters are not identical to the CIE
+  observer. A 3x3 matrix fitted on 24 ColorChecker patches maps camera RGB to
+  linear sRGB; CIEDE2000 against the spectrally computed reference measures the
+  residual. The shipped synthetic CFA uses conventional Bayer bands (blue
+  ~448 nm, green ~542 nm, red ~610 nm); the in-sample CCM meets the ΔE2000
+  gates at both illuminants, and the Luther-condition residual is reported as
+  a positive design check.
 * **Tone and trace.** The pre-tone linear trace stage plus the tone
   configuration must reproduce both the rendered display array and the
   unclipped `linear_rgb` buffer, including exposure compensation and Display
@@ -217,10 +218,10 @@ for name in ("D65", "3000K"):
 # **in-sample**: it measures whether the ISP can represent the calibration
 # scene, not whether it generalises to a held-out chart.
 #
-# The shipped synthetic CFA curves are deliberately broad. Red and green
-# overlap almost completely, so no 3x3 matrix can reproduce saturated orange,
-# green, and yellow patches. The measured means miss the design gates; the
-# notebook shows the honest numbers.
+# The shipped synthetic CFA uses conventional Bayer bands (blue ~448 nm,
+# green ~542 nm, red ~610 nm) with moderate out-of-band leakage. The in-sample
+# 3x3 CCM meets the ΔE2000 gates at both illuminants; the Luther diagnostic
+# below is a positive check that the CFA spans the CIE observer.
 
 # %%
 d65 = payload["colorchecker"]["illuminants"]["D65"]
@@ -260,12 +261,24 @@ plt.show()
 
 print(f"D65 mean: {d65['delta_e2000_mean']:.3f}, max {d65['delta_e2000_max']:.3f}")
 print(f"3000 K mean: {warm['delta_e2000_mean']:.3f}, max {warm['delta_e2000_max']:.3f}")
+margin = (4.0 - warm["delta_e2000_mean"]) / 4.0 * 100.0
+order = sorted(
+    range(len(warm["delta_e2000"])),
+    key=lambda index: warm["delta_e2000"][index],
+    reverse=True,
+)
+print(
+    f"3000 K margin: {margin:.2f}% below the 4.0 mean limit; per-patch maxima: "
+    f"{warm['delta_e2000'][order[0]]:.3f} ({warm['patch_names'][order[0]]}), "
+    f"{warm['delta_e2000'][order[1]]:.3f} ({warm['patch_names'][order[1]]})"
+)
 
 # %% [markdown]
-# The Luther-condition diagnostic explains the failure. It asks whether the
-# sensor's spectral sensitivities are a linear combination of the CIE colour
-# matching functions. A large relative residual means a 3x3 matrix cannot be
-# exact, no matter how it is fitted.
+# The Luther-condition diagnostic is a design check on the CFA. It asks
+# whether the sensor's spectral sensitivities are a linear combination of the
+# CIE colour matching functions. With the conventional bands the relative
+# residual is small; a large residual would mean a 3x3 matrix cannot be exact,
+# no matter how it is fitted.
 
 # %%
 luther = payload["sensor_colorimetry"]

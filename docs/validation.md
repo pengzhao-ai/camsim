@@ -235,13 +235,16 @@ ColorChecker, 2x oversampling, flagship preset at LCG):
 The ColorChecker criterion now passes because the shipped preset's CFA curves
 were re-authored as synthetic conventional Bayer bands centred near 448 nm
 (blue), 542 nm (green), and 610 nm (red) with moderate out-of-band leakage and
-peak transmittance 0.86-0.90. The superseded broad, nearly collinear curves had
-a red/green correlation of 0.940 and left a 45.6 % Luther-condition residual,
+peak transmittance 0.86-0.91 (R 0.905, G 0.903, B 0.864). The superseded
+broad, nearly collinear curves had a red/green correlation of 0.940 and left a
+45.6 % Luther-condition residual,
 so no 3x3 matrix could colour-correct them. The conventional bands reduce the
 correlation to 0.187, the projection condition number to 1.56, and the
 Luther-condition residual to 12.6 %, and the in-sample CCM fit RMS is about
 0.008 linear RGB at both illuminants. The ΔE thresholds (2.0 / 4.0) were not
-changed. The fit remains in-sample: it measures calibration-scene
+changed. The 3000 K mean is 3.834, 4.14 % below the 4.0 limit; the gate is
+mean-only, with per-patch maxima reaching 13.208 (blue) and 11.077 (purplish
+blue). The fit remains in-sample: it measures calibration-scene
 representability, not held-out generalisation or colour constancy.
 
 The report records these assumptions and known limitations:
@@ -252,6 +255,9 @@ The report records these assumptions and known limitations:
 - the CCM is fitted and evaluated **in-sample** on the same 24 patches; it
   measures calibration-scene representability, not held-out generalisation or
   colour constancy;
+- the ColorChecker CCM run uses **manual analytic perfect-diffuser AWB gains**
+  so the row-sum CCM is neutral-preserving; the default gray-world estimator is
+  validated separately on neutral flat fields and under an injected cast;
 - **formal ISO 12233-style e-SFR and MTF50/MTF20 are deferred to G4**, because
   the independent metrics harness does not exist in Phase 3; G3 reports
   edge-contrast preservation and positive overshoot instead;

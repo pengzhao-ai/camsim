@@ -31,6 +31,7 @@ is the strict comparison of the measured value against them.
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import os
@@ -41,7 +42,7 @@ from typing import Any
 
 import pytest
 
-from camsim.characterization import measure_g3
+from camsim.characterization import measure_g3, render_g3_report
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_PATH = REPO_ROOT / "examples" / "02_isp_stage_gallery.py"
@@ -152,7 +153,7 @@ def test_example_02_runs(tmp_path: Path) -> None:
     for check in payload["checks"]:
         assert {"name", "measured", "tolerance", "pass", "notes"} <= set(check)
         assert check["tolerance"]
-    assert payload["status"] in {"PASS", "FAIL"}
+    assert payload["status"] == "PASS"
 
     # The gallery must contain real figures, not an empty directory.
     gallery = sorted(figures.glob("02_*.png"))
@@ -163,6 +164,20 @@ def test_example_02_runs(tmp_path: Path) -> None:
     # Quick mode must never write or overwrite the committed gate artifacts.
     assert not (reports / "g3_isp_results.json").exists()
     assert not (reports / "g3_isp.md").exists()
+
+
+def test_g3_quick_status_is_pass(g3: dict[str, Any]) -> None:
+    """The quick measurement must be green; a red payload is a gate regression."""
+    assert g3["status"] == "PASS"
+    assert all(bool(check["pass"]) for check in g3["checks"])
+
+
+def test_g3_linearity_check_is_green(g3: dict[str, Any]) -> None:
+    """The linear pre-tone scaling check passes and its measured value is in bounds."""
+    check = _check(g3, "Linear pre-tone scaling invariance (max relative error)")
+    assert check["pass"] is True
+    assert check["measured"] <= check["tolerance"]["maximum"]
+    assert g3["linearity"]["max_relative_error"] <= check["tolerance"]["maximum"]
 
 
 def test_g3_colorchecker_delta_e_threshold(g3: dict[str, Any]) -> None:
@@ -304,6 +319,8 @@ def test_g3_report_tables_match_results_json() -> None:
     assert payload["kind"] == "camsim G3 ISP validation"
     assert payload["gate_evidence"] is True
     assert payload["quick"] is False
+    assert payload["status"] == "PASS"
+    assert all(bool(check["pass"]) for check in payload["checks"])
     assert f"**Status: {payload['status']}**" in text
 
     tables = _parse_markdown_tables(text)
@@ -381,6 +398,31 @@ def test_g3_report_tables_match_results_json() -> None:
                 math.isclose(value, expected, rel_tol=1e-4, abs_tol=1e-6)
                 for value, expected in zip(values, matrix_row, strict=True)
             )
+
+
+def test_g3_report_failure_summary_names_failing_checks(g3: dict[str, Any]) -> None:
+    """A FAIL payload must not render success prose and must name the failure."""
+    failing = copy.deepcopy(g3)
+    target = _check(failing, "ColorChecker mean deltaE2000 (D65)")
+    target["measured"] = 2.5
+    target["measured_text"] = "2.5"
+    target["pass"] = False
+    failing["status"] = "FAIL"
+    text = render_g3_report(failing)
+    assert "**Status: FAIL**" in text
+    assert "The G3 gate is FAIL" in text
+    assert target["name"] in text
+    assert "All measured G3 checks pass" not in text
+    assert "## Gate failure" in text
+
+
+def test_g3_report_success_summary_is_status_aware(g3: dict[str, Any]) -> None:
+    """A PASS payload renders the success summary from the same measured values."""
+    assert g3["status"] == "PASS"
+    text = render_g3_report(g3)
+    assert "**Status: PASS**" in text
+    assert "All measured G3 checks pass" in text
+    assert "The G3 gate is FAIL" not in text
 
 
 def test_g3_report_records_limitations() -> None:
