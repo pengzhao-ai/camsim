@@ -13,7 +13,8 @@ and pixel form from an ideal point source. Three models cover the useful range:
   box is area-weighted across partially covered pixels so that non-integer
   widths remain meaningful and the kernel sums to one.
 * **Airy.** Diffraction from a circular pupil: ``(2 J1(x) / x)**2`` with
-  ``x = pi r / r0`` and the first dark ring at
+  ``x = pi * r_px * pixel_pitch / (wavelength * f_number)``. The first zero of
+  ``J1`` at ``x = 3.8317`` puts the first dark ring at the customary
   ``r0 = 1.22 * wavelength * f_number / pixel_pitch`` pixels. A phone lens at
   f/1.8 and 550 nm with a 1.12 um pitch has ``r0`` just above one pixel, so
   diffraction is already visible at the pixel scale; stopping down to f/8 puts
@@ -36,10 +37,11 @@ function here returns a full 2-D kernel rather than a radial profile.
 
 Failure artefacts guarded here: an unnormalized kernel changes image
 brightness; a non-positive sigma or f-number has no physical meaning; negative
-or zero-sum kernels are not radiometric PSFs; truncating a wide Gaussian into
-too small a grid biases MTF low; frequencies beyond Nyquist alias and can make
-MTF appear to rise again; and a kernel whose MTF never crosses 0.5 lacks a
-finite MTF50.
+or zero-sum kernels are not radiometric PSFs; truncating a wide Gaussian or
+Airy core into too small a grid discards tails that renormalization then
+redistributes, biasing MTF high and adding aliasing/oscillation; frequencies
+beyond Nyquist alias and can make MTF appear to rise again; and a kernel whose
+MTF never crosses 0.5 lacks a finite MTF50.
 """
 
 from __future__ import annotations
@@ -53,15 +55,15 @@ from scipy.special import j1  # type: ignore[import-untyped]
 
 __all__ = ["airy_psf", "box_psf", "gaussian_psf", "psf_mtf", "psf_mtf50"]
 
-# Six sigma across the kernel is three sigma either side of the peak, which
-# contains 99.7 % of a continuous Gaussian's energy; the tiny missing tails are
-# renormalized away.
+# Six sigma across the kernel is approximately three sigma either side of the
+# peak, which contains 99.7 % of a continuous Gaussian's energy; the tiny
+# missing tails are renormalized away.
 _GAUSSIAN_TAIL_SIGMA: Final[float] = 6.0
 
-# Twelve first-zero radii across the kernel (six either side of the peak) put
-# the truncation far into the faint rings while keeping the default kernel
+# Twelve first-zero radii across the kernel (about six either side of the peak)
+# put the truncation far into the faint rings while keeping the default kernel
 # small enough to convolve.
-_AIRY_TAIL_DIAMETER_FIRST_ZEROS: Final[float] = 12.0
+_AIRY_TAIL_FIRST_ZERO_RADII: Final[float] = 12.0
 _AIRY_MIN_SIZE: Final[int] = 31
 
 # A 2.5e-5 cycles/pixel grid makes linear interpolation of the 0.5 crossing far
@@ -118,7 +120,7 @@ def gaussian_psf(sigma_px: float, size: int | None = None) -> NDArray[np.float64
         blur at the sensor plane.
     size:
         Odd or even side length of the square kernel. ``None`` uses
-        ``ceil(6 * sigma_px)`` made odd, which captures three sigma either
+        ``ceil(6 * sigma_px)`` made odd, i.e. approximately three sigma either
         side of the peak.
 
     Returns
@@ -127,8 +129,8 @@ def gaussian_psf(sigma_px: float, size: int | None = None) -> NDArray[np.float64
     floating-point round-off).
 
     A non-positive or non-finite sigma describes no physical blur; a sigma
-    larger than roughly ``size / 6`` is truncated by the grid and will bias
-    both energy and MTF.
+    larger than roughly ``size / 6`` is truncated by the grid, and
+    renormalizing the remaining core biases MTF high.
     """
     sigma = _positive(sigma_px, "sigma_px")
     if size is None:
@@ -193,10 +195,12 @@ def airy_psf(
     """Return a normalized, sampled Airy (diffraction-limited) PSF.
 
     The intensity profile is ``(2 J1(x) / x)**2`` where
-    ``x = pi * r / r0`` and ``r0 = 1.22 * wavelength * f_number / pitch`` is
-    the first dark-ring radius in pixels. Wavelength is converted from
-    nanometres to micrometres to match the pitch, both lengths being measured
-    at the sensor.
+    ``x = pi * r_px * pixel_pitch / (wavelength * f_number)``, with all lengths
+    in the same units. Since ``J1`` first vanishes at ``x = 3.8317``, the first
+    dark ring lies at ``r0 = 3.8317 / pi * wavelength * f_number / pitch``,
+    conventionally rounded to ``1.22 * wavelength * f_number / pitch`` pixels.
+    Wavelength is converted from nanometres to micrometres to match the pitch,
+    both lengths being measured at the sensor.
 
     Parameters
     ----------
@@ -209,8 +213,8 @@ def airy_psf(
         Sensor pixel pitch in micrometres; must be finite and positive.
     size:
         Side length of the square kernel. ``None`` uses at least 31 pixels and
-        twelve first-zero radii across the kernel (six either side), enough
-        for the first several rings.
+        twelve first-zero radii across the kernel (about six either side),
+        enough for the first several rings.
 
     Returns
     -------
@@ -218,17 +222,21 @@ def airy_psf(
 
     The Airy pattern carries a finite fraction of its energy outside any
     truncation, so normalization conserves the captured energy rather than the
-    infinite-plane total; a grid smaller than a few first-zero radii therefore
-    broadens the effective PSF and biases MTF low.
+    infinite-plane total; renormalizing a grid much smaller than a few
+    first-zero radii removes the faint rings, biasing MTF high and introducing
+    aliasing/oscillation.
     """
     aperture = _positive(f_number, "f_number")
     wavelength_um = _positive(wavelength_nm, "wavelength_nm") * 1e-3
     pitch_um = _positive(pixel_pitch_um, "pixel_pitch_um")
 
-    first_zero_px = 1.22 * wavelength_um * aperture / pitch_um
+    # x = pi * r_px / (lambda_um * N / pitch_um); the Airy scale below is the
+    # radius in pixels at which x = pi, and 1.22 times it is the first zero.
+    airy_scale_px = wavelength_um * aperture / pitch_um
+    first_zero_px = 1.22 * airy_scale_px
     if size is None:
         resolved_size = _odd_at_least(
-            max(_AIRY_MIN_SIZE, math.ceil(_AIRY_TAIL_DIAMETER_FIRST_ZEROS * first_zero_px))
+            max(_AIRY_MIN_SIZE, math.ceil(_AIRY_TAIL_FIRST_ZERO_RADII * first_zero_px))
         )
     else:
         resolved_size = _positive_size(size)
@@ -236,7 +244,7 @@ def airy_psf(
     coordinates = _centred_coordinates(resolved_size)
     yy, xx = np.meshgrid(coordinates, coordinates, indexing="ij")
     radius_px = np.hypot(xx, yy)
-    x = math.pi * radius_px / first_zero_px
+    x = math.pi * radius_px / airy_scale_px
 
     # J1(x)/x tends to 1/2 at the origin, so the profile is one there; compute
     # the ratio only away from x == 0 to avoid a 0/0 warning.

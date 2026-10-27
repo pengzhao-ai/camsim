@@ -51,8 +51,9 @@ def test_gaussian_psf_default_size_covers_six_sigma() -> None:
     sigma_px = 1.5
     psf = gaussian_psf(sigma_px)
 
-    # Six sigma is three sigma either side of the peak, which contains 99.7 %
-    # of the continuous Gaussian; the default grid must be odd so it is centred.
+    # Six sigma is approximately three sigma either side of the peak, which
+    # contains 99.7 % of the continuous Gaussian; the default grid must be odd
+    # so it is centred.
     assert psf.shape[0] % 2 == 1
     assert psf.shape[0] >= math.ceil(6.0 * sigma_px)
     assert psf.sum() == pytest.approx(1.0)
@@ -77,7 +78,7 @@ def test_gaussian_mtf50_analytic() -> None:
 
 
 def test_airy_first_zero_radius() -> None:
-    f_number = 1.8
+    f_number = 8.0
     wavelength_nm = 550.0
     pixel_pitch_um = 1.12
     size = 41
@@ -90,20 +91,35 @@ def test_airy_first_zero_radius() -> None:
     np.testing.assert_allclose(psf, psf[::-1, :], atol=1e-15)
     np.testing.assert_allclose(psf, psf[:, ::-1], atol=1e-15)
 
-    # Closed-form reference: the first zero of 2 J1(x)/x is at x = 3.8317,
-    # hence at radius 1.22 * wavelength * N / pitch pixels. At 1x sampling the
-    # dark ring falls between pixel centres, so compare the whole profile
-    # against the analytic expression rather than looking for a sampled zero.
-    first_zero_px = 1.22 * (wavelength_nm * 1e-3) * f_number / pixel_pitch_um
-    assert 1.0 < first_zero_px < 2.0  # a phone lens is diffraction-limited to ~1 px
+    # f/8 puts the first dark ring at r0 ~ 4.8 px, so it is resolved by the
+    # pixel grid. At f/1.8 (r0 ~ 1.08 px) the ring would fall between pixel
+    # centres and could not distinguish the correct scale from a 1.22x error.
+    airy_scale_px = (wavelength_nm * 1e-3) * f_number / pixel_pitch_um
+    first_zero_px = 1.22 * airy_scale_px
+    assert first_zero_px == pytest.approx(4.793, abs=1e-3)
+
+    # Closed-form reference: 2 J1(x)/x with x = pi * r / (lambda * N / pitch).
+    # The first zero of J1 is at x = 3.8317, i.e. r = 1.22 * lambda * N / pitch.
     coordinates = np.arange(size, dtype=np.float64) - (size - 1) / 2.0
     yy, xx = np.meshgrid(coordinates, coordinates, indexing="ij")
-    x = np.pi * np.hypot(xx, yy) / first_zero_px
+    x = np.pi * np.hypot(xx, yy) / airy_scale_px
     reference = np.ones_like(x)
     nonzero = x != 0.0
     reference[nonzero] = (2.0 * j1(x[nonzero]) / x[nonzero]) ** 2
     reference /= reference.sum()
     np.testing.assert_allclose(psf, reference, atol=1e-12)
+
+    # The sampled radial profile reaches its first dark-ring minimum within one
+    # pixel of the closed-form first zero, and the ring is deep relative to the
+    # peak. The search stops well before the second ring's zero.
+    center = size // 2
+    row = psf[center, center:]
+    search_end = math.ceil(1.5 * first_zero_px)
+    first_minimum = int(np.argmin(row[1:search_end])) + 1
+    assert first_minimum == pytest.approx(first_zero_px, abs=1.0)
+    assert row[first_minimum] < 5e-3 * row[0]
+    assert row[first_minimum] <= row[first_minimum - 1]
+    assert row[first_minimum] <= row[first_minimum + 1]
 
 
 @pytest.mark.parametrize(
