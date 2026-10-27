@@ -28,6 +28,7 @@ not evidence that the gate passed.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import math
 import re
@@ -115,6 +116,13 @@ def test_report_exists_and_status_is_awaiting_signoff() -> None:
     assert "has been signed off" not in text.lower()
     assert "sign-off is complete" not in text.lower()
 
+    # The gate table must carry the candidate status itself, not only the
+    # opening paragraph. No G5 row may be marked PASS.
+    g5_rows = [line for line in text.splitlines() if line.startswith("| G5 |")]
+    assert len(g5_rows) == 1, f"expected one G5 gate row, got {g5_rows}"
+    assert "Awaiting human sign-off" in g5_rows[0]
+    assert "**PASS**" not in g5_rows[0]
+
 
 def test_all_phase_gates_are_present_and_pass() -> None:
     """G1-G4 appear as PASS rows and their artifacts still pass every check."""
@@ -122,6 +130,8 @@ def test_all_phase_gates_are_present_and_pass() -> None:
     for gate in ("G1", "G2", "G3", "G4"):
         pattern = rf"^\| {gate} \|.*\| \*\*PASS\*\* \|$"
         assert re.search(pattern, text, re.MULTILINE), f"{gate} is not a PASS row"
+    g0_row = next(line for line in text.splitlines() if line.startswith("| G0 |"))
+    assert "**PASS** (local)" in g0_row
 
     for name in ("g1_scene_optics.md", "g2_sensor.md", "g3_isp.md", "g4_metrics.md"):
         assert "**Status: PASS**" in (REPORT_DIR / name).read_text(encoding="utf-8")
@@ -173,6 +183,45 @@ def test_linked_evidence_files_exist() -> None:
         "g4_metrics_results.json",
     ):
         assert (REPORT_DIR / name).is_file(), f"missing evidence {name}"
+
+
+def test_phase_artifact_bindings_match_current_files() -> None:
+    """The report's SHA-256 bindings must match the committed artifacts.
+
+    This is the freshness guard the prose promises: changing a G1-G4 report or
+    JSON without regenerating the consolidated report makes the binding stale
+    and fails here. It proves consistency with the committed artifacts, not
+    that the artifacts were regenerated from the current commit.
+    """
+    text = _report()
+    bindings: dict[str, str] = {}
+    for line in text.splitlines():
+        match = re.fullmatch(r"\| `([\w.-]+\.(?:md|json))` \| `([0-9a-f]{64})` \|", line)
+        if match:
+            bindings[match.group(1)] = match.group(2)
+    expected = {
+        "g1_scene_optics.md",
+        "g2_sensor.md",
+        "g2_sensor_results.json",
+        "g3_isp.md",
+        "g3_isp_results.json",
+        "g4_metrics.md",
+        "g4_metrics_results.json",
+    }
+    assert set(bindings) == expected, f"unexpected artifact bindings: {sorted(bindings)}"
+    for name, digest in bindings.items():
+        actual = hashlib.sha256((REPORT_DIR / name).read_bytes()).hexdigest()
+        assert actual == digest, f"{name} changed without regenerating the G5 report"
+
+
+def test_report_records_the_actual_regeneration() -> None:
+    """The sign-off report, not only the task report, records the re-runs."""
+    lower = _report().lower()
+    assert "regeneration record" in lower
+    assert "examples 01-04" in lower
+    assert "notebooks 01-03" in lower
+    assert "byte-identical" in lower
+    assert "g1 remained pass" in lower
 
 
 def test_g5_figures_exist_and_docs_mirror_is_byte_identical() -> None:
@@ -295,8 +344,10 @@ def test_camera_auto_exposure_converges_and_respects_limits() -> None:
         result = camera.auto_expose(scene)
         assert result.converged
         assert 1 <= result.iterations <= 12
-        assert result.exposure_s <= config.exposure.max_s
-        assert result.analog_gain_db <= config.analog_gain.max_db
+        assert config.exposure.min_s <= result.exposure_s <= config.exposure.max_s
+        assert config.analog_gain.min_db <= result.analog_gain_db <= config.analog_gain.max_db
+        assert math.isfinite(result.digital_gain) and result.digital_gain >= 1.0
+        assert result.mode in {"LCG", "HCG"}
         assert abs(result.metered_value - 0.18) <= 0.02
 
 

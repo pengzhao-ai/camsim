@@ -13,9 +13,8 @@ abstract: >-
   sign-off and are not included; the candidate is not tagged or published until
   that approval is recorded.
 version: 0.1.0.dev0
-# Candidate freeze date for provenance. The formal release date is set when
-# v0.1.0 is tagged after the G5 human sign-off.
-date-released: "2026-10-27"
+# date-released is intentionally omitted: this is a pre-sign-off G5 candidate,
+# not a tagged release. Set it to the v0.1.0 tag date after the owner approves.
 authors:
   - family-names: Zhao
     given-names: Peng

@@ -58,6 +58,7 @@ measurements below.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import math
 import os
@@ -175,11 +176,11 @@ class GateArtifact:
 # machine-specific measurements, not promises; the verdicts and counts are the
 # evidence. Update this block only after re-running the documented commands.
 GATE_RUN: Final[tuple[GateCommand, ...]] = (
-    GateCommand("uv run pytest -q", "1749 passed", 125.62, True),
+    GateCommand("uv run pytest -q", "1751 passed", 125.92, True),
     GateCommand(
         "uv run pytest --cov=camsim --cov-fail-under=90",
-        "1749 passed; total coverage 91.82% (required 90%)",
-        151.85,
+        "1751 passed; total coverage 91.82% (required 90%)",
+        152.16,
         True,
     ),
     GateCommand("uv run ruff check .", "All checks passed!", 0.06, True),
@@ -187,26 +188,26 @@ GATE_RUN: Final[tuple[GateCommand, ...]] = (
     GateCommand("uv run mypy src", "Success: no issues found in 68 source files", 0.59, True),
     GateCommand(
         "uv run mkdocs build --strict",
-        "Documentation built in 1.67 seconds",
-        1.86,
+        "Documentation built in 1.73 seconds",
+        1.90,
         True,
     ),
     GateCommand(
         "uv run python benchmarks/benchmark_pipeline.py --quick",
-        "pipeline total 8.25 ms (128 x 128)",
-        1.30,
+        "pipeline total 8.26 ms (128 x 128)",
+        1.31,
         True,
     ),
     GateCommand(
         "uv run python benchmarks/benchmark_pipeline.py",
-        "pipeline total 114.71 ms (512 x 512)",
-        1.86,
+        "pipeline total 115.29 ms (512 x 512)",
+        1.87,
         True,
     ),
     GateCommand(
         "uv build",
         "built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl",
-        0.59,
+        0.75,
         True,
     ),
 )
@@ -214,16 +215,16 @@ GATE_RUN: Final[tuple[GateCommand, ...]] = (
 # Benchmark stage shares recorded by the same gate run, used in the evidence
 # figure. Using recorded constants keeps the PNG deterministic; machine timing
 # is inherently variable and is reported as evidence, never as a guarantee.
-BENCHMARK_QUICK_TOTAL_MS: Final[float] = 8.25
-BENCHMARK_FULL_TOTAL_MS: Final[float] = 114.71
+BENCHMARK_QUICK_TOTAL_MS: Final[float] = 8.26
+BENCHMARK_FULL_TOTAL_MS: Final[float] = 115.29
 BENCHMARK_STAGES: Final[tuple[str, ...]] = (
     "scene.render",
     "sensor.expose",
     "isp.process",
     "measure_all",
 )
-BENCHMARK_QUICK_SHARE_PCT: Final[tuple[float, ...]] = (40.1, 38.2, 16.8, 4.8)
-BENCHMARK_FULL_SHARE_PCT: Final[tuple[float, ...]] = (41.2, 41.7, 15.4, 1.7)
+BENCHMARK_QUICK_SHARE_PCT: Final[tuple[float, ...]] = (39.7, 38.2, 17.0, 5.0)
+BENCHMARK_FULL_SHARE_PCT: Final[tuple[float, ...]] = (41.9, 41.2, 15.2, 1.7)
 
 
 def _package_version(name: str) -> str:
@@ -302,6 +303,38 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path} does not contain a JSON object")
     return payload
+
+
+# Every committed phase artifact the consolidated report reads. Binding each
+# file by hash makes the report internally consistent with the evidence it
+# summarises: changing an artifact without regenerating the report fails the
+# G5 tests instead of leaving a plausible-looking stale pairing.
+PHASE_ARTIFACTS: Final[tuple[str, ...]] = (
+    "g1_scene_optics.md",
+    "g2_sensor.md",
+    "g2_sensor_results.json",
+    "g3_isp.md",
+    "g3_isp_results.json",
+    "g4_metrics.md",
+    "g4_metrics_results.json",
+)
+
+
+def _sha256(path: Path) -> str:
+    """Return the SHA-256 digest of a file's bytes."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _artifact_bindings() -> list[tuple[str, str]]:
+    """Return ``(relative path, sha256)`` for every phase artifact used."""
+    missing = [name for name in PHASE_ARTIFACTS if not (REPORT_DIR / name).is_file()]
+    if missing:
+        raise ValueError(f"missing phase artifacts: {missing}")
+    return [(name, _sha256(REPORT_DIR / name)) for name in PHASE_ARTIFACTS]
 
 
 def _load_gates() -> tuple[list[GateArtifact], list[list[str]]]:
@@ -598,9 +631,12 @@ def _measure_auto_exposure() -> tuple[list[dict[str, Any]], list[Check]]:
         )
         result = camera.auto_expose(scene)
         within_limits = (
-            result.exposure_s <= config.exposure.max_s
-            and result.analog_gain_db <= config.analog_gain.max_db
+            config.exposure.min_s <= result.exposure_s <= config.exposure.max_s
+            and config.analog_gain.min_db <= result.analog_gain_db <= config.analog_gain.max_db
+            and math.isfinite(result.digital_gain)
+            and result.digital_gain >= 1.0
             and result.iterations <= AE_MAX_ITERATIONS
+            and result.mode in {"LCG", "HCG"}
         )
         rows.append(
             {
@@ -639,9 +675,11 @@ def _measure_auto_exposure() -> tuple[list[dict[str, Any]], list[Check]]:
                 f"{row['mode']}"
                 for row in rows
             ),
-            f"exposure <= preset max, analog <= preset max, iterations <= {AE_MAX_ITERATIONS}",
+            "exposure within preset min/max, analog within preset min/max, "
+            f"digital >= 1x, iterations <= {AE_MAX_ITERATIONS}, mode LCG/HCG",
             all(row["within_limits"] for row in rows),
-            "ExposureResult checked against SensorConfig exposure/analog windows",
+            "ExposureResult checked against the full SensorConfig exposure, "
+            "analog-gain, iteration, and mode bounds",
         ),
     ]
     return rows, checks
@@ -1170,6 +1208,7 @@ def _render_report(
     # tree; reading them back keeps the report tied to the validated build
     # rather than to a hash recomputed after a possible edit.
     presets = _load_json(REPORT_DIR / "g3_isp_results.json")["presets"]
+    bindings = _artifact_bindings()
 
     add("# camsim G5 validation report")
     add("")
@@ -1242,7 +1281,7 @@ def _render_report(
     add(
         "| G0 | 0 | install, lint, typecheck, tests, docs | "
         "[docs/validation.md](../../docs/validation.md) | "
-        f"{len(GATE_RUN)}/{len(GATE_RUN)} commands | **PASS** |"
+        f"{len(GATE_RUN)}/{len(GATE_RUN)} commands | **PASS** (local) |"
     )
     for gate in gates:
         passed = sum(1 for check in gate.checks if check.get("pass"))
@@ -1264,7 +1303,36 @@ def _render_report(
         "A phase gate is evidence only when its report says PASS and every "
         "recorded check in its machine-readable results passed. The loader "
         "that builds this table refuses quick-mode artifacts and any JSON not "
-        "marked `gate_evidence: true`."
+        "marked `gate_evidence: true`. G0 is a local gate run; no CI-matrix "
+        "result is recorded in this repository artifact."
+    )
+    add("")
+    add("### 3.1 Phase artifact bindings")
+    add("")
+    add(
+        "Every phase artifact this report reads is bound by SHA-256. The G5 "
+        "test suite recomputes these hashes and fails if an artifact changes "
+        "without this report being regenerated, so the consolidated tables and "
+        "the committed evidence cannot silently diverge. The binding proves "
+        "that the report describes the committed artifacts; it does **not** "
+        "prove that those artifacts were regenerated from this exact commit, "
+        "and no such proof is claimed."
+    )
+    add("")
+    add("| Artifact | SHA-256 |")
+    add("|---|---|")
+    for name, digest in bindings:
+        add(f"| `{name}` | `{digest}` |")
+    add("")
+    add(
+        "**Regeneration record for this candidate.** "
+        "`benchmarks/g1_scene_optics.py`, examples 01-04 in full mode, and "
+        "notebooks 01-03 headless were re-run on the validated source tree. "
+        "G1 remained PASS and its report and four figures were byte-identical; "
+        "the G2-G4 reports and JSON were byte-identical; the example and "
+        "notebook gallery figures were byte-identical. G2, G3, and G4 each "
+        "reported PASS after regeneration. Quick modes were not run against "
+        "the gate directories."
     )
     add("")
 
@@ -1274,7 +1342,12 @@ def _render_report(
         "The tables below are the verdict tables from the committed phase "
         "reports and their JSON. The values were not re-typed by hand: G2-G4 "
         "are read from the JSON, and G1 is parsed from its committed Markdown "
-        "verdict table. A stale report therefore cannot silently satisfy G5."
+        "verdict table. The hash bindings in section 3.1 tie this report to "
+        "those exact artifacts. They verify full-run PASS evidence and "
+        "artifact/report consistency; they do not by themselves prove that the "
+        "artifacts were regenerated from the current commit. The regeneration "
+        "record in section 3.1 states what was actually re-run for this "
+        "candidate."
     )
     add("")
     for gate in gates:
@@ -1322,8 +1395,8 @@ def _render_report(
         "branch coverage with `*/camsim/viz/*` omitted: the presentation layer "
         "is exercised by the executed examples and notebooks that generate "
         "the committed gallery, while the simulation, metrics, configuration, "
-        "characterization, and CLI modules remain under the threshold. The "
-        "threshold is not lowered for this candidate."
+        "characterization, and CLI modules remain subject to the coverage "
+        "gate. The threshold is not lowered for this candidate."
     )
     add("")
     add("### 5.2 Cross-cutting measurement summary")
@@ -1573,8 +1646,9 @@ def _render_report(
         "content.",
         "**Quick modes are not gate evidence.** `--quick` paths use smaller "
         "grids, write suffixed quick artifacts, and never overwrite the "
-        "committed full-run JSON or Markdown. The committed G2-G4 JSON is "
-        "full-run evidence (`gate_evidence: true`, `quick: false`).",
+        "committed full-run JSON or Markdown. The committed G2 JSON records "
+        "`gate_evidence: true` (G2 has no quick-mode payload); G3 and G4 "
+        "additionally record `quick: false`.",
         "**Auto-exposure digital-gain noise.** At 0.01 lux auto-exposure "
         "needs HCG, the exposure ceiling, maximum analog gain, and about 44x "
         "digital gain. Metering converges, but digital gain amplifies sensor "
@@ -1633,6 +1707,16 @@ def _render_report(
         "target; `make notebooks` executes every Jupytext notebook into "
         "`results/cache/notebooks` under a two-minute-per-notebook budget. "
         "Neither command tags, pushes, or publishes anything."
+    )
+    add("")
+    add(
+        "**Pre-commit snapshot caveat.** The generator records "
+        "`git rev-parse HEAD` and `date.today()` at generation time. Re-running "
+        "it on the candidate commit therefore rewrites the validated-commit "
+        "and report-date fields and dirties the working tree. The committed "
+        "report is a pre-commit snapshot of that candidate; regenerate it only "
+        "as part of a new candidate, and commit the regenerated report with the "
+        "change that invalidated it."
     )
     add("")
 

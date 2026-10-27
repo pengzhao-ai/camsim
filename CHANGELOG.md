@@ -4,10 +4,10 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-The `0.1.0` entry is an **unreleased candidate**: it is not tagged or
-published until the G5 human sign-off. After tagging, the heading is dated and
-a fresh `Unreleased` section opens. Version numbers shown here follow
-`src/camsim/_version.py`.
+The `[0.1.0]` heading names the **release candidate**, not the distribution
+version: `src/camsim/_version.py` remains `0.1.0.dev0` until the tag is cut
+after the G5 human sign-off. The candidate is not tagged or published. After
+tagging, the heading is dated and a fresh `Unreleased` section opens.
 
 ## [0.1.0] - unreleased candidate
 

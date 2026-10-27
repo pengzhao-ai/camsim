@@ -30,7 +30,7 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | colour-demosaicing | `0.2.7` |
 | Matplotlib | `3.11.2` |
 | Platform | `Darwin (arm64)` |
-| Validated source commit | `596c674f7284042970b0831d52346a9ea3cb5162` |
+| Validated source commit | `fe42fcf15993a100e0b04a00cf67d6b4d3a92af2` |
 | Branch | `feat/camsim-core` |
 | Report date | `2026-10-27` |
 | Sensor preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
@@ -44,18 +44,34 @@ The phase reports and this candidate were produced from the same source tree and
 
 | Gate | Phase | Scope | Evidence | Measured / passed | Status |
 |---|---|---|---|---|---|
-| G0 | 0 | install, lint, typecheck, tests, docs | [docs/validation.md](../../docs/validation.md) | 9/9 commands | **PASS** |
+| G0 | 0 | install, lint, typecheck, tests, docs | [docs/validation.md](../../docs/validation.md) | 9/9 commands | **PASS** (local) |
 | G1 | 1 | scene, illuminants, optics | [g1_scene_optics.md](g1_scene_optics.md) | 7/7 checks | **PASS** |
 | G2 | 2 | sensor model and EMVA characterization | [g2_sensor.md](g2_sensor.md) + [g2_sensor_results.json](g2_sensor_results.json) | 16/16 checks | **PASS** |
 | G3 | 3 | ISP stages and pipeline | [g3_isp.md](g3_isp.md) + [g3_isp_results.json](g3_isp_results.json) | 19/19 checks | **PASS** |
 | G4 | 4 | metrics harness | [g4_metrics.md](g4_metrics.md) + [g4_metrics_results.json](g4_metrics_results.json) | 31/31 checks | **PASS** |
 | G5 | 5 | consolidated cross-cutting evidence | this report | 13/13 checks | **Awaiting human sign-off** |
 
-A phase gate is evidence only when its report says PASS and every recorded check in its machine-readable results passed. The loader that builds this table refuses quick-mode artifacts and any JSON not marked `gate_evidence: true`.
+A phase gate is evidence only when its report says PASS and every recorded check in its machine-readable results passed. The loader that builds this table refuses quick-mode artifacts and any JSON not marked `gate_evidence: true`. G0 is a local gate run; no CI-matrix result is recorded in this repository artifact.
+
+### 3.1 Phase artifact bindings
+
+Every phase artifact this report reads is bound by SHA-256. The G5 test suite recomputes these hashes and fails if an artifact changes without this report being regenerated, so the consolidated tables and the committed evidence cannot silently diverge. The binding proves that the report describes the committed artifacts; it does **not** prove that those artifacts were regenerated from this exact commit, and no such proof is claimed.
+
+| Artifact | SHA-256 |
+|---|---|
+| `g1_scene_optics.md` | `9d57875d370aef49702234c33ba7d7872b0332fa7e69fc8b21a4b9065fda8140` |
+| `g2_sensor.md` | `324009aa10394db7a8842ceff0b3d92d17443b5c062d264585d2fdc788419692` |
+| `g2_sensor_results.json` | `aacbf03da1659b238b32cdbd4930563c88412d03fde0dd09d0acd8872feae796` |
+| `g3_isp.md` | `884a25af3e5797a7e884eda90faa424af57616f2f649703d8af7de52570cb118` |
+| `g3_isp_results.json` | `e7758e3cba31a5281db030a28135100efd5bdf260aceacc0abfa98a4088d46e8` |
+| `g4_metrics.md` | `2a7b33233f34f3ebf9365259c532957520dbf07b5f30b7b58bdb354915a40127` |
+| `g4_metrics_results.json` | `24de5b0f85a20790ead3d25a0e01417355f7f95e426910371cbf5305b68601bd` |
+
+**Regeneration record for this candidate.** `benchmarks/g1_scene_optics.py`, examples 01-04 in full mode, and notebooks 01-03 headless were re-run on the validated source tree. G1 remained PASS and its report and four figures were byte-identical; the G2-G4 reports and JSON were byte-identical; the example and notebook gallery figures were byte-identical. G2, G3, and G4 each reported PASS after regeneration. Quick modes were not run against the gate directories.
 
 ## 4. G1-G4 measured evidence
 
-The tables below are the verdict tables from the committed phase reports and their JSON. The values were not re-typed by hand: G2-G4 are read from the JSON, and G1 is parsed from its committed Markdown verdict table. A stale report therefore cannot silently satisfy G5.
+The tables below are the verdict tables from the committed phase reports and their JSON. The values were not re-typed by hand: G2-G4 are read from the JSON, and G1 is parsed from its committed Markdown verdict table. The hash bindings in section 3.1 tie this report to those exact artifacts. They verify full-run PASS evidence and artifact/report consistency; they do not by themselves prove that the artifacts were regenerated from the current commit. The regeneration record in section 3.1 states what was actually re-run for this candidate.
 
 ### G1 - scene, illuminants, optics
 
@@ -177,17 +193,17 @@ These criteria span phases or the engineering process, so no single phase report
 
 | Command | Recorded result | Wall time | Verdict |
 |---|---|---:|---|
-| `uv run pytest -q` | 1749 passed | 125.62 s | **PASS** |
-| `uv run pytest --cov=camsim --cov-fail-under=90` | 1749 passed; total coverage 91.82% (required 90%) | 151.85 s | **PASS** |
+| `uv run pytest -q` | 1751 passed | 125.92 s | **PASS** |
+| `uv run pytest --cov=camsim --cov-fail-under=90` | 1751 passed; total coverage 91.82% (required 90%) | 152.16 s | **PASS** |
 | `uv run ruff check .` | All checks passed! | 0.06 s | **PASS** |
 | `uv run ruff format --check .` | 140 files already formatted | 0.03 s | **PASS** |
 | `uv run mypy src` | Success: no issues found in 68 source files | 0.59 s | **PASS** |
-| `uv run mkdocs build --strict` | Documentation built in 1.67 seconds | 1.86 s | **PASS** |
-| `uv run python benchmarks/benchmark_pipeline.py --quick` | pipeline total 8.25 ms (128 x 128) | 1.30 s | **PASS** |
-| `uv run python benchmarks/benchmark_pipeline.py` | pipeline total 114.71 ms (512 x 512) | 1.86 s | **PASS** |
-| `uv build` | built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl | 0.59 s | **PASS** |
+| `uv run mkdocs build --strict` | Documentation built in 1.73 seconds | 1.90 s | **PASS** |
+| `uv run python benchmarks/benchmark_pipeline.py --quick` | pipeline total 8.26 ms (128 x 128) | 1.31 s | **PASS** |
+| `uv run python benchmarks/benchmark_pipeline.py` | pipeline total 115.29 ms (512 x 512) | 1.87 s | **PASS** |
+| `uv build` | built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl | 0.75 s | **PASS** |
 
-Absolute timings are machine-specific and are evidence, not guarantees. The coverage gate enforces at least 90 % statement and branch coverage with `*/camsim/viz/*` omitted: the presentation layer is exercised by the executed examples and notebooks that generate the committed gallery, while the simulation, metrics, configuration, characterization, and CLI modules remain under the threshold. The threshold is not lowered for this candidate.
+Absolute timings are machine-specific and are evidence, not guarantees. The coverage gate enforces at least 90 % statement and branch coverage with `*/camsim/viz/*` omitted: the presentation layer is exercised by the executed examples and notebooks that generate the committed gallery, while the simulation, metrics, configuration, characterization, and CLI modules remain subject to the coverage gate. The threshold is not lowered for this candidate.
 
 ### 5.2 Cross-cutting measurement summary
 
@@ -198,7 +214,7 @@ Absolute timings are machine-specific and are evidence, not guarantees. The cove
 | Sharpen MTF50 gain | 0.187328 -> 0.249291 cycles/pixel (+33.08%) | after > before | **PASS** |
 | Sharpen positive overshoot | max normalized profile 1.002107 (overshoot +0.21% of edge contrast) | > 1 + 0.001 | **PASS** |
 | Camera AE convergence | 2000 lux: 1 probe(s), metered 0.1930; 20 lux: 4 probe(s), metered 0.1634; 0.01 lux: 5 probe(s), metered 0.1786 | converged and \|metered - 0.18\| <= 0.02 | **PASS** |
-| Camera AE physical limits | 2000 lux: 10.00 ms, 0.0 dB analog, 1.00x digital, LCG; 20 lux: 100.00 ms, 7.0 dB analog, 1.26x digital, HCG; 0.01 lux: 100.00 ms, 24.0 dB analog, 44.34x digital, HCG | exposure <= preset max, analog <= preset max, iterations <= 12 | **PASS** |
+| Camera AE physical limits | 2000 lux: 10.00 ms, 0.0 dB analog, 1.00x digital, LCG; 20 lux: 100.00 ms, 7.0 dB analog, 1.26x digital, HCG; 0.01 lux: 100.00 ms, 24.0 dB analog, 44.34x digital, HCG | exposure within preset min/max, analog within preset min/max, digital >= 1x, iterations <= 12, mode LCG/HCG | **PASS** |
 | RCCC baseline shape and constants | (32, 48, 3), R=0.250, G=0.600, B=0.600 | finite (H, W, 3); R = 0.25; G = B = 0.60 | **PASS** |
 | RCCC baseline linearity | max \|0.5 x output - output(0.5 x input)\| = 0.000e+00 | <= 1e-6 | **PASS** |
 | Determinism (same seeds, same environment) | RAW equal=True, rendered equal=True (57344 bytes compared) | bit-identical arrays | **PASS** |
@@ -292,7 +308,7 @@ Quick modes (`--quick`) use smaller grids and write suffixed `*_quick.json` arti
 2. **In-sample calibration.** The measured mean delta-E values (0.919 under D65 and 3.834 under 3000 K) are in-sample; the 3000 K mean is 4.14 % below its limit and per-patch maxima reach 13.208. Held-out chart, illuminant-generalisation, and colour-constancy performance are not claimed.
 3. **8x Airy MTF gate.** The G4 analytic MTF cases use eight analysis samples per pixel because four carries roughly a 2 % MTF50 bias near the diffraction limit. Airy f/2.8 is a documented diagnostic only: its MTF never reaches 0.20 inside Nyquist and its crossing sits at the band edge.
 4. **Synthetic LSC, denoise, and sharpen measurements.** Lens shading is measured on a synthetic radial flat field, denoise on a synthetic noisy step edge and flat patch, and sharpen on a synthetic blurred step edge. These isolate the stages; they are not camera captures and do not include real lens shading, sensor texture, or scene content.
-5. **Quick modes are not gate evidence.** `--quick` paths use smaller grids, write suffixed quick artifacts, and never overwrite the committed full-run JSON or Markdown. The committed G2-G4 JSON is full-run evidence (`gate_evidence: true`, `quick: false`).
+5. **Quick modes are not gate evidence.** `--quick` paths use smaller grids, write suffixed quick artifacts, and never overwrite the committed full-run JSON or Markdown. The committed G2 JSON records `gate_evidence: true` (G2 has no quick-mode payload); G3 and G4 additionally record `quick: false`.
 6. **Auto-exposure digital-gain noise.** At 0.01 lux auto-exposure needs HCG, the exposure ceiling, maximum analog gain, and about 44x digital gain. Metering converges, but digital gain amplifies sensor noise and cannot create signal; extreme-low-light image quality is not claimed.
 7. **No HDR, 3-D, motion blur, or autofocus.** The model has a single linear exposure, a planar scene, static optics, and no focus search, rolling shutter, or multi-frame HDR. These are Phase 6-9 or later scope, not G5 claims.
 8. **RCCC is a baseline only.** The clear channel is a luma placeholder for G and B; Bayer colour and MTF thresholds do not apply, and advanced RCCC demosaicing is deferred.
@@ -332,6 +348,8 @@ uv build
 ```
 
 `make figures` runs examples 01-04 and is the gallery regeneration target; `make notebooks` executes every Jupytext notebook into `results/cache/notebooks` under a two-minute-per-notebook budget. Neither command tags, pushes, or publishes anything.
+
+**Pre-commit snapshot caveat.** The generator records `git rev-parse HEAD` and `date.today()` at generation time. Re-running it on the candidate commit therefore rewrites the validated-commit and report-date fields and dirties the working tree. The committed report is a pre-commit snapshot of that candidate; regenerate it only as part of a new candidate, and commit the regenerated report with the change that invalidated it.
 
 ## 9. Figure gallery
 

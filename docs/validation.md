@@ -462,6 +462,11 @@ sign-off**. G1–G4 are green, every cross-cutting check passes, and the
 engineering gates below are green. The G5 gate is still open until the project
 owner records an explicit approval.
 
+The consolidated report binds the G1–G4 reports and machine-readable results by
+SHA-256. `tests/test_g5_signoff.py` recomputes those hashes, so a phase artifact
+cannot change without regenerating the report, and the report records the
+artifact regeneration actually performed for the candidate.
+
 ### Cross-cutting evidence
 
 These criteria span phases or the engineering process and are measured by
@@ -495,13 +500,13 @@ documented luma placeholder, and the Bayer colour and MTF gates do not apply.
 
 | Gate | Recorded result |
 |---|---|
-| `uv run pytest -q` | 1749 passed |
-| `uv run pytest --cov=camsim --cov-fail-under=90` | 1749 passed; 91.82% coverage (required 90%) |
+| `uv run pytest -q` | 1751 passed |
+| `uv run pytest --cov=camsim --cov-fail-under=90` | 1751 passed; 91.82% coverage (required 90%) |
 | `uv run ruff check .` / `ruff format --check .` | clean; 140 files formatted |
 | `uv run mypy src` | no issues in 68 source files |
-| `uv run mkdocs build --strict` | built in 1.67 s |
-| `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.25 ms total (128 × 128) |
-| `uv run python benchmarks/benchmark_pipeline.py` | 114.71 ms total (512 × 512) |
+| `uv run mkdocs build --strict` | built in 1.73 s |
+| `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.26 ms total (128 × 128) |
+| `uv run python benchmarks/benchmark_pipeline.py` | 115.29 ms total (512 × 512) |
 | `uv build` | wheel and sdist for `0.1.0.dev0` |
 
 CI runs the same commands on Ubuntu and macOS across Python 3.11, 3.12, and
