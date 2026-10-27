@@ -1008,15 +1008,16 @@ import camsim
 from camsim.core.spectral import SpectralIrradiance
 from camsim.core.frames import CFAPattern
 
-def make_irr(level=100.0, shape=(32, 32)):
+def make_irr(level=1e-4, shape=(32, 32)):
     w = np.arange(360.0, 831.0, 5.0)  # matches the flagship preset grid
     data = np.full((*shape, len(w)), level, dtype=np.float32)
     return SpectralIrradiance.from_array(data, w, "W/m^2/nm", pixel_pitch_um=1.12)
 
 def test_expose_linear_with_lux(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
-    means = [sensor.expose(make_irr(l), 0.01, mode="LCG", seed=1).data.mean() for l in (1, 2, 4, 8)]
-    assert np.corrcoef(means, [1, 2, 4, 8])[0, 1] > 0.999
+    levels = (1e-5, 2e-5, 4e-5, 8e-5)
+    means = [sensor.expose(make_irr(l), 0.01, mode="LCG", seed=1).data.mean() for l in levels]
+    assert np.corrcoef(means, levels)[0, 1] > 0.999
 
 def test_same_seed_bit_identical(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
@@ -1033,12 +1034,10 @@ def test_per_call_seed_independent_of_call_order(sensor_config):
 
 def test_external_irradiance_wrong_shape_raises(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
-    grid = np.arange(360.0, 831.0, 5.0)  # correct wavelength grid, wrong spatial shape
-    irr = SpectralIrradiance.from_array(
-        np.ones((8, 8, len(grid))), grid, "W/m^2/nm", pixel_pitch_um=1.12,
-    )
+    # The first successful frame locks the native grid; later shapes raise.
+    sensor.expose(make_irr(shape=(32, 32)), 0.01, mode="LCG", seed=1)
     with pytest.raises(ValueError, match="sensor grid"):
-        sensor.expose(irr, 0.01)
+        sensor.expose(make_irr(shape=(8, 8)), 0.01, mode="LCG", seed=1)
 ```
 
 Additional tests: `test_exposure_linearity`, `test_shot_noise_variance_slope`, `test_temperature_override_increases_dark`, `test_wrong_pixel_pitch_raises`, `test_wavelength_mismatch_raises`, `test_mono_output_single_channel`, `test_rggb_mosaic_pattern`, `test_binning_analog_vs_digital`, `test_crosstalk_row_sums`, `test_blooming_spreads_saturated_charge`, `test_no_nan_in_raw`.
@@ -1088,17 +1087,17 @@ from camsim.characterization import characterize_sensor
 
 def test_characterization_recovers_read_noise(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
-    report = characterize_sensor(sensor, irradiance_levels=[1, 2, 4, 8, 16], frames_per_level=16, mode="HCG", exposure_s=0.01, base_seed=3)
+    report = characterize_sensor(sensor, irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2], frames_per_level=16, mode="HCG", exposure_s=0.01, base_seed=3)
     assert report.read_noise_e == pytest.approx(0.7, rel=0.10)
 
 def test_characterization_recovers_saturation(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
-    report = characterize_sensor(sensor, irradiance_levels=[1, 2, 4, 8, 16, 32], frames_per_level=8, mode="HCG", exposure_s=0.01, base_seed=3)
+    report = characterize_sensor(sensor, irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 4e-2], frames_per_level=8, mode="HCG", exposure_s=0.01, base_seed=3)
     assert report.saturation_capacity_e == pytest.approx(2000.0, rel=0.10)
 
 def test_characterization_reports_dynamic_range(sensor_config):
     sensor = camsim.Sensor(sensor_config, seed=1)
-    report = characterize_sensor(sensor, irradiance_levels=[1, 2, 4, 8], frames_per_level=8, mode="LCG", exposure_s=0.01, base_seed=3)
+    report = characterize_sensor(sensor, irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2], frames_per_level=8, mode="LCG", exposure_s=0.01, base_seed=3)
     assert report.dynamic_range_db > 30.0
 ```
 
@@ -1111,7 +1110,7 @@ Expected: FAIL with import errors.
 
 - [ ] **Step 3: Implement the EMVA-style measurement**
 
-Generate flat-field frames per level with independent seeds; subtract black level; compute mean/variance per level; fit the photon transfer curve; derive system gain, read noise, saturation, absolute sensitivity threshold, dynamic range, DSNU, PRNU, and SNR curve. Document assumptions and cite EMVA 1288 in the module docstring.
+Generate flat-field frames per level with independent seeds; subtract black level; compute mean/variance per level; fit the photon transfer curve; derive system gain, read noise, saturation, absolute sensitivity threshold, dynamic range, DSNU, PRNU, and SNR curve. Document assumptions and cite EMVA 1288 in the module docstring. `irradiance_levels` are flat-field spectral irradiance in W/m²/nm; use the low-signal-to-saturation range (e.g., 2e-4 to 4e-2 for HCG at 10 ms), not 1–16 W/m²/nm, which saturates every frame.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -1151,7 +1150,7 @@ from camsim.config.io import load_sensor
 def test_preset_linearity_and_dynamic_range():
     cfg = load_sensor("src/camsim/config/presets/sensors/flagship_phone_50mp.json")
     sensor = camsim.Sensor(cfg, seed=5)
-    report = characterize_sensor(sensor, irradiance_levels=[1, 2, 4, 8, 16], frames_per_level=8, mode="LCG", exposure_s=0.01, base_seed=9)
+    report = characterize_sensor(sensor, irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 4e-2, 8e-2], frames_per_level=8, mode="LCG", exposure_s=0.01, base_seed=9)
     assert report.linearity_residual < 0.05
     assert 30.0 < report.dynamic_range_db < 90.0
 ```
@@ -1163,7 +1162,7 @@ Expected: FAIL until the preset/report are complete.
 
 - [ ] **Step 3: Finalize the preset, datasheet guide, and examples**
 
-Fill the flagship preset with value-justified QE/CFA/IR-cut curves and provenance; document how each datasheet field maps to JSON and which values are assumptions. Add the EMVA example and sensor notebook sections. Generate G2 plots: QE/CFA/IR-cut curves, PTC, SNR vs irradiance, dark current vs temperature, LCG/HCG comparison, DSNU/PRNU histograms.
+Fill the flagship preset with value-justified QE/CFA/IR-cut curves and provenance; document how each datasheet field maps to JSON and which values are assumptions. Add the optional `spatial_crosstalk` kernel to `SensorConfig` and apply it per channel plane after spectral crosstalk and before read noise (default identity/none), closing the Task 15 helper-only gap. Add the EMVA example and sensor notebook sections. Generate G2 plots: QE/CFA/IR-cut curves, PTC, SNR vs irradiance, dark current vs temperature, LCG/HCG comparison, DSNU/PRNU histograms.
 
 - [ ] **Step 4: Run the G2 gate**
 
