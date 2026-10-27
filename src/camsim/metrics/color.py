@@ -647,6 +647,8 @@ class PatchColorResult:
         ``True`` only when both differences are finite. An invalid patch may
         carry ``NaN``; a valid one may not.
 
+    Notes
+    -----
     The dataclass is frozen so a per-patch row can travel from a metric into a
     report without being edited. Camera colour differences typically run from
     below 1 for a near-perfect match to 5 or more for a visible error.
@@ -710,6 +712,8 @@ class ColorResult:
         and both means are finite. An empty result has no defined mean and is
         therefore invalid.
 
+    Notes
+    -----
     The dataclass is frozen. It carries the per-patch rows so a report can show
     which patches dominate an error instead of only a summary number; a mean of
     about 1-5 delta-E00 is typical camera colour, and individual patches can be

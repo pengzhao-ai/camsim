@@ -40,13 +40,6 @@ plugins:
         python:
           options:
             docstring_style: numpy
-            # The source docstrings use NumPy sections with a short prose
-            # paragraph after some parameter lists. Griffe reads that prose as
-            # extra parameter names and warns about them; the documentation is
-            # correct, so docstring parsing warnings are disabled while link,
-            # nav, and build warnings remain strict.
-            docstring_options:
-              warnings: false
             show_source: false
             filters: ["!^_"]
             members_order: source

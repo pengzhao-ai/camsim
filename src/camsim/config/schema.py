@@ -238,7 +238,7 @@ class ConfigModel(BaseModel):
 class Provenance(ConfigModel):
     """Traceability metadata for a preset.
 
-    Parameters
+    Attributes
     ----------
     source:
         Where the numbers came from, for example a datasheet name or
@@ -574,7 +574,7 @@ class SensorConfig(ConfigModel):
 class LensConfig(ConfigModel):
     """Reference lens geometry and transmission.
 
-    Parameters
+    Attributes
     ----------
     f_number:
         Relative aperture ``N``; real lenses span f/0.7 to f/22.
@@ -590,6 +590,8 @@ class LensConfig(ConfigModel):
         Optional strength in ``[0, 1]`` scaling the physical ``cos**4``
         falloff; ``None`` disables vignetting in the scene renderer.
 
+    Notes
+    -----
     Derived quantities are properties rather than stored fields so they can
     never disagree with the geometry. The reference phone lens (f/1.8,
     6.4 mm actual focal length, 11.46 mm diagonal, T = 0.9) sees about 84

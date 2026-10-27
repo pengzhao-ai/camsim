@@ -117,6 +117,8 @@ class PatchROI:
     width, height:
         Region size in sensor pixels. Both are positive integers.
 
+    Notes
+    -----
     The region is half-open: it covers columns ``x .. x + width - 1`` and rows
     ``y .. y + height - 1``. It carries no image size, so it may be built
     before the frame is known; :func:`extract_patch` performs the containment
@@ -214,6 +216,8 @@ class ChartLayout:
         known. Combined with ``pixel_pitch_um`` it gives the angular pixel
         pitch that converts cycles/pixel to cycles/degree.
 
+    Notes
+    -----
     Coordinates refer to the sensor grid of the measured image, never to the
     oversampled rendering grid. The layout is a frozen value object: it can be
     shared between metric calls and serialized for a report's provenance

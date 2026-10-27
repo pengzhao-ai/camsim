@@ -123,7 +123,8 @@ branch = true
 # The presentation layer is plotting code, not a numerical contract. It is
 # exercised by the example scripts and Jupytext notebooks that generate the
 # committed gallery (run headlessly by `make figures` and `make notebooks`),
-# not by the unit suite, so it is excluded from the statement-coverage gate.
+# not by the unit suite, so it is excluded from the statement-and-branch
+# coverage gate.
 # The simulation, metrics, configuration, characterization, and CLI modules
 # remain under the 90% threshold.
 omit = ["*/tests/*", "*/camsim/viz/*"]

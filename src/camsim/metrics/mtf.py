@@ -276,6 +276,8 @@ class MTFCurve:
         an unclipped estimate, but a passive system cannot amplify modulation
         and :func:`slanted_edge_mtf` clips its own result to ``[0, 1]``.
 
+    Notes
+    -----
     Both inputs are converted to float64 and **copied**, so mutating the caller's
     array afterwards cannot change a curve that may be shared between a result,
     a report, and a plot. The dataclass is frozen; the arrays it holds are not
@@ -342,6 +344,8 @@ class MTFResult:
         Upper edge of the measured band in cycles/pixel; 0.5 by default. The
         finite crossing fields must lie inside ``[0, nyquist_cp]``.
 
+    Notes
+    -----
     The fields are stored as given; the class does not recompute the crossings
     from the curve, so a caller who edits a curve before constructing the result
     is responsible for keeping the summary consistent. The dataclass is frozen;

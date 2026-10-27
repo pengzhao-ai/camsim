@@ -255,13 +255,13 @@ class MetricReport:
         focal length, reference illuminant, MTF input domain, and the
         ``skipped`` list. ``None`` becomes an empty dict; a mapping is copied.
 
+    Notes
+    -----
     The dataclass is frozen, so a report can be shared between a sweep, a
     figure, and a serialized artifact without a later stage editing it. The
     nested SNR dicts are ordinary dicts for JSON compatibility; treat them as
     read-only.
 
-    Notes
-    -----
     :meth:`to_dict` expands dataclasses and converts arrays, tuples, NumPy
     scalars, and non-finite floats (to ``None``). :meth:`to_json` serializes
     that mapping with ``allow_nan=False``, so NaN crossings and undefined SNR

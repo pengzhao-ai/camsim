@@ -28,6 +28,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 README = REPO_ROOT / "README.md"
@@ -92,6 +93,33 @@ def test_docs_pages_and_release_workflow_exist():
     workflow = REPO_ROOT / ".github" / "workflows" / "release.yml"
     assert workflow.is_file(), "missing release workflow"
     assert (REPO_ROOT / ".github" / "workflows" / "docs.yml").is_file()
+
+
+def test_api_page_renders_lazy_top_level_exports(tmp_path: Path) -> None:
+    """The built API page must expose the five lazy public names as anchors."""
+    pytest.importorskip("mkdocs")
+    site_dir = tmp_path / "site"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mkdocs",
+            "build",
+            "--strict",
+            "--site-dir",
+            str(site_dir),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "MPLBACKEND": "Agg"},
+        timeout=180,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    page = (site_dir / "api" / "index.html").read_text(encoding="utf-8")
+    for name in ("ISP", "Sensor", "SpectralIrradiance", "WavelengthGrid", "LensConfig"):
+        assert f'id="camsim.{name}"' in page, f"API page has no anchor for camsim.{name}"
 
 
 def test_release_workflow_tag_trigger_and_assets():

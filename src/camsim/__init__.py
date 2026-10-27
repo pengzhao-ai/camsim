@@ -12,9 +12,20 @@ Later phases register public names in ``_LAZY_EXPORTS`` as
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from ._version import __version__
+
+if TYPE_CHECKING:
+    # Static analysers and the documentation builder cannot execute the lazy
+    # ``__getattr__`` below, so mirror the public map with type-checking-only
+    # aliases. This block is never imported at runtime and therefore adds no
+    # cost to ``import camsim``.
+    from camsim.config.schema import LensConfig as LensConfig
+    from camsim.core.spectral import SpectralIrradiance as SpectralIrradiance
+    from camsim.core.spectral import WavelengthGrid as WavelengthGrid
+    from camsim.isp.pipeline import ISP as ISP
+    from camsim.sensor import Sensor as Sensor
 
 __all__: Final[list[str]] = [
     "ISP",

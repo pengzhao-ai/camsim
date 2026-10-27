@@ -97,8 +97,8 @@ package and operates on arrays plus metadata.
 - Explicit `numpy.random.Generator` objects, recorded seeds and config hashes,
   no global RNG; bit-identical within one environment, tolerance-based across
   platforms.
-- Phase gates G0–G5 with committed reports and figures; see
-  [Validation](docs/validation.md).
+- Phase gates G0–G4 with committed reports and figures; G5 human sign-off is
+  pending; see [Validation](docs/validation.md).
 
 ## Installation
 
@@ -268,10 +268,11 @@ uv run python benchmarks/benchmark_pipeline.py --quick
 
 Timings are machine-specific and are printed, never committed as claims.
 
-The coverage gate is statement coverage of the simulation, metrics, and support
-modules. The presentation layer (`camsim.viz`) is validated by the executed
-examples and notebooks that generate the committed gallery, and is excluded
-from the unit-suite gate; see [Validation](docs/validation.md) for the policy.
+The coverage gate is statement and branch coverage of the simulation, metrics,
+and support modules. The presentation layer (`camsim.viz`) is validated by the
+executed examples and notebooks that generate the committed gallery, and is
+excluded from the unit-suite gate; see [Validation](docs/validation.md) for the
+policy.
 
 ## Release status
 

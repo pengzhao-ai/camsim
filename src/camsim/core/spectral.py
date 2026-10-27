@@ -81,6 +81,8 @@ class WavelengthGrid:
         One-dimensional wavelength samples in nanometres. The array is copied
         and made read-only, so the grid cannot drift after construction.
 
+    Notes
+    -----
     The grid must contain at least two wavelengths so that a spacing is
     defined. Non-uniform spacing, non-positive or non-finite wavelengths, and
     non-monotonic order are rejected because they break the projection-matrix
@@ -175,6 +177,8 @@ class SpectralIrradiance:
         Optional square-pixel pitch in micrometres. Positive when present; used
         by the sensor to reject cubes rendered for a different pixel grid.
 
+    Notes
+    -----
     The cube describes irradiance at the sensor plane *before* the sensor's own
     IR-cut and CFA filters, so those filters are applied exactly once. Values
     are per-nanometre densities; this class does not integrate over wavelength.

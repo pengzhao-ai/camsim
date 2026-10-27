@@ -53,11 +53,11 @@ repository or the release page; a checked box without evidence is not a pass.
 - [ ] `uv sync --all-extras` from a clean clone.
 - [ ] `uv run pytest -q` passes.
 - [ ] `uv run pytest --cov=camsim --cov-fail-under=90` passes. The gate covers
-      the simulation, metrics, configuration, and CLI modules; `camsim.viz` is
-      excluded because the presentation layer is validated by the executed
-      gallery examples and notebooks, not by unit tests. Do not lower the
-      threshold to make a release; fix the gap or document a reviewed
-      exception.
+      statement and branch coverage of the simulation, metrics, configuration,
+      and CLI modules; `camsim.viz` is excluded because the presentation layer
+      is validated by the executed gallery examples and notebooks, not by unit
+      tests. Do not lower the threshold to make a release; fix the gap or
+      document a reviewed exception.
 - [ ] `uv run ruff check .` and `uv run ruff format --check .` pass.
 - [ ] `uv run mypy src` passes under `strict`.
 - [ ] `uv run mkdocs build --strict` passes with the docs extra installed.

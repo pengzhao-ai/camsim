@@ -199,6 +199,8 @@ class PatchROI:
     width, height:
         Region size in sensor pixels; both strictly positive.
 
+    Notes
+    -----
     The region is half-open: it covers columns ``x .. x + width - 1`` and rows
     ``y .. y + height - 1``. This small layout type is intentionally local to
     the scene layer for the current phase; the metrics layer defines a richer
@@ -235,6 +237,8 @@ class SceneLayout:
         region for edge-based metrics; this phase supplies a conservative
         centred region, and the metrics layer may crop further.
 
+    Notes
+    -----
     Coordinates always refer to the sensor grid of the returned
     :class:`SceneResult.irradiance`, not to the oversampled rendering grid.
     """
@@ -278,6 +282,8 @@ class SceneResult:
         grid shape, PSF and vignetting settings, and seed). Copied on
         construction.
 
+    Notes
+    -----
     A scene result is a value object: mutate the arrays it exposes rather than
     the result fields, and pass it to the sensor layer exactly as returned.
     """

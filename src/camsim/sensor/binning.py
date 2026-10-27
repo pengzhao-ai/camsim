@@ -79,6 +79,8 @@ class BinningPlan:
     output_shape:
         Binned ``(height // factor, width // factor)`` in pixels.
 
+    Notes
+    -----
     ``pixel_pitch_scale`` is the factor by which the output pixel pitch grows;
     the sensor writes ``pixel_pitch_um * factor`` into the RAW frame.
     """

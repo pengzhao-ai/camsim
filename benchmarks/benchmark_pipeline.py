@@ -53,8 +53,7 @@ ISP_PRESET: Final[Path] = PRESETS_DIR / "isp" / "default.json"
 
 QUICK_SHAPE: Final[tuple[int, int]] = (128, 128)
 FULL_SHAPE: Final[tuple[int, int]] = (512, 512)
-QUICK_REPEATS: Final[int] = 3
-FULL_REPEATS: Final[int] = 3
+DEFAULT_REPEATS: Final[int] = 3
 
 SCENE_SEED: Final[int] = 11
 SENSOR_SEED: Final[int] = 1
@@ -130,8 +129,8 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--repeats",
         type=_positive_int,
-        default=None,
-        help="timed repetitions per stage (default: 3, or 3 in quick mode)",
+        default=DEFAULT_REPEATS,
+        help="timed repetitions per stage",
     )
     parser.add_argument(
         "--warmup",
@@ -232,11 +231,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the benchmark and return a process exit code."""
     args = _parse_args(argv)
     shape = QUICK_SHAPE if args.quick else FULL_SHAPE
-    repeats = (
-        args.repeats
-        if args.repeats is not None
-        else (QUICK_REPEATS if args.quick else FULL_REPEATS)
-    )
+    repeats = args.repeats
     _print_header(shape, warmup=args.warmup, repeats=repeats, quick=bool(args.quick))
 
     operations = _build_pipeline(shape)

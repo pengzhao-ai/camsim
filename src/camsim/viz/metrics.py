@@ -103,6 +103,8 @@ class MTFPlotSeries:
         Interpolated crossings in cycles/pixel, or NaN when the curve never
         reaches that level inside Nyquist. A NaN crossing draws no marker.
 
+    Notes
+    -----
     The arrays are converted to float64 and copied, so the series is a value
     object that a figure and a report can share without later mutation.
     """

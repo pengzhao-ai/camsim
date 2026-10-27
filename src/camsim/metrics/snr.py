@@ -209,6 +209,8 @@ class SNRResult:
         positive mean and std, because those are exactly the conditions under
         which the ratio exists.
 
+    Notes
+    -----
     The dataclass is frozen. A result carries the statistics that produced it,
     so a report can show why a measurement was rejected - for example a flat
     patch with ``std == 0`` and its measured mean - rather than only a NaN.

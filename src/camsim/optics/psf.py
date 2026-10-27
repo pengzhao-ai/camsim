@@ -163,6 +163,8 @@ def box_psf(width_px: float, size: int | None = None) -> NDArray[np.float64]:
         Side length of the square kernel. ``None`` uses the smallest odd size
         that contains the box.
 
+    Notes
+    -----
     Boxes wider than one pixel produce a sampled transfer function close to
     ``|sinc(width_px * f)|``. A one-pixel box exactly covers one pixel centre,
     so it samples to a delta kernel and its continuous ``sinc(f)`` response is

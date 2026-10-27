@@ -515,6 +515,8 @@ class GlyphDataset:
         Mapping recording the font, rasteriser, default ColorChecker spectra,
         rotation bounds, and seed scheme.
 
+    Notes
+    -----
     A full spectral cube for n=20 samples at 64 x 64 sensor pixels and four
     samples per pixel is about 1 GB in float64; the stored masks are a few
     megabytes. :meth:`materialize` builds a cube only when a consumer needs

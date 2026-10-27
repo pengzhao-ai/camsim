@@ -41,7 +41,7 @@ comparisons use tolerances because floating-point reduction order may differ.
 
 ## Coverage policy
 
-The coverage gate enforces **at least 90 % statement coverage** with:
+The coverage gate enforces **at least 90 % statement and branch coverage** with:
 
 ```bash
 uv run pytest --cov=camsim --cov-fail-under=90

@@ -187,8 +187,10 @@ shape and oversampling as the render.
 `MetricReport.to_dict()` expands the nested dataclasses into a JSON-friendly
 mapping; `to_json()` serializes it with `allow_nan=False`, converting NaN
 crossings and undefined ratios to `null`. NumPy scalars and tuples become plain
-Python values. The committed `results/reports/g4_metrics_results.json` is an
-example of this format.
+Python values. The G4 gate's committed
+`results/reports/g4_metrics_results.json` is the gate's measurement payload,
+not a serialized `MetricReport`; its `measure_all.serialization` section
+records the serialization checks as booleans.
 
 ```python
 report = measure_all(image, layout)

@@ -121,6 +121,8 @@ class SNRPoint:
     snr_db_total:
         ``20 log10(mean_signal_e / noise_e_total)``.
 
+    Notes
+    -----
     The explicit DN and electron fields keep the units auditable. A bare
     ``snr`` value cannot be interpreted without knowing whether the noise was
     measured before or after gain, quantization, and row-noise removal.
@@ -244,6 +246,8 @@ class EMVAReport:
         statement that this is a simulated characterization rather than a
         certified EMVA measurement.
 
+    Notes
+    -----
     Numeric fields are validated on construction. ``provenance`` is copied so a
     caller cannot mutate the report through an alias.
     """

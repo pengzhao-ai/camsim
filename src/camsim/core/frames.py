@@ -98,6 +98,8 @@ class StageOutput:
     metadata:
         Stage-specific parameters or statistics. Defaults to an empty dict.
 
+    Notes
+    -----
     Trace outputs are snapshots: later stages must not mutate arrays received
     from an earlier stage, otherwise the trace no longer describes the
     processing order that produced the final image.

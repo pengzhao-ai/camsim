@@ -203,6 +203,8 @@ class G3Gallery:
     rccc_image:
         Rendered RCCC baseline image, shape ``(H, W, 3)``.
 
+    Notes
+    -----
     The dataclass is frozen, but the arrays and the stage dictionary are not
     deep-frozen; treat them as read-only snapshots.
     """
