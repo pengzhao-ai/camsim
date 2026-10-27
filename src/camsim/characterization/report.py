@@ -18,7 +18,9 @@ the measurements defined by EMVA Standard 1288:
 * **Dynamic range**, ``20 log10(saturation_capacity_e / read_noise_e)``.
 * **DSNU** (dark-signal non-uniformity) and **PRNU** (photo-response
   non-uniformity), the fixed spatial standard deviations of the dark offset
-  and of the relative flat-field response.
+  and of the relative flat-field response. ``dsnu_e`` is the pre-zero-clamp,
+  input-referred offset sigma; the raw post-clamp dark spread is smaller and is
+  recorded in provenance.
 * **SNR curve** and **linearity residual**, which describe the signal range
   between the noise floor and saturation.
 
@@ -108,10 +110,20 @@ class SNRPoint:
     snr_db:
         ``20 log10(mean_signal_e / noise_e)``. At the absolute sensitivity
         threshold and below it is at or under 0 dB.
+    noise_dn_total:
+        Optional raw-frame temporal noise in DN, including common-mode row
+        noise and ADC quantization. The primary ``noise_dn`` is the
+        row-demeaned pixel-temporal noise (quantization included, common-mode
+        row noise removed); the total variant describes what a single image
+        actually shows.
+    noise_e_total:
+        The total noise in electrons.
+    snr_db_total:
+        ``20 log10(mean_signal_e / noise_e_total)``.
 
     The explicit DN and electron fields keep the units auditable. A bare
     ``snr`` value cannot be interpreted without knowing whether the noise was
-    measured before or after gain and quantization.
+    measured before or after gain, quantization, and row-noise removal.
     """
 
     irradiance_w_per_m2_nm: float
@@ -120,6 +132,9 @@ class SNRPoint:
     noise_dn: float
     noise_e: float
     snr_db: float
+    noise_dn_total: float | None = None
+    noise_e_total: float | None = None
+    snr_db_total: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -136,8 +151,24 @@ class SNRPoint:
         object.__setattr__(self, "noise_dn", _non_negative_float(self.noise_dn, "noise_dn"))
         object.__setattr__(self, "noise_e", _non_negative_float(self.noise_e, "noise_e"))
         object.__setattr__(self, "snr_db", _finite_float(self.snr_db, "snr_db"))
+        if self.noise_dn_total is not None:
+            object.__setattr__(
+                self,
+                "noise_dn_total",
+                _non_negative_float(self.noise_dn_total, "noise_dn_total"),
+            )
+        if self.noise_e_total is not None:
+            object.__setattr__(
+                self,
+                "noise_e_total",
+                _non_negative_float(self.noise_e_total, "noise_e_total"),
+            )
+        if self.snr_db_total is not None:
+            object.__setattr__(
+                self, "snr_db_total", _finite_float(self.snr_db_total, "snr_db_total")
+            )
 
-    def to_dict(self) -> dict[str, float]:
+    def to_dict(self) -> dict[str, float | None]:
         """Return the point as a JSON-friendly mapping."""
         return {
             "irradiance_w_per_m2_nm": self.irradiance_w_per_m2_nm,
@@ -146,6 +177,9 @@ class SNRPoint:
             "noise_dn": self.noise_dn,
             "noise_e": self.noise_e,
             "snr_db": self.snr_db,
+            "noise_dn_total": self.noise_dn_total,
+            "noise_e_total": self.noise_e_total,
+            "snr_db_total": self.snr_db_total,
         }
 
     @classmethod
@@ -162,7 +196,11 @@ class SNRPoint:
         missing = [name for name in required if name not in payload]
         if missing:
             raise ValueError(f"SNR point is missing required field(s): {', '.join(missing)}")
-        return cls(**{name: payload[name] for name in required})
+        values = {name: payload[name] for name in required}
+        for optional in ("noise_dn_total", "noise_e_total", "snr_db_total"):
+            if optional in payload:
+                values[optional] = payload[optional]
+        return cls(**values)
 
 
 @dataclass(frozen=True)
@@ -184,7 +222,11 @@ class EMVAReport:
     dynamic_range_db:
         ``20 log10(saturation_capacity_e / read_noise_e)``.
     dsnu_e:
-        Dark-signal non-uniformity in electrons rms.
+        Pre-zero-clamp, input-referred dark-signal non-uniformity in electrons
+        rms. The sensor clamps the pre-Poisson mean charge at zero and
+        quantizes the sub-LSB dark signal, so the raw post-clamp spatial spread
+        is smaller; the characterization records it separately in provenance
+        (``dsnu_observed_fixed_pattern_e``).
     prnu_percent:
         Photo-response non-uniformity as a percentage (0.5 means 0.5 %, not
         50 %). The field name carries the unit to prevent the classic

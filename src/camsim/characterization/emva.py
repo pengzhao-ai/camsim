@@ -30,12 +30,18 @@ in the flagship preset):
   and overstates read noise. Each frame is row-demeaned per CFA plane before
   the variance is formed; the lost independent degrees of freedom are restored
   with the ``n / (n - 1)`` factor.
-* **ADC quantization.** Rounding to integer codes adds about ``1/12`` DN**2 of
-  variance when the noise spans the least significant bit. EMVA read noise is
-  input referred, so that quantization variance is subtracted from every PTC
-  point. Without the correction, a sensor with 0.7 e- read noise measures about
-  1.0 e- because 0.25 DN of read noise is quantized away and re-appears as
-  rounding variance.
+* **ADC quantization.** Rounding to integer codes is *not* a constant
+  ``1/12`` DN**2 correction when the noise is sub-LSB: the quantization
+  variance depends on the phase of the signal within a code. A 0.7 e- read
+  noise is only 0.25 DN in HCG and 2 e- is only 0.24 DN in LCG, so the fixed
+  correction biases both. The fit therefore evaluates the exact quantized
+  forward model ``round(K * (Poisson(mu) + N(0, sigma_read)))`` with the charge
+  clipped at zero, and solves for ``K`` and ``sigma_read`` from all points.
+  The model is evaluated with a Poisson mixture at low signal and a Gaussian
+  with the same mean and variance above 60 e-. Points below one DN are
+  excluded because the ensemble of mostly-zero pixels is no longer described
+  by a single Poisson mean; the sweep is extended downward until a point near
+  that anchor exists.
 
 Other measured quantities
 -------------------------
@@ -50,21 +56,28 @@ Other measured quantities
 * **Dynamic range** is ``20 log10(saturation_capacity_e / read_noise_e)``.
 * **DSNU** (dark-signal non-uniformity) is measured from dark frames as the
   spatial standard deviation of the per-pixel temporal mean, after removing the
-  temporal variance of that mean. This sensor clips charge at zero electrons
-  and its 10-bit ADC resolves only about 0.06 DN of dark offset in LCG, so both
-  clipping and quantization compress the apparent dark pattern. The measured
-  fixed-pattern standard deviation is therefore inverted through a clipped and
-  quantized Gaussian model of the dark code to recover the pre-clipping offset
-  distribution. Without those corrections, a configured 0.5 e- DSNU measures
-  only about 0.25 e- (HCG) or 0.15 e- (LCG).
+  temporal variance of that mean. This sensor clamps the pre-Poisson mean
+  charge at zero and its 10-bit ADC resolves only about 0.06 DN of dark offset
+  in LCG, so the clamp and quantization compress the apparent dark pattern.
+  The measured fixed-pattern spread is inverted through the exact forward model
+  ``round(K * (Poisson(max(0, d)) + N(0, sigma_read)))`` with the read noise
+  from the PTC. The reported ``dsnu_e`` is the **pre-clamp, input-referred**
+  offset standard deviation (the configured DSNU parameter); the raw
+  post-clamp fixed-pattern spread is recorded separately in provenance. Without
+  the inversion, a configured 0.5 e- DSNU measures only about 0.25 e- (HCG) or
+  0.15 e- (LCG).
 * **PRNU** (photo-response non-uniformity) is measured on the unsaturated flat
   field nearest 70 % of saturation. The spatial variance of the averaged frame
   is corrected for temporal noise and DSNU, then divided by the squared mean and
   reported in percent. Reporting the fraction 0.005 instead of 0.5 % is a
   classic 100x error, which is why the report field is named ``prnu_percent``.
 * **SNR curve** and **linearity residual** describe the range between the noise
-  floor and saturation. The residual is the maximum relative deviation from a
-  straight-line fit over unsaturated levels.
+  floor and saturation. Each SNR point stores both the row-demeaned
+  pixel-temporal noise and the raw-frame total noise (which adds common-mode
+  row noise), so a reader can use either convention. The residual is the
+  maximum relative deviation from a straight-line fit over unsaturated levels;
+  if the primary channel is partially clipped, a channel that still spans the
+  linear range is used and recorded in provenance.
 
 Levels, units, and levels that actually reach the sensor
 --------------------------------------------------------
@@ -82,7 +95,10 @@ The old plan snippet's 1-16 W/m^2/nm levels are far above this part's full-well
 knee (a 10 ms exposure clips at roughly 5e-4 W/m^2/nm in HCG and 1.6e-3 in
 LCG), so they cannot define a PTC. The module verifies the actual response and
 auto-ranges when the caller does not supply levels; the tests use the
-low-to-saturation sweep documented in ``tests/test_characterization.py``.
+low-to-saturation sweep documented in ``tests/test_characterization.py``. If a
+caller supplies only a high-level sweep, geometrically lower levels are
+appended until the low-signal anchor exists, and the added levels are recorded
+in provenance.
 
 Assumptions and limitations
 ---------------------------
@@ -92,7 +108,12 @@ conversion-gain mode (a PTC has one ``K``), a fixed sensor temperature, no lens
 shading, stationary DSNU/PRNU maps, Gaussian read noise, Poisson shot noise,
 and an ideal linear ADC. ``mode="auto"`` is resolved once to a single mode,
 because a photon transfer curve that mixes HCG and LCG frames has no single
-slope; the resolved mode is recorded in the provenance.
+slope; the resolved mode is recorded in the provenance. Dark current versus
+temperature is **not** measured here; that sweep is scoped to Task 17. A small
+residual row-noise/quantization coupling leaves a few percent uncertainty in
+HCG read noise at the sub-LSB operating point; the exact-model fit is still
+within the 5 % G2 criterion at the documented test seed, and provenance records
+the model limitations.
 
 Real-world ranges: system gain 0.01-10 DN/e-, read noise 0.3-10 e- rms,
 full well 2-50 ke-, dark current 0.01-100 e-/s, DSNU 0.1-10 e-, PRNU 0.1-2 %,
@@ -116,7 +137,8 @@ from typing import Any, Final, Literal, TypeAlias, cast
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.stats import norm  # type: ignore[import-untyped]
+from scipy.optimize import least_squares  # type: ignore[import-untyped]
+from scipy.stats import norm, poisson  # type: ignore[import-untyped]
 
 from camsim.config.schema import GainMode, LensConfig, SensorConfig
 from camsim.core.frames import RawFrame
@@ -141,10 +163,27 @@ Mode: TypeAlias = Literal["auto", "LCG", "HCG"]
 _FLAT_WIDTH: Final[int] = 64
 _FLAT_HEIGHT: Final[int] = 64
 
-# Rounding to an integer code adds 1/12 DN^2 when the analog noise spans the
-# LSB. Subtracting it recovers input-referred read noise instead of the
-# quantized output noise.
+# The 1/12 DN^2 term is the asymptotic quantization variance for a signal whose
+# noise spans many LSBs. It is used only to seed the exact-model fit; the fit
+# itself evaluates the phase-dependent quantized Poisson/Gaussian variance.
 _QUANTIZATION_VARIANCE_DN2: Final[float] = 1.0 / 12.0
+
+# Below one DN the output is a nearly deterministic zero/one sequence; the
+# single-mean Poisson model cannot represent the ensemble of sub-code pixels,
+# and those points bias the read-noise intercept. The exact-model fit starts at
+# one DN, and the sweep is extended downward until at least one level lands
+# near that anchor.
+_PTC_MIN_MEAN_DN: Final[float] = 1.0
+
+# Above this signal the Poisson distribution is replaced by a Gaussian with the
+# same mean and variance. The two agree to better than 0.1 % in the moments.
+_POISSON_MODEL_MAX_E: Final[float] = 60.0
+
+# If a caller supplies only a high-level sweep, geometrically lower levels are
+# appended until the low-signal anchor is reached. The added levels are recorded
+# in provenance.
+_LOW_LEVEL_SCALE: Final[float] = 0.25
+_MAX_LOW_SIGNAL_LEVELS: Final[int] = 8
 
 # Pixels whose temporal variance collapses below this value are candidates for
 # the clipped population. An unsaturated high-signal pixel has variance of
@@ -200,11 +239,11 @@ _REFERENCE_LENS_FOCAL_LENGTH_MM: Final[float] = 6.4
 _REFERENCE_LENS_DIAGONAL_MM: Final[float] = 11.46
 _REFERENCE_LENS_TRANSMITTANCE: Final[float] = 0.9
 
-# DSNU clipping inversion grid. The model is monotonic; 20 e- covers DSNU far
-# beyond any real sensor while keeping the forward evaluation cheap.
-_DSNU_MODEL_MAX_E: Final[float] = 20.0
-_DSNU_MODEL_POINTS: Final[int] = 400
-_DSNU_MODEL_QUADRATURE_POINTS: Final[int] = 4001
+# DSNU clipping inversion grid. The forward model is monotonic; 10 e- covers
+# the full real-world DSNU range (0.1-10 e-) while keeping the evaluation cheap.
+_DSNU_MODEL_MAX_E: Final[float] = 10.0
+_DSNU_MODEL_POINTS: Final[int] = 120
+_DSNU_QUADRATURE_POINTS: Final[int] = 301
 
 
 @dataclass(frozen=True)
@@ -380,6 +419,8 @@ def characterize_sensor(
     nominal_sat_e = _nominal_saturation_e(config, resolved_mode)
 
     level_stats = [source.measure(spec, frames) for spec in specs]
+    added_low_levels = _extend_low_signal_sweep(source, level_stats, frames)
+    primary = _primary_channel(level_stats)
     saturation = _find_saturation(level_stats, nominal_sat_dn)
     saturation_appended = False
     if saturation is None:
@@ -400,18 +441,10 @@ def characterize_sensor(
                 saturation_appended = True
                 break
 
-    gain, intercept, ptc_points = _fit_ptc(
+    gain, read_noise_e, ptc_points = _fit_ptc(
         level_stats,
         nominal_sat_dn=nominal_sat_dn,
     )
-    if intercept <= 0.0:
-        raise ValueError(
-            "photon transfer curve has a non-positive intercept; the levels do not "
-            "reach a low enough signal to separate read noise from shot noise"
-        )
-    read_noise_e = math.sqrt(intercept) / gain
-    if read_noise_e <= 0.0:
-        raise ValueError("photon transfer curve produced a zero read noise; check the levels")
     if saturation is None:
         saturation_dn = nominal_sat_dn
         saturation_source = "configured_saturation_fallback"
@@ -423,7 +456,6 @@ def characterize_sensor(
     dynamic_range_db = 20.0 * math.log10(saturation_capacity_e / read_noise_e)
     absolute_sensitivity_threshold_e = 0.5 * (1.0 + math.sqrt(1.0 + 4.0 * read_noise_e**2))
 
-    primary = _primary_channel(level_stats)
     dsnu_e, dsnu_observed_e = _measure_dsnu(
         source=source,
         frames=frames,
@@ -443,7 +475,7 @@ def characterize_sensor(
     snr_curve = _measure_snr_curve(
         level_stats, primary=primary, gain=gain, nominal_sat_dn=nominal_sat_dn
     )
-    linearity_residual = _measure_linearity(
+    linearity_residual, linearity_channel = _measure_linearity(
         level_stats, primary=primary, saturation_dn=saturation_dn
     )
 
@@ -479,37 +511,55 @@ def characterize_sensor(
         "lux_levels": lux_values,
         "illuminant": illuminant if lux_values is not None else None,
         "lens": lens_info,
+        "low_levels_appended": bool(added_low_levels),
+        "added_low_levels_w_per_m2_nm": added_low_levels,
         "saturation_level_appended": saturation_appended,
         "saturation_source": saturation_source,
         "saturation_clipped_fraction": saturation_clipped_fraction,
         "primary_channel": primary,
+        "linearity_channel": linearity_channel,
         "ptc_points": ptc_points,
-        "ptc_fit": "weighted least squares; weights 1/mean_DN^2",
+        "ptc_min_mean_dn": _PTC_MIN_MEAN_DN,
+        "ptc_fit": (
+            "nonlinear least squares against the exact quantized PTC model: "
+            "Poisson(mu) + Gaussian read noise, zero-charge clip, integer ADC "
+            "rounding; parameters K and read noise"
+        ),
         "system_gain_method": (
-            "joint photon-transfer slope across all CFA channels in DN per electron"
+            "joint photon-transfer fit across all CFA channels in DN per electron"
         ),
         "nominal_system_gain_dn_per_e": nominal_gain,
         "system_gain_relative_error": (gain - nominal_gain) / nominal_gain,
         "read_noise_definition": (
-            "sqrt(PTC intercept in DN^2) / K, after per-row common-mode removal and "
-            "subtraction of 1/12 DN^2 ADC quantization variance"
+            "input-referred Gaussian read-noise sigma in the exact quantized PTC "
+            "model, after per-row common-mode removal and n/(n-1) correction; "
+            "zero-charge clipping is part of the forward model"
         ),
         "row_noise_handling": (
             "each frame row-demeaned per CFA plane; n/(n-1) restores independent "
             "shot and read-noise variance"
         ),
-        "quantization_variance_removed_dn2": _QUANTIZATION_VARIANCE_DN2,
         "configured_full_well_e": float(config.modes[resolved_mode].full_well_e),
         "configured_read_noise_e": float(config.modes[resolved_mode].read_noise_e_rms),
         "configured_saturation_e": nominal_sat_e,
         "saturation_cross_check_ratio": saturation_capacity_e / nominal_sat_e,
+        "dsnu_definition": (
+            "pre-zero-clamp, input-referred dark-signal non-uniformity in electrons "
+            "rms (the configured DSNU parameter); the raw post-clamp fixed-pattern "
+            "spread is recorded separately"
+        ),
         "dsnu_method": (
             "dark-frame fixed-pattern standard deviation after removing temporal "
-            "variance of the mean, inverted through a clipped and quantized "
-            "Gaussian model of the dark code to undo zero-charge clipping and "
-            "sub-LSB ADC quantization"
+            "variance of the mean, inverted through the exact pre-clamp forward "
+            "model Poisson(max(0, d)) + Gaussian read noise + zero-charge clip + "
+            "integer ADC rounding"
         ),
         "dsnu_observed_fixed_pattern_e": dsnu_observed_e,
+        "dsnu_observed_fixed_pattern_definition": (
+            "raw post-clamp, post-quantization fixed-pattern spread of the "
+            "averaged dark frame in electrons (not deconvolved); this is what a "
+            "naive dark-frame standard deviation reports"
+        ),
         "configured_dsnu_e": float(config.noise.dsnu_e),
         "prnu_method": (
             "spatial standard deviation of the averaged flat field at the level "
@@ -528,9 +578,14 @@ def characterize_sensor(
             "5 % and 95 % of the saturation code; dimensionless fraction"
         ),
         "snr_curve_definition": (
-            "mean signal and temporal noise per unsaturated level, after removing "
-            "common-mode row noise and ADC quantization variance; snr_db = "
+            "mean signal and measured temporal noise per unsaturated level. The "
+            "primary noise fields are row-demeaned pixel-temporal noise (ADC "
+            "quantization included, common-mode row noise removed); the *_total "
+            "fields are raw-frame noise including row noise. snr_db = "
             "20 log10(mean_signal_e / noise_e)"
+        ),
+        "dark_current_characterization": (
+            "not measured here; temperature-dependent dark current is scoped to Task 17"
         ),
         "emva_assumptions": [
             "spatially uniform flat-field illumination",
@@ -543,8 +598,10 @@ def characterize_sensor(
         ],
         "limitations": [
             "simulated sensor, not a physical camera or a certified measurement",
-            "no dark-current-versus-temperature sweep",
+            "no dark-current-versus-temperature sweep (Task 17)",
             "no lens or illumination non-uniformity in the flat field",
+            "residual row-noise/quantization coupling leaves a few percent "
+            "uncertainty in HCG read noise at the sub-LSB operating point",
         ],
     }
 
@@ -938,6 +995,34 @@ def _find_saturation(
     return max(candidates, key=lambda item: item[0].spec.mean_w_per_m2_nm)
 
 
+def _extend_low_signal_sweep(
+    source: _FrameSource,
+    level_stats: list[_LevelStats],
+    frames: int,
+) -> list[float]:
+    """Append geometrically lower levels until the PTC has a low anchor.
+
+    Callers often supply a "bright" sweep copied from a plan whose levels are
+    far above the full-well knee. The exact PTC model needs at least one level
+    in the sub-ten-DN region to separate read noise from shot noise, so missing
+    low levels are added at a quarter of the current lowest level. Added levels
+    are recorded in provenance; the caller's original sweep is never removed.
+    """
+    added: list[float] = []
+    for _ in range(_MAX_LOW_SIGNAL_LEVELS):
+        primary = _primary_channel(level_stats)
+        lowest = min(level_stats, key=lambda item: item.spec.mean_w_per_m2_nm)
+        stats = lowest.channels.get(primary)
+        if stats is None or stats.mean_dn <= _PTC_MIN_MEAN_DN:
+            break
+        if lowest.spec.mean_w_per_m2_nm * _LOW_LEVEL_SCALE < 1e-15:
+            break
+        new_spec = _scale_spec(lowest.spec, _LOW_LEVEL_SCALE)
+        level_stats.append(source.measure(new_spec, frames))
+        added.append(new_spec.mean_w_per_m2_nm)
+    return added
+
+
 # ---------------------------------------------------------------------------
 # Photon transfer curve and derived quantities
 # ---------------------------------------------------------------------------
@@ -947,11 +1032,20 @@ def _fit_ptc(
     level_stats: list[_LevelStats],
     nominal_sat_dn: float,
 ) -> tuple[float, float, int]:
-    """Fit ``variance_DN = K * mean_DN + intercept`` across usable points.
+    """Fit the exact quantized photon-transfer model across usable points.
 
-    Returns ``(K, intercept, point_count)`` in DN per electron, DN**2, and
-    count. Saturated channels are excluded per channel so a partially clipped
-    level can still contribute its unsaturated colours.
+    The model for one channel is ``round(K * (Poisson(mu) + N(0, sigma)))``
+    with the charge clipped at zero, where ``mu`` is the mean photoelectron
+    count and ``sigma`` is the input-referred read noise. Both the mean and the
+    variance predicted by that model are compared with the measured points:
+    the mean fixes ``mu`` at each level and the variance fixes ``K`` and
+    ``sigma``. This removes the phase-dependent bias of the asymptotic
+    ``1/12 DN**2`` quantization correction, which is substantial when the read
+    noise is only about a quarter of an LSB.
+
+    Returns ``(K, read_noise_e, point_count)``. Saturated channels are excluded
+    per channel so a partially clipped level can still contribute its
+    unsaturated colours.
     """
     global_max = max(level.max_mean_dn for level in level_stats)
     high_floor = max(_SATURATION_LEVEL_FRACTION * global_max, 0.25 * nominal_sat_dn)
@@ -962,32 +1056,143 @@ def _fit_ptc(
         for stats in level.channels.values():
             if high_level and stats.clipped_fraction > _MAX_PTC_CLIPPED_FRACTION:
                 continue
-            x = stats.mean_dn
-            y = stats.variance_dn2 - _QUANTIZATION_VARIANCE_DN2
-            if x <= 1e-6 or y <= 0.0:
+            if stats.mean_dn < _PTC_MIN_MEAN_DN or stats.variance_dn2 <= 0.0:
                 continue
-            xs.append(x)
-            ys.append(y)
+            xs.append(stats.mean_dn)
+            ys.append(stats.variance_dn2)
     if len(xs) < _MIN_PTC_POINTS:
         raise ValueError(
             f"photon transfer curve needs at least {_MIN_PTC_POINTS} usable "
-            f"channel-level points; got {len(xs)}. Supply more unsaturated levels "
-            "between the noise floor and saturation"
+            f"channel-level points at or above {_PTC_MIN_MEAN_DN:g} DN; got {len(xs)}. "
+            "Supply a sweep between the noise floor and saturation"
         )
     x_array = np.asarray(xs, dtype=np.float64)
     y_array = np.asarray(ys, dtype=np.float64)
-    # The standard error of a variance estimate grows with the signal, so a
-    # 1/mean^2 weight (w = 1/mean in polyfit's squared-weight convention)
-    # balances the deep low-signal points against the high-signal lever arm.
-    weights = 1.0 / np.maximum(x_array, 1e-6)
-    coefficients = np.polyfit(x_array, y_array, 1, w=weights)
-    gain = float(coefficients[0])
-    intercept = float(coefficients[1])
-    if not math.isfinite(gain) or not math.isfinite(intercept):
-        raise ValueError("photon transfer fit produced a non-finite gain or intercept")
-    if gain <= 0.0:
-        raise ValueError("photon transfer fit produced a non-positive system gain")
-    return gain, intercept, len(xs)
+
+    # Seed the nonlinear fit with the asymptotic linear PTC. That fit is only
+    # approximate for a sub-LSB read noise, but it reliably lands in the right
+    # basin for the exact model.
+    approximate_x: list[float] = []
+    approximate_y: list[float] = []
+    for mean_dn, variance_dn2 in zip(xs, ys, strict=True):
+        approximate = variance_dn2 - _QUANTIZATION_VARIANCE_DN2
+        if approximate > 0.0:
+            approximate_x.append(mean_dn)
+            approximate_y.append(approximate)
+    gain0 = 0.0
+    sigma0 = 1.0
+    if len(approximate_x) >= 2:
+        coefficients = np.polyfit(
+            np.asarray(approximate_x, dtype=np.float64),
+            np.asarray(approximate_y, dtype=np.float64),
+            1,
+            w=1.0 / np.maximum(np.asarray(approximate_x, dtype=np.float64), 1e-6),
+        )
+        gain0 = float(coefficients[0])
+        intercept0 = float(coefficients[1])
+        if gain0 > 0.0 and math.isfinite(intercept0):
+            sigma0 = math.sqrt(max(intercept0, 1e-6)) / gain0
+    if gain0 <= 0.0 or not math.isfinite(gain0):
+        high = [
+            (mean_dn, variance_dn2)
+            for mean_dn, variance_dn2 in zip(xs, ys, strict=True)
+            if mean_dn > 5.0
+        ]
+        if high:
+            gain0 = float(np.median([variance / mean for mean, variance in high]))
+        else:
+            gain0 = float(np.median(y_array / x_array))
+        sigma0 = 1.0
+    gain0 = min(max(gain0, 1e-4), 100.0)
+    sigma0 = min(max(sigma0, 1e-3), 100.0)
+
+    def residuals(parameters: NDArray[np.float64]) -> NDArray[np.float64]:
+        gain, sigma = float(parameters[0]), float(parameters[1])
+        if gain <= 0.0 or sigma <= 0.0:
+            return np.full(x_array.shape, 1e6, dtype=np.float64)
+        residual: list[float] = []
+        for mean_dn, variance_dn2 in zip(xs, ys, strict=True):
+            mean_e = _invert_model_mean(mean_dn, gain, sigma)
+            _, model_variance = _quantized_moments(mean_e, gain, sigma)
+            residual.append((model_variance - variance_dn2) / max(variance_dn2, 0.5))
+        return np.asarray(residual, dtype=np.float64)
+
+    result = least_squares(
+        residuals,
+        x0=np.asarray([gain0, sigma0], dtype=np.float64),
+        bounds=([1e-6, 1e-6], [100.0, 100.0]),
+        xtol=1e-6,
+        ftol=1e-6,
+        gtol=1e-6,
+        max_nfev=80,
+    )
+    gain = float(result.x[0])
+    read_noise = float(result.x[1])
+    if not math.isfinite(gain) or not math.isfinite(read_noise):
+        raise ValueError("photon transfer fit produced a non-finite gain or read noise")
+    if gain <= 0.0 or read_noise <= 0.0:
+        raise ValueError("photon transfer fit produced a non-positive gain or read noise")
+    return gain, read_noise, len(xs)
+
+
+def _quantized_moments(
+    mean_e: float,
+    gain: float,
+    read_noise_e: float,
+) -> tuple[float, float]:
+    """Return ``(E[DN], Var[DN])`` for Poisson + read noise + ADC rounding.
+
+    The charge is ``Poisson(max(0, mean_e))`` plus Gaussian read noise, clipped
+    at zero charge, and rounded to an integer code with ``DN = round(K*charge)``.
+    Above ``_POISSON_MODEL_MAX_E`` the Poisson distribution is replaced by a
+    Gaussian with the same mean and variance; the difference in the first two
+    moments is below 0.1 %.
+    """
+    mean_e = max(float(mean_e), 0.0)
+    sigma = max(float(read_noise_e), 1e-9)
+    if mean_e <= _POISSON_MODEL_MAX_E:
+        nmax = int(mean_e + 10.0 * math.sqrt(mean_e) + 20.0)
+        charges = np.arange(nmax + 1, dtype=np.float64)
+        poisson_probabilities = np.asarray(poisson.pmf(charges, mean_e), dtype=np.float64)
+        max_code = math.ceil(gain * (nmax + 8.0 * sigma)) + 2
+        codes = np.arange(max_code + 1, dtype=np.float64)
+        upper = (codes + 0.5) / gain
+        lower = (codes - 0.5) / gain
+        lower[0] = -np.inf
+        conditional = norm.cdf((upper[None, :] - charges[:, None]) / sigma) - norm.cdf(
+            (lower[None, :] - charges[:, None]) / sigma
+        )
+        probabilities = np.clip(poisson_probabilities @ conditional, 0.0, None)
+    else:
+        standard_deviation = math.sqrt(mean_e + sigma * sigma)
+        max_code = math.ceil(gain * (mean_e + 8.0 * standard_deviation)) + 2
+        codes = np.arange(max_code + 1, dtype=np.float64)
+        upper = (codes + 0.5) / gain
+        lower = (codes - 0.5) / gain
+        lower[0] = -np.inf
+        probabilities = np.clip(
+            norm.cdf((upper - mean_e) / standard_deviation)
+            - norm.cdf((lower - mean_e) / standard_deviation),
+            0.0,
+            None,
+        )
+    expected = float(probabilities @ codes)
+    variance = float(((codes - expected) ** 2) @ probabilities)
+    return expected, variance
+
+
+def _invert_model_mean(mean_dn: float, gain: float, read_noise_e: float) -> float:
+    """Return the photoelectron mean whose model expectation is ``mean_dn``."""
+    low = 0.0
+    high = max(2.0 * mean_dn / gain + 20.0, 50.0)
+    for _ in range(24):
+        middle = 0.5 * (low + high)
+        model_mean, _ = _quantized_moments(middle, gain, read_noise_e)
+        if model_mean < mean_dn:
+            low = middle
+        else:
+            high = middle
+    return 0.5 * (low + high)
 
 
 def _measure_dsnu(
@@ -1032,53 +1237,49 @@ def _measure_dsnu(
 
 
 def _invert_clipped_dsnu(observed_dn: float, read_noise_e: float, gain: float) -> float:
-    """Invert the clipped and quantized dark-offset transfer.
+    """Invert the pre-clamp Poisson/read/quantization dark transfer.
 
-    A pixel offset ``d`` is recorded as ``max(0, d + N(0, sigma))`` and then
-    rounded to an integer DN. Both the zero-charge clipping knee and the ADC
-    quantization compress the observed spatial spread, and the compression is
-    much stronger when the offset spans less than one code (as in LCG, where
-    one DN is about eight electrons). The forward model computes the expected
-    code for every offset, including both effects; numeric inversion then
-    returns the pre-clipping DSNU that EMVA 1288 defines.
+    For a pixel with dark offset ``d`` the sensor forms ``max(0, d)``, samples
+    Poisson photoelectrons, adds Gaussian read noise, clips the charge at zero,
+    and rounds to an integer DN. Both the zero-charge clamp and the sub-LSB ADC
+    quantization compress the observed spatial spread, and LCG is especially
+    compressed (one DN is about eight electrons). The forward model computes
+    the expected code for every offset, including all three effects; numeric
+    inversion returns the pre-clamp DSNU that EMVA 1288 defines.
     """
     if observed_dn <= 0.0:
         return 0.0
-    sigma = max(read_noise_e, 1e-6)
+    sigma = max(read_noise_e, 1e-9)
     grid = np.linspace(1e-4, _DSNU_MODEL_MAX_E, _DSNU_MODEL_POINTS)
     model = np.asarray([_observed_quantized_mean_std(value, sigma, gain) for value in grid])
+    if not np.all(np.diff(model) >= -1e-12):
+        raise ValueError(
+            "DSNU inversion model is not monotonic in the offset standard deviation; "
+            "the dark-frame statistics are too noisy for a unique inversion"
+        )
     return float(np.interp(observed_dn, model, grid))
 
 
 def _observed_quantized_mean_std(dsnu_e: float, sigma_e: float, gain: float) -> float:
     """Return the spatial std in DN of the expected quantized dark code.
 
-    The charge distribution at each pixel is a Gaussian around its offset,
-    clipped at zero charge. The expected integer code is the sum over codes of
-    ``k * P(round(K * charge) = k)``. Averaging that expectation over a Gaussian
-    offset distribution and taking its spatial standard deviation gives the
-    quantity the dark-frame measurement observes before temporal noise is
-    subtracted.
+    The pre-Poisson clamp is explicit: a pixel with offset ``d`` samples
+    ``Poisson(max(0, d))`` and then the usual read-noise, zero-charge clip, and
+    rounding chain. The expectation over the Gaussian offset population uses a
+    uniform grid with Gaussian weights rather than a low-order Hermite rule:
+    the expected code has a sharp knee at ``d = 0``, which a small polynomial
+    quadrature resolves poorly.
     """
-    span = 6.0 * dsnu_e + 6.0 * sigma_e
-    offsets = np.linspace(-span, span, _DSNU_MODEL_QUADRATURE_POINTS)
+    span = 6.0 * dsnu_e
+    offsets = np.linspace(-span, span, _DSNU_QUADRATURE_POINTS)
     weights = norm.pdf(offsets / dsnu_e) / dsnu_e
-    max_code = math.ceil(gain * (dsnu_e + 6.0 * sigma_e)) + 2
-    codes = np.arange(max_code + 1, dtype=np.float64)
-    upper = (codes + 0.5) / gain
-    lower = (codes - 0.5) / gain
-    # Charge below zero is clipped to zero, so code zero also collects the
-    # whole negative tail; every higher code has a positive lower edge.
-    lower[0] = -np.inf
-    probabilities = norm.cdf((upper[None, :] - offsets[:, None]) / sigma_e) - norm.cdf(
-        (lower[None, :] - offsets[:, None]) / sigma_e
+    weights = weights / weights.sum()
+    expected_codes = np.asarray(
+        [_quantized_moments(max(float(offset), 0.0), gain, sigma_e)[0] for offset in offsets],
+        dtype=np.float64,
     )
-    expected_code = np.clip(probabilities, 0.0, None) @ codes
-    total = float(weights.sum())
-    if total <= 0.0:
-        return 0.0
-    average = float((weights * expected_code).sum() / total)
-    variance = float((weights * (expected_code - average) ** 2).sum() / total)
+    average = float((weights * expected_codes).sum())
+    variance = float((weights * (expected_codes - average) ** 2).sum())
     return math.sqrt(max(variance, 0.0))
 
 
@@ -1131,12 +1332,14 @@ def _measure_snr_curve(
         # signal also has near-zero variance and must stay on the curve.
         if level.max_mean_dn >= high_floor and stats.clipped_fraction > _MAX_PTC_CLIPPED_FRACTION:
             continue
-        noise_variance = stats.variance_dn2 - _QUANTIZATION_VARIANCE_DN2
-        if noise_variance <= 0.0 or stats.mean_dn <= 0.0:
+        if stats.variance_dn2 <= 0.0 or stats.mean_dn <= 0.0:
             continue
-        noise_dn = math.sqrt(noise_variance)
+        noise_dn = math.sqrt(stats.variance_dn2)
         noise_e = noise_dn / gain
         signal_e = stats.mean_dn / gain
+        total_noise_dn = math.sqrt(max(stats.raw_variance_dn2, 0.0))
+        total_noise_e = total_noise_dn / gain
+        total_snr = 20.0 * math.log10(signal_e / total_noise_e) if total_noise_e > 0.0 else None
         points.append(
             SNRPoint(
                 irradiance_w_per_m2_nm=level.spec.mean_w_per_m2_nm,
@@ -1145,7 +1348,15 @@ def _measure_snr_curve(
                 noise_dn=noise_dn,
                 noise_e=noise_e,
                 snr_db=20.0 * math.log10(signal_e / noise_e),
+                noise_dn_total=total_noise_dn,
+                noise_e_total=total_noise_e,
+                snr_db_total=total_snr,
             )
+        )
+    if not points:
+        raise ValueError(
+            "no usable unsaturated levels remain for an SNR curve; supply a sweep "
+            "between the noise floor and saturation"
         )
     points.sort(key=lambda point: point.irradiance_w_per_m2_nm)
     return tuple(points)
@@ -1155,36 +1366,45 @@ def _measure_linearity(
     level_stats: list[_LevelStats],
     primary: str,
     saturation_dn: float,
-) -> float:
-    """Return the maximum relative deviation from a linear irradiance fit."""
-    # Select by signal range rather than by the clipping flag: at low signal,
-    # sub-LSB quantization gives many pixels a variance below the clipping
-    # threshold, so that flag is only meaningful near the ceiling. A truly
-    # clipped level has a mean near the saturation code and is excluded here.
-    candidates: list[tuple[float, float]] = []
-    for level in level_stats:
-        stats = level.channels.get(primary)
-        if stats is None:
+) -> tuple[float, str]:
+    """Return the maximum relative deviation and the channel used.
+
+    The primary channel is preferred, but a partially clipped Bayer sweep can
+    leave it with only one unsaturated point while another colour still spans
+    the linear range. Falling back to that channel keeps the residual
+    measurable instead of failing an otherwise valid characterization.
+    """
+    available = sorted(level_stats[0].channels)
+    order = [primary, *(channel for channel in available if channel != primary)]
+    for channel in order:
+        # Select by signal range rather than by the clipping flag: at low
+        # signal, sub-LSB quantization gives many pixels a variance below the
+        # clipping threshold, so that flag is only meaningful near the ceiling.
+        candidates: list[tuple[float, float]] = []
+        for level in level_stats:
+            stats = level.channels.get(channel)
+            if stats is None:
+                continue
+            mean_dn = stats.mean_dn
+            if 0.05 * saturation_dn <= mean_dn <= 0.95 * saturation_dn:
+                candidates.append((level.spec.mean_w_per_m2_nm, mean_dn))
+        if len(candidates) < 2:
+            candidates = [
+                (level.spec.mean_w_per_m2_nm, level.channels[channel].mean_dn)
+                for level in level_stats
+                if channel in level.channels
+                and 0.0 < level.channels[channel].mean_dn <= 0.95 * saturation_dn
+            ]
+        if len(candidates) < 2:
             continue
-        mean_dn = stats.mean_dn
-        if 0.05 * saturation_dn <= mean_dn <= 0.95 * saturation_dn:
-            candidates.append((level.spec.mean_w_per_m2_nm, mean_dn))
-    if len(candidates) < 2:
-        candidates = [
-            (level.spec.mean_w_per_m2_nm, level.channels[primary].mean_dn)
-            for level in level_stats
-            if primary in level.channels
-            and 0.0 < level.channels[primary].mean_dn <= 0.95 * saturation_dn
-        ]
-    if len(candidates) < 2:
-        raise ValueError("not enough unsaturated levels to measure linearity")
-    x = np.asarray([item[0] for item in candidates], dtype=np.float64)
-    y = np.asarray([item[1] for item in candidates], dtype=np.float64)
-    coefficients = np.polyfit(x, y, 1)
-    fitted = np.polyval(coefficients, x)
-    if np.any(fitted <= 0.0):
-        raise ValueError("linearity fit produced a non-positive signal; check the levels")
-    return float(np.max(np.abs(y - fitted) / fitted))
+        x = np.asarray([item[0] for item in candidates], dtype=np.float64)
+        y = np.asarray([item[1] for item in candidates], dtype=np.float64)
+        coefficients = np.polyfit(x, y, 1)
+        fitted = np.polyval(coefficients, x)
+        if np.any(fitted <= 0.0):
+            continue
+        return float(np.max(np.abs(y - fitted) / fitted)), channel
+    raise ValueError("not enough unsaturated levels to measure linearity")
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,8 @@
 
 The characterization module configures a sensor with known read noise, full
 well, DSNU, and PRNU, then measures them back from simulated flat fields and
-dark frames. These tests pin the measurement chain end to end:
+dark frames. The assertions use the design's G2 gates: read noise within 5 %
+and DSNU/PRNU within 10 %. These tests pin the measurement chain end to end:
 
 * the photon transfer curve recovers the ADC conversion scale;
 * its intercept, corrected for row noise and ADC quantization, recovers the
@@ -24,6 +25,7 @@ pixel.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -70,10 +72,14 @@ def flagship_config() -> SensorConfig:
 def hcg_report(flagship_config: SensorConfig) -> EMVAReport:
     """One HCG characterization shared by the measurement tests."""
     sensor = camsim.Sensor(flagship_config, seed=1)
+    # 32 frames is the characterization default and averages the residual
+    # row-noise/quantization coupling enough to meet the 5 % read-noise G2 gate
+    # at the sub-LSB operating point. Sixteen frames still passes at most
+    # seeds but leaves a few percent seed-to-seed scatter.
     return characterize_sensor(
         sensor,
         irradiance_levels=HCG_LEVELS,
-        frames_per_level=16,
+        frames_per_level=32,
         mode="HCG",
         exposure_s=0.01,
         base_seed=3,
@@ -95,8 +101,13 @@ def lcg_report(flagship_config: SensorConfig) -> EMVAReport:
 
 
 def test_characterization_recovers_read_noise(hcg_report: EMVAReport) -> None:
-    """The PTC intercept recovers the configured 0.7 e- rms HCG read noise."""
-    assert hcg_report.read_noise_e == pytest.approx(0.7, rel=0.10)
+    """The exact quantized PTC recovers 0.7 e- rms HCG read noise at G2 (5 %)."""
+    assert hcg_report.read_noise_e == pytest.approx(0.7, rel=0.05)
+
+
+def test_lcg_read_noise_recovered(lcg_report: EMVAReport) -> None:
+    """The same model recovers the configured 2.0 e- rms LCG read noise."""
+    assert lcg_report.read_noise_e == pytest.approx(2.0, rel=0.05)
 
 
 def test_characterization_recovers_saturation(hcg_report: EMVAReport) -> None:
@@ -115,9 +126,65 @@ def test_ptc_slope_matches_system_gain(hcg_report: EMVAReport) -> None:
 
 
 def test_dsnu_prnu_recovered(hcg_report: EMVAReport) -> None:
-    """Dark fixed pattern and flat-field non-uniformity are recovered."""
-    assert hcg_report.dsnu_e == pytest.approx(0.5, rel=0.25)
-    assert hcg_report.prnu_percent == pytest.approx(0.5, rel=0.25)
+    """Dark fixed pattern and flat-field non-uniformity are recovered at G2 (10 %)."""
+    assert hcg_report.dsnu_e == pytest.approx(0.5, rel=0.10)
+    assert hcg_report.prnu_percent == pytest.approx(0.5, rel=0.10)
+
+
+def test_lcg_dsnu_prnu_recovered(lcg_report: EMVAReport) -> None:
+    """LCG's sub-LSB dark signal still recovers DSNU and PRNU at G2 (10 %)."""
+    assert lcg_report.dsnu_e == pytest.approx(0.5, rel=0.10)
+    assert lcg_report.prnu_percent == pytest.approx(0.5, rel=0.10)
+
+
+def test_dsnu_recovers_configured_strengths(flagship_config: SensorConfig) -> None:
+    """The clipped/quantized inversion is calibrated across known DSNU values."""
+    for configured in (0.25, 1.0):
+        noise = flagship_config.noise.model_copy(update={"dsnu_e": configured})
+        config = flagship_config.model_copy(update={"noise": noise})
+        sensor = camsim.Sensor(config, seed=1)
+        report = characterize_sensor(
+            sensor,
+            irradiance_levels=HCG_LEVELS,
+            frames_per_level=8,
+            mode="HCG",
+            exposure_s=0.01,
+            base_seed=3,
+        )
+        assert report.dsnu_e == pytest.approx(configured, rel=0.10)
+
+
+def test_high_level_sweep_is_extended_downward(flagship_config: SensorConfig) -> None:
+    """A too-bright caller sweep gets low levels instead of a fit failure."""
+    sensor = camsim.Sensor(flagship_config, seed=1)
+    report = characterize_sensor(
+        sensor,
+        irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3],
+        frames_per_level=8,
+        mode="HCG",
+        exposure_s=0.01,
+        base_seed=3,
+    )
+    assert report.provenance["low_levels_appended"] is True
+    assert len(report.provenance["added_low_levels_w_per_m2_nm"]) > 0
+    assert report.read_noise_e == pytest.approx(0.7, rel=0.10)
+    assert report.saturation_capacity_e == pytest.approx(2000.0, rel=0.10)
+
+
+def test_snr_curve_exposes_total_noise(hcg_report: EMVAReport) -> None:
+    """Each SNR point carries both row-removed and total-noise variants."""
+    assert hcg_report.snr_curve
+    for point in hcg_report.snr_curve:
+        assert point.noise_dn_total is not None
+        assert point.noise_e_total is not None
+        assert point.snr_db_total is not None
+        assert point.noise_dn_total > 0.0
+        assert point.noise_e_total == pytest.approx(
+            point.noise_dn_total / hcg_report.system_gain_dn_per_e
+        )
+        assert point.snr_db_total == pytest.approx(
+            20.0 * math.log10(point.mean_signal_e / point.noise_e_total)
+        )
 
 
 def test_linearity_residual_small(hcg_report: EMVAReport) -> None:
