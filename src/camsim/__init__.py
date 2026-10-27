@@ -16,10 +16,16 @@ from typing import Any, Final
 
 from ._version import __version__
 
-__all__: Final[list[str]] = ["SpectralIrradiance", "WavelengthGrid", "__version__"]
+__all__: Final[list[str]] = [
+    "LensConfig",
+    "SpectralIrradiance",
+    "WavelengthGrid",
+    "__version__",
+]
 
 # Public name -> (module path, attribute name). Populated as public types land.
 _LAZY_EXPORTS: Final[dict[str, tuple[str, str]]] = {
+    "LensConfig": ("camsim.config.schema", "LensConfig"),
     "SpectralIrradiance": ("camsim.core.spectral", "SpectralIrradiance"),
     "WavelengthGrid": ("camsim.core.spectral", "WavelengthGrid"),
 }
