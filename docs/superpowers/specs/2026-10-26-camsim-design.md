@@ -463,13 +463,13 @@ Signal chain order (documented and tested):
 5. Optional blooming: redistribute overflow to neighbours.
 6. Optional spectral crosstalk on channel means, and optional spatial crosstalk kernel.
 7. Add input-referred read noise `N(0, σ_read)`; clip to full well.
-8. Conversion gain: `V = N · CG_mode` (µV/e⁻).
-9. Analog gain: `V ·= 10^(G_db/20)`.
-10. ADC: `DN = round(V / V_ref · (2^bits - 1 - black_level)) + black_level`;
+8. Row noise (electrons, common per row) and optional banding in the electron
+   domain, before conversion.
+9. Conversion gain: `V = N · CG_mode` (µV/e⁻).
+10. Analog gain: `V ·= 10^(G_db/20)`.
+11. ADC: `DN = round(V / V_ref · (2^bits - 1 - black_level)) + black_level`;
     clip to `[0, 2^bits - 1]`.
-11. Digital gain applied to signal DN before re-adding black level; clip.
-12. Row noise (electrons, common per row) and banding (optional) applied before
-    conversion.
+12. Digital gain applied to signal DN before re-adding black level; clip.
 
 `RawFrame` stores the mode, gains, black level, bit depth, and masks. Saturation can be
 full-well-limited or ADC-limited; the validator warns when the configured gain makes the

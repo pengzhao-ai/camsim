@@ -1050,7 +1050,7 @@ Expected: FAIL with import errors.
 
 - [ ] **Step 3: Implement `Sensor.expose` and the supporting models**
 
-Follow the signal-chain order in Section 7.2 of the spec exactly: spectral integration → PRNU → dark + DSNU → Poisson + full-well clip → crosstalk → read noise + clip → conversion gain → analog gain → ADC → digital gain → row noise. Validate irradiance shape/pitch/wavelength grid before integration and raise precise errors. Generate fixed-pattern maps once from `pattern_seed`. Implement analog/digital binning and optional blooming. Add the `sensor`, `raw_frame`, `mono_sensor_config`, and `mono_raw_frame` fixtures to `tests/conftest.py`.
+Follow the signal-chain order in Section 7.2 of the spec exactly: spectral integration → PRNU → dark + DSNU → Poisson + full-well clip → blooming (optional) → crosstalk → read noise + clip → row noise (electrons, before conversion) → conversion gain → analog gain → ADC → digital gain. Validate irradiance shape/pitch/wavelength grid before integration and raise precise errors. Generate fixed-pattern maps once from `pattern_seed`. Implement analog/digital binning and optional blooming. Add the `sensor`, `raw_frame`, `mono_sensor_config`, and `mono_raw_frame` fixtures to `tests/conftest.py`.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
