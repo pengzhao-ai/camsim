@@ -1025,10 +1025,12 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
     if status == "PASS" and not failing:
         summary_lines = [
             "**All measured G4 checks pass.** The analytic MTF cases agree with",
-            f"`psf_mtf` within {100.0 * max_mtf_error:.3f} % (gate 2 %); the",
+            f"`psf_mtf` within {100.0 * max_mtf_error:.3f} % relative (budget 2 %",
+            "plus a 1e-3 cycles/pixel floor); the",
             f"MTF50 angle spread is at most {100.0 * max_angle_spread:.3f} %",
-            "(gate 5 %); spatial, temporal, and mono SNR recover the known noise",
-            f"within {max_snr_error:.3f} dB (gate 0.5 dB); delta-E76 and",
+            "(gate 5 %); spatial, temporal, and mono SNR recover the",
+            f"generating means and sigmas within {max_snr_error:.3f} dB (gate 0.5 dB);",
+            "delta-E76 and",
             "delta-E2000 agree with `colour-science` to floating-point precision;",
             f"and `measure_all` returns {chart['patch_count']} valid colour",
             "patches with per-patch SNR, an edge MTF/acutance report, and strict",
@@ -1103,13 +1105,15 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
         "MTF50 bias that the conventional four carries. The gate cases are a",
         "Gaussian (sigma = 1 px), a box pixel aperture (width = 4 px), and",
         "diffraction at f/4 and f/8 (550 nm, 1.12 um pitch). MTF50 and MTF20",
-        "must agree within 2 %; MTF50 must vary by less than 5 % across 5, 10,",
-        "15, and 20 degree edges and by less than 5 % with additive Gaussian",
-        "noise (sigma = 0.01). The curve must be normalized to one at DC, stay",
-        "in [0, 1], and be monotone for the passive Gaussian and for the box",
-        "main lobe. The width-4 box transfer function is `|sinc(4 f)|`: it",
-        "reaches zero at 0.25 cycles/pixel and then carries a sidelobe, so its",
-        "oscillation is documented exactly as the Airy oscillation is.",
+        "must agree within a budget of 2 % of the analytic reference plus a",
+        "1e-3 cycles/pixel absolute floor; MTF50 must vary by less than 5 %",
+        "across 5, 10, 15, and 20 degree edges and by less than 5 % with",
+        "additive Gaussian noise (sigma = 0.01). The curve must be normalized",
+        "to one at DC, stay in [0, 1], and be monotone for the passive Gaussian",
+        "and for the box main lobe. The width-4 box transfer function is",
+        "`|sinc(4 f)|`: it reaches zero at 0.25 cycles/pixel and then carries a",
+        "sidelobe, so its oscillation is documented exactly as the Airy",
+        "oscillation is.",
         "",
         "**Airy f/2.8 diagnostic.** Airy f/2.8 appears only as a diagnostic,",
         "not as a gate case: its first zero is closest to Nyquist, the ESF",
@@ -1118,15 +1122,21 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
         "finite MTF20. It is reported with that documented bias rather than",
         "silently omitted.",
         "",
-        "**Known-noise SNR.** A synthetic flat patch carries known per-channel",
-        "means and Gaussian noise. `snr_patch` must recover",
-        "`20 log10(mean / std)` from the same sample standard deviation per",
-        "channel and in Rec. 709 linear luma. A second stack adds a static",
+        "**Known-noise SNR.** A synthetic flat patch carries known **generating**",
+        "per-channel means and Gaussian noise. `snr_patch` is compared with",
+        "`20 log10(mu / sigma)` using those generating constants, not the",
+        "estimator's own sample statistics. The Rec. 709 luma reference uses the",
+        "weighted generating means and the quadrature-weighted sigma, because the",
+        "channel noise draws are independent. A second stack adds a static",
         "per-pixel fixed pattern (sigma = 0.05) on top of independent temporal",
-        "noise (sigma = 0.01); `snr_temporal` must recover the known temporal",
-        "noise SNR, and the single-frame spatial SNR must be at least 5 dB",
-        "worse because it counts the fixed pattern as noise. A mono path must",
-        "report one `mono` channel with the same statistics.",
+        "noise (sigma = 0.01); `snr_temporal` is compared with",
+        "`20 log10(TEMPORAL_MEAN / TEMPORAL_SIGMA)` from the generating",
+        "constants, and the single-frame spatial SNR must be at least 5 dB worse",
+        "because it counts the fixed pattern as noise. A mono path reports one",
+        "`mono` channel and is compared with the generating R-channel mean and",
+        "sigma. A separate sample-statistics consistency diagnostic (estimator",
+        "against its own patch mean and std) is recorded and is identically zero",
+        "by construction; it is not gate evidence.",
         "",
         "**Delta-E.** `camsim.metrics.color._delta_e76` and",
         f"`_delta_e2000` are evaluated on {color['pair_count']} pairs: the published Sharma et",
@@ -1139,8 +1149,9 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
         "**Unified harness.** The synthetic chart is built from the spectrally",
         "computed reference Lab by adapting to D65 and encoding to display sRGB,",
         "with a deterministic per-patch Lab perturbation for a meaningful",
-        "delta-E heatmap and a small display noise field so every SNR patch is",
-        "valid. `measure_all` must return complete colour and SNR groups; a",
+        "delta-E heatmap, a small display floor so no channel sits at zero,",
+        "and a display noise field so every SNR patch is valid. `measure_all`",
+        "must return complete colour and SNR groups; a",
         "separate edge layout must return MTF and acutance, and a perfectly",
         "sharp synthetic edge must serialize its not-reached crossings as",
         "`null`. A mono image must return SNR and no colour group. A fresh",
@@ -1256,6 +1267,19 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "The expected column comes from the **generating** means and sigmas:"
+            f" R/G/B {', '.join(_g4_number(value) for value in snr['spatial']['means'])}"
+            f" with sigma {_g4_number(snr['spatial']['noise_sigma'])}; luma mean"
+            f" {_g4_number(snr['spatial']['luma_reference_mean'])} and sigma"
+            f" {_g4_number(snr['spatial']['luma_reference_sigma'])}; temporal mean"
+            f" {_g4_number(temporal['reference_mean'])} and sigma"
+            f" {_g4_number(temporal['reference_sigma'])}; mono mean"
+            f" {_g4_number(mono['reference_mean'])} and sigma"
+            f" {_g4_number(mono['reference_sigma'])}. The sample-statistics"
+            " consistency diagnostic is"
+            f" {_g4_number(snr['consistency']['max_abs_error_db'])} dB; it is zero"
+            " by construction and is not gate evidence.",
+            "",
             f"The temporal stack has {temporal['frames']} frames with a static",
             f"fixed pattern of sigma {float(temporal['fixed_pattern_sigma']):g} and",
             f"temporal noise of sigma {float(temporal['temporal_sigma']):g}. Its",
@@ -1330,6 +1354,23 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
+            "Per-patch SNR from the same synthetic chart (dB):",
+            "",
+            "| Patch | R | G | B | Luma |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
+    for row in chart["per_patch_snr_db"]:
+        lines.append(
+            f"| {row['patch']} | "
+            f"{_g4_number(row['R'], missing='not measured')} | "
+            f"{_g4_number(row['G'], missing='not measured')} | "
+            f"{_g4_number(row['B'], missing='not measured')} | "
+            f"{_g4_number(row['luma'], missing='not measured')} |"
+        )
+    lines.extend(
+        [
+            "",
             "The edge layout's MTF crossings are reported as `not reached` because",
             "an ideal synthetic step never falls to 50 % or 20 % inside Nyquist.",
             "That is a legitimate answer, and it must serialize as JSON `null`",
@@ -1353,6 +1394,36 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
             "it falls monotonically as the Gaussian blur widens. It is a sharpness",
             "proxy for correlation studies, not a calibrated MTF and not an",
             "ISO 12233 quantity.",
+        ]
+    )
+    lux_sweep = payload.get("lux_sweep")
+    if isinstance(lux_sweep, Mapping):
+        lines.extend(
+            [
+                "",
+                "## 6. SNR-versus-lux gallery (non-gate evidence)",
+                "",
+                "The flat-field sweep runs the shipped sensor and default ISP at a",
+                f" fixed {1000.0 * float(lux_sweep['exposure_s']):.1f} ms exposure on a",
+                f" {lux_sweep['shape'][1]} x {lux_sweep['shape'][0]} frame with PDAF",
+                "disabled, and measures the linear `RenderedImage.linear_rgb` ROI with",
+                "`snr_channels`. It illustrates the read-noise to shot-noise",
+                "transition and is **not** a G4 gate check.",
+                "",
+                "| Lux | R (dB) | G (dB) | B (dB) | Luma (dB) | Clipped fraction |",
+                "|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for index, lux in enumerate(lux_sweep["lux"]):
+            lines.append(
+                f"| {_g4_number(lux)} | {_g4_number(lux_sweep['snr_db']['R'][index])} | "
+                f"{_g4_number(lux_sweep['snr_db']['G'][index])} | "
+                f"{_g4_number(lux_sweep['snr_db']['B'][index])} | "
+                f"{_g4_number(lux_sweep['snr_db']['luma'][index])} | "
+                f"{_g4_number(lux_sweep['clipped_fraction'][index])} |"
+            )
+    lines.extend(
+        [
             "",
             "## Figures",
             "",
@@ -1363,7 +1434,7 @@ def render_g4_report(payload: Mapping[str, Any]) -> str:
             "| Per-patch delta-E heatmap | `results/figures/03_delta_e_heatmap.png` |",
             "| Acutance versus Gaussian blur | `results/figures/03_acutance_vs_blur.png` |",
             "| MTF gate figure | `results/figures/g4_mtf_curves.png` |",
-            "| SNR-versus-lux gate figure | `results/figures/g4_snr_vs_lux.png` |",
+            "| SNR-versus-lux gallery figure | `results/figures/g4_snr_vs_lux.png` |",
             "| Delta-E gate heatmap | `results/figures/g4_delta_e_heatmap.png` |",
             "| Acutance gate figure | `results/figures/g4_acutance_vs_blur.png` |",
             "| Check summary | `results/figures/g4_check_summary.png` |",

@@ -307,55 +307,63 @@ stack, and a 96 x 128 synthetic ColorChecker-like chart):
 
 | Check | Measured | Tolerance | Result |
 |---|---:|---|---|
-| MTF50 vs analytic Gaussian sigma=1 px (relative error) | 0.0003382 | < 0.02 | PASS |
-| MTF20 vs analytic Gaussian sigma=1 px (relative error) | 0.0003583 | < 0.02 | PASS |
+| MTF50 vs analytic Gaussian sigma=1 px (absolute error, cp) | 6.338e-05 | <= 0.00474782 | PASS |
+| MTF20 vs analytic Gaussian sigma=1 px (absolute error, cp) | 0.0001023 | <= 0.00671124 | PASS |
 | MTF50 angle spread, Gaussian (relative) | 0.00150161 | < 0.05 | PASS |
-| MTF50 vs analytic Box width=4 px (relative error) | 0.00121909 | < 0.02 | PASS |
-| MTF20 vs analytic Box width=4 px (relative error) | 0.00226892 | < 0.02 | PASS |
+| MTF50 vs analytic Box width=4 px (absolute error, cp) | 0.0001755 | <= 0.00387929 | PASS |
+| MTF20 vs analytic Box width=4 px (absolute error, cp) | 0.0004548 | <= 0.00500934 | PASS |
 | MTF50 angle spread, Box (relative) | 0.0104204 | < 0.05 | PASS |
-| MTF50 vs analytic Airy f/4 (relative error) | 0.0007437 | < 0.02 | PASS |
-| MTF20 vs analytic Airy f/4 (relative error) | 0.0007649 | < 0.02 | PASS |
+| MTF50 vs analytic Airy f/4 (absolute error, cp) | 0.0001569 | <= 0.00521839 | PASS |
+| MTF20 vs analytic Airy f/4 (absolute error, cp) | 0.0002694 | <= 0.00804524 | PASS |
 | MTF50 angle spread, Airy f/4 (relative) | 0.00492637 | < 0.05 | PASS |
-| MTF50 vs analytic Airy f/8 (relative error) | 0.00117628 | < 0.02 | PASS |
-| MTF20 vs analytic Airy f/8 (relative error) | 0.0003152 | < 0.02 | PASS |
+| MTF50 vs analytic Airy f/8 (absolute error, cp) | 0.0001242 | <= 0.00311163 | PASS |
+| MTF20 vs analytic Airy f/8 (absolute error, cp) | 5.557e-05 | <= 0.00452605 | PASS |
 | MTF50 angle spread, Airy f/8 (relative) | 0.00151456 | < 0.05 | PASS |
 | MTF50 noise robustness, Gaussian (relative change) | 0.0118359 | < 0.05 | PASS |
-| MTF curve DC normalization (max abs error) | 0 | < 1e-9 | PASS |
-| MTF curve range [0, 1] (max violation) | 0 | < 1e-9 | PASS |
-| MTF curve monotonicity, Gaussian full band (max rise) | -0.0001296 | < 1e-9 | PASS |
-| MTF curve monotonicity, box main lobe (max rise) | -0.0004265 | < 1e-9 | PASS |
-| SNR spatial per-channel agreement (max abs error, dB) | 0 | < 0.5 | PASS |
-| SNR spatial luma agreement (abs error, dB) | 0 | < 0.5 | PASS |
-| SNR temporal vs known noise (abs error, dB) | 0.0008095 | < 0.5 | PASS |
+| MTF curve DC normalization (max abs error) | 0 | < 1e-09 | PASS |
+| MTF curve range [0, 1] (max violation) | 0 | < 1e-09 | PASS |
+| MTF curve monotonicity, Gaussian full band (max rise) | -0.0001296 | < 1e-09 | PASS |
+| MTF curve monotonicity, box main lobe (max rise) | -0.0004265 | < 1e-09 | PASS |
+| SNR spatial per-channel agreement (max abs error, dB) | 0.0835339 | < 0.5 | PASS |
+| SNR spatial luma agreement (abs error, dB) | 0.0156268 | < 0.5 | PASS |
+| SNR temporal vs known noise (abs error, dB) | 0.0179613 | < 0.5 | PASS |
 | SNR temporal fixed-pattern rejection (temporal minus spatial, dB) | 14.0558 | > 5 | PASS |
-| SNR mono path agreement (abs error, dB) | 0 | < 0.5 | PASS |
-| DeltaE76 vs colour-science (max abs error) | 0 | < 1e-9 | PASS |
-| DeltaE2000 vs colour-science (max abs error) | 0 | < 1e-9 | PASS |
+| SNR mono path agreement (abs error, dB) | 0.009943 | < 0.5 | PASS |
+| DeltaE76 vs colour-science (max abs error) | 0 | < 1e-09 | PASS |
+| DeltaE2000 vs colour-science (max abs error) | 0 | < 1e-09 | PASS |
 | DeltaE identity (max abs error) | 0 | < 1e-12 | PASS |
-| Sharma CIEDE2000 published pairs (max abs error) | 4.95e-05 | < 1e-4 | PASS |
-| measure_all RGB chart completeness (colour + SNR) | 1 | = 1 | PASS |
-| measure_all edge layout completeness (MTF + acutance) | 1 | = 1 | PASS |
-| measure_all MONO report (SNR without colour) | 1 | = 1 | PASS |
-| measure_all JSON serialization (NaN -> null) | 1 | = 1 | PASS |
-| metrics import independence (forbidden modules absent) | 1 | = 1 | PASS |
+| Sharma CIEDE2000 published pairs (max abs error) | 4.95e-05 | < 0.0001 | PASS |
+| measure_all RGB chart completeness (colour + SNR) | 1 | = 1 +/- 0 | PASS |
+| measure_all edge layout completeness (MTF + acutance) | 1 | = 1 +/- 0 | PASS |
+| measure_all MONO report (SNR without colour) | 1 | = 1 +/- 0 | PASS |
+| measure_all JSON serialization (NaN -> null) | 1 | = 1 +/- 0 | PASS |
+| metrics import independence (forbidden modules absent) | 1 | = 1 +/- 0 | PASS |
 
 The analytic MTF reference is `camsim.optics.psf.psf_mtf`, the exact discrete
 transfer function of the same kernel, evaluated on a dense frequency grid; the
-metric and the reference share no measurement code. The eight analysis samples
-per pixel remove the roughly 2 % near-diffraction-limited MTF50 bias that four
-samples per pixel carries. The SNR references are the known synthetic noise,
-not the estimator under test: the spatial checks use each patch's own sample
-statistics, the temporal check uses the known temporal sigma, and the 14.06 dB
-gap between the temporal and single-frame spatial estimates demonstrates
-fixed-pattern rejection. Delta-E is compared with
-`colour.delta_E(method="CIE 1976"/"CIE 2000")` on 43 pairs, including the 34
-published Sharma et al. (2005) CIEDE2000 pairs; agreement is at floating-point
-round-off, and the published four-decimal values agree to 4.95e-05.
+metric and the reference share no measurement code. The crossing budget is 2 %
+of the reference plus a 1e-3 cycles/pixel absolute floor. The eight analysis
+samples per pixel remove the roughly 2 % near-diffraction-limited MTF50 bias
+that four samples per pixel carries. The SNR references are the **generating**
+means and sigmas, not the estimator's own sample statistics: the spatial
+channels use `SPATIAL_MEANS`/`SPATIAL_SIGMA`, luma uses the weighted generating
+mean and quadrature-weighted sigma (the channel draws are independent), the
+temporal check uses `TEMPORAL_MEAN`/`TEMPORAL_SIGMA`, and mono uses the
+generating R-channel constants. The sample-statistics consistency diagnostic is
+zero by construction and is recorded in `snr.consistency` as a non-gate
+diagnostic, not as evidence. The 14.06 dB gap between the temporal and
+single-frame spatial estimates demonstrates fixed-pattern rejection. Delta-E is
+compared with `colour.delta_E(method="CIE 1976"/"CIE 2000")` on 43 pairs,
+including the 34 published Sharma et al. (2005) CIEDE2000 pairs; agreement is at
+floating-point round-off, and the published four-decimal values agree to
+4.95e-05.
 
 The gallery also plots a sensor/ISP flat-field SNR sweep from 25 to 3200 lux at
 a fixed 10 ms exposure (64 x 64 pixels, PDAF disabled, linear
-`RenderedImage.linear_rgb`), where luma SNR rises from 12.45 to 35.16 dB; that
-sweep is an illustration, not a gate check.
+`RenderedImage.linear_rgb`), where luma SNR rises from 12.45 to 35.16 dB. The
+committed `results/reports/g4_metrics_results.json` records the exact levels,
+per-channel values, and clipped fractions in its `lux_sweep` section with
+`gate_evidence: false`; the sweep is an illustration, not a gate check.
 
 The report records these assumptions and known limitations:
 

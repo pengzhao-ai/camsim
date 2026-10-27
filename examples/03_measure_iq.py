@@ -331,6 +331,44 @@ def _acutance_replica(payload: dict[str, Any]) -> Figure:
     return figure
 
 
+def _relative_preset(path: Path) -> str:
+    """Return a repository-relative preset path when the checkout allows it."""
+    try:
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:  # pragma: no cover - installed-package fallback
+        return path.as_posix()
+
+
+def _lux_sweep_section(
+    *,
+    quick: bool,
+    levels: list[float],
+    series: dict[str, list[float]],
+    rows: list[dict[str, float]],
+) -> dict[str, Any]:
+    """Package the illustrative lux sweep for the JSON report and Markdown."""
+    snr_by_channel: dict[str, list[float]] = {}
+    for channel, values in series.items():
+        snr_by_channel[channel] = [float(value) for value in values]
+    return {
+        "gate_evidence": False,
+        "note": (
+            "Gallery illustration, not a G4 check: fixed exposure, flagship "
+            "sensor and default ISP, PDAF disabled, linear RenderedImage.linear_rgb "
+            "ROI measured with snr_channels."
+        ),
+        "quick": quick,
+        "shape": list(_SWEEP_SHAPE),
+        "exposure_s": _SWEEP_EXPOSURE_S,
+        "sensor_preset": _relative_preset(_SENSOR_PRESET),
+        "isp_preset": _relative_preset(_ISP_PRESET),
+        "pdaf_disabled": True,
+        "lux": [float(value) for value in levels],
+        "snr_db": snr_by_channel,
+        "clipped_fraction": [float(row["clipped_fraction"]) for row in rows],
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the gallery and G4 measurements, write the artifacts, return an exit code."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -362,6 +400,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     payload = measure_g4(quick=args.quick)
     sweep_lux, sweep_series, sweep_rows = _flat_field_snr_sweep(quick=args.quick)
+    # The lux sweep is gallery-only, so it travels in the report payload with an
+    # explicit `gate_evidence: false` marker; measure_g4's gate checks never see it.
+    report_payload = dict(payload)
+    report_payload["lux_sweep"] = _lux_sweep_section(
+        quick=args.quick,
+        levels=sweep_lux,
+        series=sweep_series,
+        rows=sweep_rows,
+    )
     gate_passed = payload["status"] == "PASS"
 
     print("\nAnalytic MTF cases:")
@@ -391,13 +438,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.quick:
         report_path = reports / QUICK_REPORT_NAME
-        _write_json(report_path, payload)
+        _write_json(report_path, report_payload)
         print(f"\nQuick results JSON: {report_path}")
     else:
         report_path = reports / REPORT_NAME
-        _write_json(report_path, payload)
+        _write_json(report_path, report_payload)
         markdown_path = reports / REPORT_MARKDOWN_NAME
-        markdown_path.write_text(render_g4_report(payload), encoding="utf-8")
+        markdown_path.write_text(render_g4_report(report_payload), encoding="utf-8")
         print(f"\nResults JSON: {report_path}")
         print(f"Report: {markdown_path}")
 

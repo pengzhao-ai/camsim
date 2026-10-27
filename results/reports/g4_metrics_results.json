@@ -27,26 +27,26 @@
   },
   "checks": [
     {
-      "measured": 0.00033823140514091505,
-      "measured_text": "0.0003382",
-      "name": "MTF50 vs analytic Gaussian sigma=1 px (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 6.33815939381499e-05,
+      "measured_text": "6.338e-05",
+      "name": "MTF50 vs analytic Gaussian sigma=1 px (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.004747824298677627
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00474782"
     },
     {
-      "measured": 0.0003582583348014668,
-      "measured_text": "0.0003583",
-      "name": "MTF20 vs analytic Gaussian sigma=1 px (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 0.00010230502188290913,
+      "measured_text": "0.0001023",
+      "name": "MTF20 vs analytic Gaussian sigma=1 px (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.006711243086059823
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00671124"
     },
     {
       "measured": 0.0015016104536449526,
@@ -60,26 +60,26 @@
       "tolerance_text": "< 0.05"
     },
     {
-      "measured": 0.0012190900103167454,
-      "measured_text": "0.00121909",
-      "name": "MTF50 vs analytic Box width=4 px (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 0.0001755059288231775,
+      "measured_text": "0.0001755",
+      "name": "MTF50 vs analytic Box width=4 px (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.003879294019931758
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00387929"
     },
     {
-      "measured": 0.0022689178954599597,
-      "measured_text": "0.00226892",
-      "name": "MTF20 vs analytic Box width=4 px (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 0.0004548428831311624,
+      "measured_text": "0.0004548",
+      "name": "MTF20 vs analytic Box width=4 px (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.005009337526415479
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00500934"
     },
     {
       "measured": 0.010420407943978234,
@@ -93,26 +93,26 @@
       "tolerance_text": "< 0.05"
     },
     {
-      "measured": 0.0007437390612474192,
-      "measured_text": "0.0007437",
-      "name": "MTF50 vs analytic Airy f/4 (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 0.0001568692470233779,
+      "measured_text": "0.0001569",
+      "name": "MTF50 vs analytic Airy f/4 (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.005218394735386698
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00521839"
     },
     {
-      "measured": 0.0007648628475932803,
-      "measured_text": "0.0007649",
-      "name": "MTF20 vs analytic Airy f/4 (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 0.00026943230578679866,
+      "measured_text": "0.0002694",
+      "name": "MTF20 vs analytic Airy f/4 (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.008045244951682386
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00804524"
     },
     {
       "measured": 0.004926374446290268,
@@ -126,26 +126,26 @@
       "tolerance_text": "< 0.05"
     },
     {
-      "measured": 0.0011762781425453594,
-      "measured_text": "0.00117628",
-      "name": "MTF50 vs analytic Airy f/8 (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 0.00012419342642447373,
+      "measured_text": "0.0001242",
+      "name": "MTF50 vs analytic Airy f/8 (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.0031116336677944286
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00311163"
     },
     {
-      "measured": 0.00031521401284088983,
-      "measured_text": "0.0003152",
-      "name": "MTF20 vs analytic Airy f/8 (relative error)",
-      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel.",
+      "measured": 5.5572956162153186e-05,
+      "measured_text": "5.557e-05",
+      "name": "MTF20 vs analytic Airy f/8 (absolute error, cp)",
+      "notes": "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling against psf_mtf evaluated exactly on the discrete PSF kernel; budget = 2 % of the reference plus a 1e-3 cycles/pixel absolute floor.",
       "pass": true,
       "tolerance": {
-        "maximum": 0.02
+        "maximum": 0.004526046044799707
       },
-      "tolerance_text": "< 0.02"
+      "tolerance_text": "<= 0.00452605"
     },
     {
       "measured": 0.0015145630729276793,
@@ -214,10 +214,10 @@
       "tolerance_text": "< 1e-09"
     },
     {
-      "measured": 0.0,
-      "measured_text": "0",
+      "measured": 0.08353387440730486,
+      "measured_text": "0.0835339",
       "name": "SNR spatial per-channel agreement (max abs error, dB)",
-      "notes": "snr_patch per R/G/B channel against 20 log10(mean / std) with the sample standard deviation (ddof=1) of the same synthetic patch.",
+      "notes": "snr_patch per R/G/B channel against 20 log10(mu / sigma) using the generating means and noise sigma; channel noise draws are independent.",
       "pass": true,
       "tolerance": {
         "maximum": 0.5
@@ -225,10 +225,10 @@
       "tolerance_text": "< 0.5"
     },
     {
-      "measured": 0.0,
-      "measured_text": "0",
+      "measured": 0.015626779946991576,
+      "measured_text": "0.0156268",
       "name": "SNR spatial luma agreement (abs error, dB)",
-      "notes": "Rec. 709 luma (0.2126 R + 0.7152 G + 0.0722 B) in linear light against the luma plane's own sample statistics.",
+      "notes": "Rec. 709 luma in linear light against the generating luma mean 0.2126 mu_R + 0.7152 mu_G + 0.0722 mu_B and the quadrature weighted sigma, since the channel noise draws are independent.",
       "pass": true,
       "tolerance": {
         "maximum": 0.5
@@ -236,10 +236,10 @@
       "tolerance_text": "< 0.5"
     },
     {
-      "measured": 0.0008095227166720065,
-      "measured_text": "0.0008095",
+      "measured": 0.017961338786939507,
+      "measured_text": "0.0179613",
       "name": "SNR temporal vs known noise (abs error, dB)",
-      "notes": "Pooled per-pixel temporal variance over 32 frames with a static fixed pattern (sigma=0.05) and temporal noise (sigma=0.01); reference uses the known temporal sigma, not the estimator under test.",
+      "notes": "Pooled per-pixel temporal variance over 32 frames with a static fixed pattern (sigma=0.05) and temporal noise (sigma=0.01); the reference is 20 log10(0.5 / 0.01) from the generating constants, not the measured stack mean.",
       "pass": true,
       "tolerance": {
         "maximum": 0.5
@@ -258,10 +258,10 @@
       "tolerance_text": "> 5"
     },
     {
-      "measured": 0.0,
-      "measured_text": "0",
+      "measured": 0.009942995311355673,
+      "measured_text": "0.009943",
       "name": "SNR mono path agreement (abs error, dB)",
-      "notes": "A 2-D mono patch reports one 'mono' channel with the same spatial statistics; no colour channel is invented.",
+      "notes": "A 2-D mono patch reports one 'mono' channel with the same spatial statistics; its reference is the generating R-channel mean and sigma, and no colour channel is invented.",
       "pass": true,
       "tolerance": {
         "maximum": 0.5
@@ -1237,11 +1237,87 @@
   },
   "gate_evidence": true,
   "kind": "camsim G4 metrics validation",
+  "lux_sweep": {
+    "clipped_fraction": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "exposure_s": 0.01,
+    "gate_evidence": false,
+    "isp_preset": "src/camsim/config/presets/isp/default.json",
+    "lux": [
+      25.0,
+      50.0,
+      100.0,
+      200.0,
+      400.0,
+      800.0,
+      1600.0,
+      3200.0
+    ],
+    "note": "Gallery illustration, not a G4 check: fixed exposure, flagship sensor and default ISP, PDAF disabled, linear RenderedImage.linear_rgb ROI measured with snr_channels.",
+    "pdaf_disabled": true,
+    "quick": false,
+    "sensor_preset": "src/camsim/config/presets/sensors/flagship_phone_50mp.json",
+    "shape": [
+      64,
+      64
+    ],
+    "snr_db": {
+      "B": [
+        9.37102616403254,
+        13.90400215285738,
+        17.395082037617854,
+        20.227632145648617,
+        23.61616139839132,
+        26.88476827151574,
+        29.973527096120467,
+        32.496854845113226
+      ],
+      "G": [
+        12.218286140100151,
+        15.967014992895042,
+        19.51402977733867,
+        22.77466029447197,
+        25.753431439663213,
+        29.03543211369998,
+        31.927651862293686,
+        34.85292568063988
+      ],
+      "R": [
+        10.884194985492407,
+        14.731826785706465,
+        18.245486443259438,
+        21.461519602083317,
+        24.594535181342575,
+        27.85183247540288,
+        30.989541245654046,
+        33.478453634907545
+      ],
+      "luma": [
+        12.453445116252555,
+        16.246924993789996,
+        19.882332761189666,
+        23.04858432193563,
+        26.085658015386702,
+        29.431249733395326,
+        32.35756209964997,
+        35.16381817009359
+      ]
+    }
+  },
   "measure_all": {
     "chart": {
-      "mean_delta_e2000": 1.6007573542083733,
-      "mean_delta_e76": 2.091742704123795,
-      "mean_luma_snr_db": 40.400795000231604,
+      "all_snr_valid": true,
+      "mean_delta_e2000": 1.6046013054515609,
+      "mean_delta_e76": 2.099809745898157,
+      "mean_luma_snr_db": 40.40103726277464,
       "patch_count": 24,
       "patch_names": [
         "dark skin",
@@ -1287,7 +1363,7 @@
         0.8330365704031367,
         1.3344348057238582,
         2.0100056106297837,
-        2.382495129717568,
+        2.474749959554073,
         0.7657112799621602,
         2.7843178265435915,
         2.3833972201736637,
@@ -1313,13 +1389,183 @@
         1.5920498665846925,
         2.453098349619363,
         2.3858537719423323,
-        4.057979408602619,
+        4.251588411187311,
         1.0893384996426307,
         2.7145368865299253,
         2.3287047604613322,
         1.235216520827103,
         2.1876033096926375,
         2.1378409962827765
+      ],
+      "per_patch_snr_db": [
+        {
+          "B": 32.684297083195155,
+          "G": 34.050948118769696,
+          "R": 36.95638835184849,
+          "luma": 37.98740496699875,
+          "patch": "dark skin"
+        },
+        {
+          "B": 38.8159252927756,
+          "G": 38.861237818407034,
+          "R": 41.80843868262677,
+          "luma": 42.56106933191794,
+          "patch": "light skin"
+        },
+        {
+          "B": 40.15754517626293,
+          "G": 37.40880796932495,
+          "R": 35.71027563708863,
+          "luma": 39.48951039016112,
+          "patch": "blue sky"
+        },
+        {
+          "B": 32.66803896303454,
+          "G": 37.07711074124055,
+          "R": 35.44277511327637,
+          "luma": 38.25263032090268,
+          "patch": "foliage"
+        },
+        {
+          "B": 40.75988261342181,
+          "G": 37.78931427432474,
+          "R": 38.5553041617801,
+          "luma": 41.23946926894078,
+          "patch": "blue flower"
+        },
+        {
+          "B": 39.98528512369903,
+          "G": 40.60328478337659,
+          "R": 35.00428937517732,
+          "luma": 41.94943081961037,
+          "patch": "bluish green"
+        },
+        {
+          "B": 30.211312707385044,
+          "G": 36.95002009862226,
+          "R": 42.393310984934544,
+          "luma": 42.29936809880806,
+          "patch": "orange"
+        },
+        {
+          "B": 40.91550449443161,
+          "G": 34.778267985851926,
+          "R": 33.409100064876476,
+          "luma": 38.096097634907146,
+          "patch": "purplish blue"
+        },
+        {
+          "B": 35.194845011486244,
+          "G": 34.99045669862225,
+          "R": 41.778482795193035,
+          "luma": 41.95342356574888,
+          "patch": "moderate red"
+        },
+        {
+          "B": 37.15969695377717,
+          "G": 32.53901171819125,
+          "R": 35.373176498369496,
+          "luma": 37.181983419210916,
+          "patch": "purple"
+        },
+        {
+          "B": 31.930369076930315,
+          "G": 40.973920728253475,
+          "R": 38.98913159378264,
+          "luma": 42.56235038083966,
+          "patch": "yellow green"
+        },
+        {
+          "B": 28.554271989085347,
+          "G": 38.55715657166832,
+          "R": 42.62182468815834,
+          "luma": 42.423858498711546,
+          "patch": "orange yellow"
+        },
+        {
+          "B": 38.06399919247108,
+          "G": 32.323362587816014,
+          "R": 28.694721241813617,
+          "luma": 37.07448291870533,
+          "patch": "blue"
+        },
+        {
+          "B": 33.56014046851266,
+          "G": 38.74839725502321,
+          "R": 33.197816765244724,
+          "luma": 39.34487768152218,
+          "patch": "green"
+        },
+        {
+          "B": 32.267771862004466,
+          "G": 30.649100633856,
+          "R": 40.05377737509421,
+          "luma": 40.13450639980949,
+          "patch": "red"
+        },
+        {
+          "B": 30.56593419985245,
+          "G": 42.130354289747906,
+          "R": 42.28331921085911,
+          "luma": 44.719544484810726,
+          "patch": "yellow"
+        },
+        {
+          "B": 39.52094064203528,
+          "G": 35.47059480079219,
+          "R": 40.59685854040363,
+          "luma": 42.035867623094035,
+          "patch": "magenta"
+        },
+        {
+          "B": 39.90941814289214,
+          "G": 38.53118886693381,
+          "R": 15.626217492901828,
+          "luma": 39.60056809563183,
+          "patch": "cyan"
+        },
+        {
+          "B": 42.920849753315416,
+          "G": 43.111141524881596,
+          "R": 42.87620461219745,
+          "luma": 45.797445873774876,
+          "patch": "white 9.5 (.05 D)"
+        },
+        {
+          "B": 40.96019345450422,
+          "G": 42.01701089143903,
+          "R": 40.97164914548975,
+          "luma": 44.63790840357085,
+          "patch": "neutral 8 (.23 D)"
+        },
+        {
+          "B": 39.25203125364817,
+          "G": 38.80799340846744,
+          "R": 40.04715537356951,
+          "luma": 41.222278504897005,
+          "patch": "neutral 6.5 (.44 D)"
+        },
+        {
+          "B": 36.54516489639109,
+          "G": 37.70422863949504,
+          "R": 36.99497981741773,
+          "luma": 40.005669356505855,
+          "patch": "neutral 5 (.70 D)"
+        },
+        {
+          "B": 34.08163025561632,
+          "G": 33.29843375348788,
+          "R": 35.12555334567398,
+          "luma": 36.03805739966754,
+          "patch": "neutral 3.5 (1.05 D)"
+        },
+        {
+          "B": 31.87760012560201,
+          "G": 30.782584904427623,
+          "R": 30.882199988262443,
+          "luma": 33.017090867843834,
+          "patch": "black 2 (1.5 D)"
+        }
       ],
       "shape": [
         96,
@@ -1352,7 +1598,7 @@
       ]
     },
     "import_independence": {
-      "command": "/Users/pengzhao/Documents/Projects/git_repos/IQ_machine_vision/.venv/bin/python -c \"import camsim.metrics, sys; assert 'camsim.sensor' not in sys.modules; assert 'camsim.isp' not in sys.modules; assert 'camsim.scene' not in sys.modules; assert 'camsim.optics' not in sys.modules\"",
+      "command": "python -c \"import camsim.metrics, sys; assert 'camsim.sensor' not in sys.modules; assert 'camsim.isp' not in sys.modules; assert 'camsim.scene' not in sys.modules; assert 'camsim.optics' not in sys.modules\"",
       "forbidden_modules": [
         "camsim.sensor",
         "camsim.isp",
@@ -1479,6 +1725,8 @@
     ],
     "cases": [
       {
+        "absolute_error_mtf20_cp": 0.00010230502188290913,
+        "absolute_error_mtf50_cp": 6.33815939381499e-05,
         "analytic_mtf": [
           1.0000000000000004,
           0.9997154760947488,
@@ -1894,9 +2142,15 @@
         "reference_mtf50_cp": 0.18739121493388133,
         "relative_error_mtf20": -0.0003582583348014668,
         "relative_error_mtf50": -0.00033823140514091505,
-        "short": "Gaussian"
+        "short": "Gaussian",
+        "tolerance_mtf20_cp": 0.006711243086059823,
+        "tolerance_mtf50_cp": 0.004747824298677627,
+        "within_tolerance_mtf20": true,
+        "within_tolerance_mtf50": true
       },
       {
+        "absolute_error_mtf20_cp": 0.0004548428831311624,
+        "absolute_error_mtf50_cp": 0.0001755059288231775,
         "analytic_mtf": [
           1.0,
           0.9995732140533515,
@@ -2312,9 +2566,15 @@
         "reference_mtf50_cp": 0.1439647009965879,
         "relative_error_mtf20": 0.0022689178954599597,
         "relative_error_mtf50": 0.0012190900103167454,
-        "short": "Box"
+        "short": "Box",
+        "tolerance_mtf20_cp": 0.005009337526415479,
+        "tolerance_mtf50_cp": 0.003879294019931758,
+        "within_tolerance_mtf20": true,
+        "within_tolerance_mtf50": true
       },
       {
+        "absolute_error_mtf20_cp": 0.00026943230578679866,
+        "absolute_error_mtf50_cp": 0.0001568692470233779,
         "analytic_mtf": [
           0.9999999999999998,
           0.998988723225964,
@@ -2730,9 +2990,15 @@
         "reference_mtf50_cp": 0.2109197367693349,
         "relative_error_mtf20": -0.0007648628475932803,
         "relative_error_mtf50": -0.0007437390612474192,
-        "short": "Airy f/4"
+        "short": "Airy f/4",
+        "tolerance_mtf20_cp": 0.008045244951682386,
+        "tolerance_mtf50_cp": 0.005218394735386698,
+        "within_tolerance_mtf20": true,
+        "within_tolerance_mtf50": true
       },
       {
+        "absolute_error_mtf20_cp": 5.5572956162153186e-05,
+        "absolute_error_mtf50_cp": 0.00012419342642447373,
         "analytic_mtf": [
           0.9999999999999996,
           0.9962186356842322,
@@ -3148,7 +3414,11 @@
         "reference_mtf50_cp": 0.10558168338972142,
         "relative_error_mtf20": -0.00031521401284088983,
         "relative_error_mtf50": 0.0011762781425453594,
-        "short": "Airy f/8"
+        "short": "Airy f/8",
+        "tolerance_mtf20_cp": 0.004526046044799707,
+        "tolerance_mtf50_cp": 0.0031116336677944286,
+        "within_tolerance_mtf20": true,
+        "within_tolerance_mtf50": true
       }
     ],
     "diagnostics": [
@@ -3221,19 +3491,29 @@
     "snr_temporal": 43
   },
   "snr": {
+    "consistency": {
+      "max_abs_error_db": 0.0,
+      "note": "Estimator against the same patch's sample mean and standard deviation. This is zero by construction; it is reported as a diagnostic and is not the gate reference. The gate compares against the generating means and sigmas."
+    },
     "mono": {
       "channel": "mono",
       "channels": [
         "mono"
       ],
-      "error_db": 0.0,
-      "expected_snr_db": 23.531768176424983,
+      "error_db": 0.009942995311355673,
+      "expected_snr_db": 23.521825181113627,
       "mean": 0.29961238878608376,
+      "reference_mean": 0.3,
+      "reference_sigma": 0.02,
+      "sample_consistency_error_db": 0.0,
+      "sample_expected_snr_db": 23.531768176424983,
       "snr_db": 23.531768176424983,
       "std": 0.019951307322427836,
       "valid": true
     },
     "spatial": {
+      "luma_reference_mean": 0.44868,
+      "luma_reference_sigma": 0.014992299890277007,
       "means": [
         0.3,
         0.52,
@@ -3242,36 +3522,52 @@
       "measurements": [
         {
           "channel": "R",
-          "error_db": 0.0,
-          "expected_snr_db": 23.531768176424983,
+          "error_db": 0.009942995311355673,
+          "expected_snr_db": 23.521825181113627,
           "mean": 0.29961238878608376,
+          "reference_mean": 0.3,
+          "reference_sigma": 0.02,
+          "sample_consistency_error_db": 0.0,
+          "sample_expected_snr_db": 23.531768176424983,
           "snr_db": 23.531768176424983,
           "std": 0.019951307322427836,
           "valid": true
         },
         {
           "channel": "G",
-          "error_db": 0.0,
-          "expected_snr_db": 28.22586678145461,
+          "error_db": -0.073600177961751,
+          "expected_snr_db": 28.29946695941636,
           "mean": 0.5200857216323667,
+          "reference_mean": 0.52,
+          "reference_sigma": 0.02,
+          "sample_consistency_error_db": 0.0,
+          "sample_expected_snr_db": 28.22586678145461,
           "snr_db": 28.22586678145461,
           "std": 0.020173515754341554,
           "valid": true
         },
         {
           "channel": "B",
-          "error_db": 0.0,
-          "expected_snr_db": 19.001316314379192,
+          "error_db": -0.08353387440730486,
+          "expected_snr_db": 19.084850188786497,
           "mean": 0.17947762441323406,
+          "reference_mean": 0.18,
+          "reference_sigma": 0.02,
+          "sample_consistency_error_db": 0.0,
+          "sample_expected_snr_db": 19.001316314379192,
           "snr_db": 19.001316314379192,
           "std": 0.020134669106900427,
           "valid": true
         },
         {
           "channel": "luma",
-          "error_db": 0.0,
-          "expected_snr_db": 29.53699578792589,
+          "error_db": 0.015626779946991576,
+          "expected_snr_db": 29.521369007978898,
           "mean": 0.4486211864500255,
+          "reference_mean": 0.44868,
+          "reference_sigma": 0.014992299890277007,
+          "sample_consistency_error_db": 0.0,
+          "sample_expected_snr_db": 29.53699578792589,
           "snr_db": 29.53699578792589,
           "std": 0.014963389821837878,
           "valid": true
@@ -3284,8 +3580,8 @@
       ]
     },
     "temporal": {
-      "error_db": -0.0008095227166720065,
-      "expected_snr_db": 33.96224827065011,
+      "error_db": -0.017961338786939507,
+      "expected_snr_db": 33.979400086720375,
       "fixed_pattern_sigma": 0.05,
       "fpn_rejection_db": 14.055833029184619,
       "frames": 32,
@@ -3294,6 +3590,10 @@
         32,
         32
       ],
+      "reference_mean": 0.5,
+      "reference_sigma": 0.01,
+      "sample_consistency_error_db": 0.0,
+      "sample_expected_snr_db": 33.961438747933435,
       "snr_db": 33.961438747933435,
       "spatial_single_frame_snr_db": 19.905605718748816,
       "std": 0.010000932040902242,

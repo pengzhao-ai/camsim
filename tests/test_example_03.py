@@ -166,6 +166,22 @@ def test_example_03_runs(tmp_path: Path) -> None:
     assert len(gallery) >= 3, [path.name for path in gallery]
     for path in gallery:
         assert path.stat().st_size > 0
+    # Every figure written by --quick must carry the _quick suffix, and no
+    # unsuffixed full-resolution figure may appear in the same directory.
+    for path in figures.glob("*.png"):
+        assert path.name.endswith("_quick.png"), path.name
+    full_names = (
+        "03_mtf_curves.png",
+        "03_snr_vs_lux.png",
+        "03_delta_e_heatmap.png",
+        "03_acutance_vs_blur.png",
+        "g4_mtf_curves.png",
+        "g4_snr_vs_lux.png",
+        "g4_delta_e_heatmap.png",
+        "g4_acutance_vs_blur.png",
+        "g4_check_summary.png",
+    )
+    assert not any((figures / name).exists() for name in full_names)
 
     # Quick mode must never write or overwrite the committed gate artifacts.
     assert not (reports / "g4_metrics_results.json").exists()
@@ -187,8 +203,12 @@ def test_g4_gaussian_mtf50(g4: dict[str, Any]) -> None:
     assert case["reference_mtf50_cp"] == pytest.approx(0.18739, abs=1e-4)
     assert case["measured_mtf50_cp"] == pytest.approx(case["reference_mtf50_cp"], rel=0.02)
     assert case["measured_mtf20_cp"] == pytest.approx(case["reference_mtf20_cp"], rel=0.02)
-    assert abs(case["relative_error_mtf50"]) < 0.02
-    assert abs(case["relative_error_mtf20"]) < 0.02
+    for level in ("mtf50", "mtf20"):
+        reference = case[f"reference_{level}_cp"]
+        tolerance = 0.02 * abs(reference) + 1e-3
+        assert case[f"tolerance_{level}_cp"] == pytest.approx(tolerance, abs=1e-15)
+        assert case[f"absolute_error_{level}_cp"] <= case[f"tolerance_{level}_cp"]
+        assert case[f"within_tolerance_{level}"] is True
 
     frequency = case["frequency_cp"]
     measured = case["measured_mtf"]
@@ -207,8 +227,12 @@ def test_g4_airy_mtf(g4: dict[str, Any]) -> None:
     for case in (f4, f8):
         assert case["measured_mtf50_cp"] == pytest.approx(case["reference_mtf50_cp"], rel=0.02)
         assert case["measured_mtf20_cp"] == pytest.approx(case["reference_mtf20_cp"], rel=0.02)
-        assert abs(case["relative_error_mtf50"]) < 0.02
-        assert abs(case["relative_error_mtf20"]) < 0.02
+        for level in ("mtf50", "mtf20"):
+            reference = case[f"reference_{level}_cp"]
+            tolerance = 0.02 * abs(reference) + 1e-3
+            assert case[f"tolerance_{level}_cp"] == pytest.approx(tolerance, abs=1e-15)
+            assert case[f"absolute_error_{level}_cp"] <= case[f"tolerance_{level}_cp"]
+            assert case[f"within_tolerance_{level}"] is True
     # Stopping down increases diffraction blur, so f/8 must be softer than f/4.
     assert f8["measured_mtf50_cp"] < f4["measured_mtf50_cp"]
 
@@ -223,19 +247,42 @@ def test_g4_airy_mtf(g4: dict[str, Any]) -> None:
 
 
 def test_g4_snr_known_noise(g4: dict[str, Any]) -> None:
-    """Spatial and temporal SNR recover the known synthetic noise levels."""
+    """Spatial, luma, temporal, and mono SNR recover the generating noise levels."""
     spatial = g4["snr"]["spatial"]
+    means = spatial["means"]
+    sigma = spatial["noise_sigma"]
+    expected_by_channel = {
+        "R": 20.0 * math.log10(means[0] / sigma),
+        "G": 20.0 * math.log10(means[1] / sigma),
+        "B": 20.0 * math.log10(means[2] / sigma),
+    }
+    # The channel noise draws are independent, so the luma sigma is the
+    # quadrature sum of the weighted channel sigmas.
+    luma_mean = 0.2126 * means[0] + 0.7152 * means[1] + 0.0722 * means[2]
+    weighted_variance = sum((weight * sigma) ** 2 for weight in (0.2126, 0.7152, 0.0722))
+    luma_sigma = math.sqrt(weighted_variance)
+    expected_by_channel["luma"] = 20.0 * math.log10(luma_mean / luma_sigma)
+    assert spatial["luma_reference_mean"] == pytest.approx(luma_mean, abs=1e-12)
+    assert spatial["luma_reference_sigma"] == pytest.approx(luma_sigma, abs=1e-12)
+
     for row in spatial["measurements"]:
         assert row["valid"] is True
-        assert row["error_db"] == pytest.approx(0.0, abs=1e-9)
-        assert abs(row["snr_db"] - row["expected_snr_db"]) <= 0.5
+        assert row["expected_snr_db"] == pytest.approx(
+            expected_by_channel[row["channel"]], abs=1e-9
+        )
+        assert abs(row["error_db"]) <= 0.5
+        # The sample-statistics consistency value is a diagnostic, not the gate
+        # reference; it is zero by construction.
+        assert abs(row["sample_consistency_error_db"]) <= 1e-9
     channels = {row["channel"] for row in spatial["measurements"]}
     assert channels == {"R", "G", "B", "luma"}
 
     temporal = g4["snr"]["temporal"]
     assert temporal["valid"] is True
+    expected_temporal = 20.0 * math.log10(0.5 / 0.01)
+    assert temporal["expected_snr_db"] == pytest.approx(expected_temporal, abs=1e-9)
     assert abs(temporal["error_db"]) <= 0.5
-    assert temporal["snr_db"] == pytest.approx(20.0 * math.log10(0.5 / 0.01), abs=0.5)
+    assert abs(temporal["sample_consistency_error_db"]) <= 1e-9
     # A static fixed pattern must be rejected by the temporal estimator: the
     # single-frame spatial SNR counts it and is materially lower.
     assert temporal["fpn_rejection_db"] >= 5.0
@@ -244,7 +291,11 @@ def test_g4_snr_known_noise(g4: dict[str, Any]) -> None:
     mono = g4["snr"]["mono"]
     assert mono["channel"] == "mono"
     assert mono["valid"] is True
+    expected_mono = 20.0 * math.log10(means[0] / sigma)
+    assert mono["expected_snr_db"] == pytest.approx(expected_mono, abs=1e-9)
     assert abs(mono["error_db"]) <= 0.5
+    assert abs(mono["sample_consistency_error_db"]) <= 1e-9
+    assert g4["snr"]["consistency"]["max_abs_error_db"] <= 1e-9
 
 
 def test_g4_delta_e_matches_reference(g4: dict[str, Any]) -> None:
@@ -272,6 +323,13 @@ def test_g4_measure_all_serialization(g4: dict[str, Any]) -> None:
     assert len(chart["per_patch_delta_e2000"]) == 24
     assert chart["snr_patch_count"] == 24
     assert chart["snr_channels"] == ["R", "G", "B", "luma"]
+    assert chart["all_snr_valid"] is True
+    assert len(chart["per_patch_snr_db"]) == 24
+    for row in chart["per_patch_snr_db"]:
+        assert row["patch"]
+        for channel in ("R", "G", "B", "luma"):
+            assert row[channel] is not None
+            assert math.isfinite(row[channel])
 
     edge = harness["edge"]
     assert edge["acutance"] is not None
@@ -376,6 +434,10 @@ def test_g4_report_tables_match_results_json() -> None:
     assert G4_REPORT_PATH.exists(), f"missing gate report: {G4_REPORT_PATH}"
     payload = json.loads(G4_JSON_PATH.read_text(encoding="utf-8"))
     text = G4_REPORT_PATH.read_text(encoding="utf-8")
+    # The committed report must be byte-identical to a fresh render of the
+    # committed JSON. The table checks below localize a failure; this guard
+    # makes the completeness claim exact.
+    assert text == render_g4_report(payload)
     tables = _parse_markdown_tables(text)
 
     # Verdict summary: every check, in order, with its exact display strings.
@@ -394,7 +456,9 @@ def test_g4_report_tables_match_results_json() -> None:
         assert tolerance_numbers
         assert all(
             any(
-                math.isclose(parsed_value, expected, rel_tol=1e-6, abs_tol=1e-12)
+                # Tolerance display is six significant digits, so allow one
+                # part in 1e5 rather than the exact float round-trip.
+                math.isclose(parsed_value, expected, rel_tol=1e-5, abs_tol=1e-12)
                 for expected in expected_tolerance
             )
             for parsed_value in tolerance_numbers
@@ -507,6 +571,16 @@ def test_g4_report_tables_match_results_json() -> None:
             abs_tol=1e-9,
         )
 
+    # Per-patch synthetic-chart SNR table.
+    rows = _table_with_header(tables, ["Patch", "R", "G", "B", "Luma"])
+    assert len(rows) == len(chart["per_patch_snr_db"])
+    for row, section in zip(rows, chart["per_patch_snr_db"], strict=True):
+        assert row[0] == section["patch"]
+        for column, channel in enumerate(("R", "G", "B", "luma"), start=1):
+            assert math.isclose(
+                _numbers(row[column])[0], section[channel], rel_tol=1e-3, abs_tol=1e-9
+            )
+
     # Acutance-versus-blur table.
     rows = _table_with_header(tables, ["Gaussian blur sigma (px)", "Acutance"])
     sweep = payload["acutance_sweep"]
@@ -515,11 +589,38 @@ def test_g4_report_tables_match_results_json() -> None:
         assert math.isclose(_numbers(row[0])[0], sigma, rel_tol=1e-6, abs_tol=1e-12)
         assert math.isclose(_numbers(row[1])[0], acutance, rel_tol=1e-3, abs_tol=1e-9)
 
+    # Illustrative lux sweep, serialized in the committed payload as
+    # non-gate evidence.
+    lux_sweep = payload["lux_sweep"]
+    assert lux_sweep["gate_evidence"] is False
+    rows = _table_with_header(
+        tables,
+        ["Lux", "R (dB)", "G (dB)", "B (dB)", "Luma (dB)", "Clipped fraction"],
+    )
+    assert len(rows) == len(lux_sweep["lux"])
+    for index, row in enumerate(rows):
+        assert math.isclose(
+            _numbers(row[0])[0], lux_sweep["lux"][index], rel_tol=1e-6, abs_tol=1e-12
+        )
+        for column, channel in enumerate(("R", "G", "B", "luma"), start=1):
+            assert math.isclose(
+                _numbers(row[column])[0],
+                lux_sweep["snr_db"][channel][index],
+                rel_tol=1e-3,
+                abs_tol=1e-9,
+            )
+        assert math.isclose(
+            _numbers(row[5])[0],
+            lux_sweep["clipped_fraction"][index],
+            rel_tol=1e-3,
+            abs_tol=1e-12,
+        )
+
 
 def test_g4_report_failure_summary_names_failing_checks(g4: dict[str, Any]) -> None:
     """A FAIL payload must not render success prose and must name the failure."""
     failing = copy.deepcopy(g4)
-    target = _check(failing, "MTF50 vs analytic Gaussian sigma=1 px (relative error)")
+    target = _check(failing, "MTF50 vs analytic Gaussian sigma=1 px (absolute error, cp)")
     target["measured"] = 0.05
     target["measured_text"] = "0.05"
     target["pass"] = False

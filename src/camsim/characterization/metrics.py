@@ -19,14 +19,22 @@ four. Airy f/2.8 is reported only as a diagnostic because its first zero sits
 so close to Nyquist that the measured crossings are noisier and its transfer
 function never reaches 0.20 inside the band.
 
-**Known-noise SNR.** A synthetic flat patch is generated with a known mean and
-Gaussian noise. The spatial estimator must recover ``20 log10(mean / std)`` per
-channel and in Rec. 709 linear luma. A second stack adds a static per-pixel
-fixed pattern on top of independent temporal noise; the temporal estimator must
-recover the temporal-noise SNR, while the single-frame spatial estimate is
-materially worse because it counts the fixed pattern as noise. This is the
-fixed-pattern rejection that separates the two estimators. A mono path is
-measured with the same rules.
+**Known-noise SNR.** A synthetic flat patch is generated with known per-channel
+means and Gaussian noise. The spatial estimator is compared with
+``20 log10(mu / sigma)`` using the **generating** means and noise sigma, not the
+estimator's own sample statistics; an estimator checked against its own
+arithmetic would always read zero error and prove nothing. The Rec. 709 luma
+reference uses the weighted generating means and the quadrature-weighted sigma,
+because the channel noise draws are independent. A second stack adds a static
+per-pixel fixed pattern on top of independent temporal noise; the temporal
+estimator is compared with ``20 log10(TEMPORAL_MEAN / TEMPORAL_SIGMA)`` from the
+generating constants, while the single-frame spatial estimate is materially
+worse because it counts the fixed pattern as noise. This is the fixed-pattern
+rejection that separates the two estimators. A mono path is measured against
+the generating R-channel mean and sigma with the same rules. A separate
+sample-statistics consistency diagnostic records the (identically zero) error
+against each patch's own sample mean and std; it is reported for transparency
+and is not gate evidence.
 
 **Colour difference.** :func:`camsim.metrics.color._delta_e76` and
 :func:`camsim.metrics.color._delta_e2000` are compared with
@@ -73,6 +81,7 @@ import platform
 import subprocess
 import sys
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Final, TypeAlias
 
 import colour
@@ -121,9 +130,10 @@ QUICK_MTF_SHAPE: Final[tuple[int, int]] = (128, 128)
 
 # Design tolerances from the G4 task brief.
 MTF_RELATIVE_TOLERANCE: Final[float] = 0.02
-# A reference crossing below this frequency (cycles/pixel) would make a pure
-# relative error numerically unstable; the denominator is floored there so a
-# near-zero reference is judged on an absolute scale of 0.001 cycles/pixel.
+# A reference crossing below _MTF_ABSOLUTE_FLOOR_CP would make a pure relative
+# tolerance meaningless, so the gate budget is the 2 % relative allowance plus a
+# 1e-3 cycles/pixel absolute floor: |measured - reference| <= 0.02 * |reference|
+# + 1e-3. The relative error is still reported for readability.
 MTF_ABSOLUTE_FLOOR_CP: Final[float] = 1e-3
 ANGLE_SPREAD_TOLERANCE: Final[float] = 0.05
 NOISE_ROBUSTNESS_TOLERANCE: Final[float] = 0.05
@@ -162,6 +172,12 @@ FULL_CHART_SHAPE: Final[tuple[int, int]] = (96, 128)
 QUICK_CHART_SHAPE: Final[tuple[int, int]] = (64, 96)
 CHART_OVERSAMPLING: Final[int] = 2
 CHART_NOISE_SIGMA: Final[float] = 0.003
+# Some reference colours (notably the sRGB cyan patch) land at an encoded
+# channel value of exactly zero. A channel sitting on the display floor has a
+# mean comparable to the added noise and a meaningless SNR, so every encoded
+# channel is lifted to this small floor; the chart is a measurement vehicle,
+# not a colour-accuracy target.
+CHART_DISPLAY_FLOOR: Final[float] = 0.02
 CHART_PERTURBATION: Final[tuple[float, float, float]] = (2.0, 1.6, 1.4)
 EDGE_LAYOUT_SHAPE: Final[int] = 128
 EDGE_LAYOUT_MARGIN: Final[int] = 16
@@ -284,6 +300,7 @@ def _check(
     measured: float,
     *,
     maximum: float | None = None,
+    inclusive_maximum: bool = False,
     minimum: float | None = None,
     target: float | None = None,
     relative: float | None = None,
@@ -292,10 +309,11 @@ def _check(
 ) -> dict[str, Any]:
     """Return one serializable gate check with an honest verdict.
 
-    A ``maximum`` is a strict upper bound, a ``minimum`` a strict lower bound,
-    and a ``target`` uses ``math.isclose`` with the supplied relative or
-    absolute tolerance. The display strings are stored in the JSON so the
-    Markdown report and the report-consistency test compare exactly.
+    A ``maximum`` is an upper bound (strict unless ``inclusive_maximum`` is
+    set), a ``minimum`` a strict lower bound, and a ``target`` uses
+    ``math.isclose`` with the supplied relative or absolute tolerance. The
+    display strings are stored in the JSON so the Markdown report and the
+    report-consistency test compare exactly.
     """
     value = float(measured)
     if not math.isfinite(value):
@@ -304,7 +322,10 @@ def _check(
     passed = True
     if maximum is not None:
         tolerance["maximum"] = float(maximum)
-        passed = passed and value < float(maximum)
+        if inclusive_maximum:
+            passed = passed and value <= float(maximum)
+        else:
+            passed = passed and value < float(maximum)
     if minimum is not None:
         tolerance["minimum"] = float(minimum)
         passed = passed and value > float(minimum)
@@ -319,6 +340,9 @@ def _check(
         passed = passed and math.isclose(
             value, float(target), rel_tol=rel, abs_tol=absolute_tolerance
         )
+    tolerance_text = _format_tolerance(tolerance)
+    if inclusive_maximum and "maximum" in tolerance:
+        tolerance_text = f"<= {_format_number(tolerance['maximum'])}"
     return {
         "name": name,
         "measured": value,
@@ -326,7 +350,7 @@ def _check(
         "pass": bool(passed),
         "notes": notes,
         "measured_text": _format_number(value),
-        "tolerance_text": _format_tolerance(tolerance),
+        "tolerance_text": tolerance_text,
     }
 
 
@@ -374,16 +398,19 @@ def _reference_crossings(psf: NDArray[np.float64]) -> tuple[float, float]:
 
 
 def _relative_error(reference: float, measured: float) -> float:
-    """Return ``(measured - reference) / max(|reference|, floor)``.
+    """Return ``(measured - reference) / |reference|`` for reporting.
 
-    The absolute floor keeps a near-zero reference crossing from turning a
-    tiny absolute difference into an enormous relative error. Every gate case
-    has a reference well above the floor, so its value is the plain relative
-    error; the floor only matters for a future case whose crossing sits very
-    close to zero frequency.
+    The gate itself uses the absolute budget
+    ``MTF_RELATIVE_TOLERANCE * |reference| + MTF_ABSOLUTE_FLOOR_CP``; this
+    relative value is kept for the report table and is only meaningful when the
+    reference is comfortably above zero.
     """
-    denominator = max(abs(reference), MTF_ABSOLUTE_FLOOR_CP)
-    return (measured - reference) / denominator
+    return (measured - reference) / abs(reference)
+
+
+def _mtf_tolerance(reference: float) -> float:
+    """Return the absolute crossing budget: 2 % of the reference plus 1e-3 cp."""
+    return MTF_RELATIVE_TOLERANCE * abs(reference) + MTF_ABSOLUTE_FLOOR_CP
 
 
 def _odd_at_least(minimum: int) -> int:
@@ -467,6 +494,10 @@ def _measure_mtf(shape: tuple[int, int]) -> tuple[dict[str, Any], list[dict[str,
         analytic_mtf = np.asarray(psf_mtf(psf, frequencies), dtype=np.float64)
         error_50 = _relative_error(reference_50, float(primary.mtf50_cp))
         error_20 = _relative_error(reference_20, float(primary.mtf20_cp))
+        absolute_error_50 = abs(float(primary.mtf50_cp) - reference_50)
+        absolute_error_20 = abs(float(primary.mtf20_cp) - reference_20)
+        tolerance_50 = _mtf_tolerance(reference_50)
+        tolerance_20 = _mtf_tolerance(reference_20)
 
         cases.append(
             {
@@ -480,6 +511,12 @@ def _measure_mtf(shape: tuple[int, int]) -> tuple[dict[str, Any], list[dict[str,
                 "measured_mtf20_cp": float(primary.mtf20_cp),
                 "relative_error_mtf50": float(error_50),
                 "relative_error_mtf20": float(error_20),
+                "absolute_error_mtf50_cp": float(absolute_error_50),
+                "absolute_error_mtf20_cp": float(absolute_error_20),
+                "tolerance_mtf50_cp": float(tolerance_50),
+                "tolerance_mtf20_cp": float(tolerance_20),
+                "within_tolerance_mtf50": bool(absolute_error_50 <= tolerance_50),
+                "within_tolerance_mtf20": bool(absolute_error_20 <= tolerance_20),
                 "measured_edge_angle_deg": float(primary.edge_angle_deg),
                 "frequency_cp": [float(value) for value in frequencies],
                 "measured_mtf": [float(value) for value in measured_mtf],
@@ -527,15 +564,21 @@ def _measure_mtf(shape: tuple[int, int]) -> tuple[dict[str, Any], list[dict[str,
             }
         )
 
-        for label, error in (("MTF50", error_50), ("MTF20", error_20)):
+        for label, absolute_error, tolerance in (
+            ("MTF50", absolute_error_50, tolerance_50),
+            ("MTF20", absolute_error_20, tolerance_20),
+        ):
             checks.append(
                 _check(
-                    f"{label} vs analytic {spec['name']} (relative error)",
-                    abs(float(error)),
-                    maximum=MTF_RELATIVE_TOLERANCE,
+                    f"{label} vs analytic {spec['name']} (absolute error, cp)",
+                    float(absolute_error),
+                    maximum=float(tolerance),
+                    inclusive_maximum=True,
                     notes=(
                         "Slanted-edge e-SFR at 5 degrees and 8x analysis oversampling "
-                        "against psf_mtf evaluated exactly on the discrete PSF kernel."
+                        "against psf_mtf evaluated exactly on the discrete PSF "
+                        "kernel; budget = 2 % of the reference plus a 1e-3 "
+                        "cycles/pixel absolute floor."
                     ),
                 )
             )
@@ -683,12 +726,19 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
     measurements: list[dict[str, Any]] = []
     per_channel_errors: list[float] = []
+    consistency_errors: list[float] = []
     for index, channel in enumerate(("R", "G", "B")):
         patch = image[..., index]
-        expected = _snr_db(float(patch.mean()), float(patch.std(ddof=1)))
+        # The reference is the generating mean and sigma, not the estimator's
+        # own patch statistics. Using the sample statistics would make the
+        # error identically zero and prove nothing about noise recovery.
+        expected = _snr_db(SPATIAL_MEANS[index], SPATIAL_SIGMA)
+        sample_expected = _snr_db(float(patch.mean()), float(patch.std(ddof=1)))
         result = results[channel]
         error = float(result.snr_db) - expected
+        consistency_error = float(result.snr_db) - sample_expected
         per_channel_errors.append(abs(error))
+        consistency_errors.append(abs(consistency_error))
         measurements.append(
             {
                 "channel": channel,
@@ -698,12 +748,29 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
                 "expected_snr_db": float(expected),
                 "error_db": error,
                 "valid": bool(result.valid),
+                "reference_mean": float(SPATIAL_MEANS[index]),
+                "reference_sigma": float(SPATIAL_SIGMA),
+                "sample_expected_snr_db": float(sample_expected),
+                "sample_consistency_error_db": float(consistency_error),
             }
         )
+    # Each channel's noise is drawn independently, so the Rec. 709 luma noise
+    # variance is the weighted sum of the per-channel variances. The reference
+    # mean and sigma therefore come from the generating constants, not from the
+    # realized luma plane.
     luma = _luma(image)
-    luma_expected = _snr_db(float(luma.mean()), float(luma.std(ddof=1)))
+    luma_reference_mean = sum(
+        weight * mean for weight, mean in zip(REC709_WEIGHTS, SPATIAL_MEANS, strict=True)
+    )
+    luma_reference_sigma = math.sqrt(
+        sum((weight * SPATIAL_SIGMA) ** 2 for weight in REC709_WEIGHTS)
+    )
+    luma_expected = _snr_db(luma_reference_mean, luma_reference_sigma)
+    luma_sample_expected = _snr_db(float(luma.mean()), float(luma.std(ddof=1)))
     luma_result = results["luma"]
     luma_error = float(luma_result.snr_db) - luma_expected
+    luma_consistency_error = float(luma_result.snr_db) - luma_sample_expected
+    consistency_errors.append(abs(luma_consistency_error))
     measurements.append(
         {
             "channel": "luma",
@@ -713,6 +780,10 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "expected_snr_db": float(luma_expected),
             "error_db": float(luma_error),
             "valid": bool(luma_result.valid),
+            "reference_mean": float(luma_reference_mean),
+            "reference_sigma": float(luma_reference_sigma),
+            "sample_expected_snr_db": float(luma_sample_expected),
+            "sample_consistency_error_db": float(luma_consistency_error),
         }
     )
 
@@ -723,8 +794,9 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             float(max_channel_error),
             maximum=SNR_TOLERANCE_DB,
             notes=(
-                "snr_patch per R/G/B channel against 20 log10(mean / std) with the "
-                "sample standard deviation (ddof=1) of the same synthetic patch."
+                "snr_patch per R/G/B channel against 20 log10(mu / sigma) using the "
+                "generating means and noise sigma; channel noise draws are "
+                "independent."
             ),
         )
     )
@@ -734,8 +806,9 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             abs(float(luma_error)),
             maximum=SNR_TOLERANCE_DB,
             notes=(
-                "Rec. 709 luma (0.2126 R + 0.7152 G + 0.0722 B) in linear light "
-                "against the luma plane's own sample statistics."
+                "Rec. 709 luma in linear light against the generating luma mean "
+                "0.2126 mu_R + 0.7152 mu_G + 0.0722 mu_B and the quadrature "
+                "weighted sigma, since the channel noise draws are independent."
             ),
         )
     )
@@ -760,8 +833,14 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         height=temporal_size,
     )
     temporal = snr_temporal(stack, temporal_roi)
-    temporal_expected = _snr_db(float(temporal.mean), TEMPORAL_SIGMA)
+    # Reference the generating mean and temporal sigma, never the realized
+    # stack mean, so the check measures noise recovery rather than restating the
+    # estimator's own arithmetic.
+    temporal_expected = _snr_db(TEMPORAL_MEAN, TEMPORAL_SIGMA)
     temporal_error = float(temporal.snr_db) - temporal_expected
+    temporal_sample_expected = _snr_db(float(temporal.mean), float(temporal.std))
+    temporal_consistency_error = float(temporal.snr_db) - temporal_sample_expected
+    consistency_errors.append(abs(temporal_consistency_error))
     spatial_single = snr_patch(stack[0], temporal_roi, channel="mono")
     fpn_rejection = float(temporal.snr_db) - float(spatial_single.snr_db)
     checks.append(
@@ -772,8 +851,9 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             notes=(
                 f"Pooled per-pixel temporal variance over {frames} frames with a "
                 f"static fixed pattern (sigma={FIXED_PATTERN_SIGMA:g}) and temporal "
-                f"noise (sigma={TEMPORAL_SIGMA:g}); reference uses the known "
-                "temporal sigma, not the estimator under test."
+                f"noise (sigma={TEMPORAL_SIGMA:g}); the reference is "
+                f"20 log10({TEMPORAL_MEAN:g} / {TEMPORAL_SIGMA:g}) from the "
+                "generating constants, not the measured stack mean."
             ),
         )
     )
@@ -789,13 +869,18 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         )
     )
 
-    # Mono path: the same flat field without a CFA, measured as one plane.
+    # Mono path: the same flat field without a CFA, measured as one plane. The
+    # plane is the synthetic R channel, so its generating constants are the
+    # reference; the sample-statistics version is kept only as a diagnostic.
     mono_result = snr_patch(image[..., 0], roi, channel="mono")
-    mono_expected = _snr_db(
+    mono_expected = _snr_db(SPATIAL_MEANS[0], SPATIAL_SIGMA)
+    mono_sample_expected = _snr_db(
         float(image[..., 0].mean()),
         float(image[..., 0].std(ddof=1)),
     )
     mono_error = float(mono_result.snr_db) - mono_expected
+    mono_consistency_error = float(mono_result.snr_db) - mono_sample_expected
+    consistency_errors.append(abs(mono_consistency_error))
     mono_channels = list(snr_channels(image[..., 0], roi))
     checks.append(
         _check(
@@ -804,7 +889,8 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             maximum=SNR_TOLERANCE_DB,
             notes=(
                 "A 2-D mono patch reports one 'mono' channel with the same "
-                "spatial statistics; no colour channel is invented."
+                "spatial statistics; its reference is the generating R-channel "
+                "mean and sigma, and no colour channel is invented."
             ),
         )
     )
@@ -814,6 +900,8 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "shape": [patch_size, patch_size],
             "means": [float(value) for value in SPATIAL_MEANS],
             "noise_sigma": SPATIAL_SIGMA,
+            "luma_reference_mean": float(luma_reference_mean),
+            "luma_reference_sigma": float(luma_reference_sigma),
             "measurements": measurements,
         },
         "temporal": {
@@ -821,11 +909,15 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "patch_shape": [temporal_size, temporal_size],
             "fixed_pattern_sigma": FIXED_PATTERN_SIGMA,
             "temporal_sigma": TEMPORAL_SIGMA,
+            "reference_mean": TEMPORAL_MEAN,
+            "reference_sigma": TEMPORAL_SIGMA,
             "mean": float(temporal.mean),
             "std": float(temporal.std),
             "snr_db": float(temporal.snr_db),
             "expected_snr_db": float(temporal_expected),
             "error_db": float(temporal_error),
+            "sample_expected_snr_db": float(temporal_sample_expected),
+            "sample_consistency_error_db": float(temporal_consistency_error),
             "valid": bool(temporal.valid),
             "spatial_single_frame_snr_db": float(spatial_single.snr_db),
             "fpn_rejection_db": float(fpn_rejection),
@@ -837,8 +929,21 @@ def _measure_snr(quick: bool) -> tuple[dict[str, Any], list[dict[str, Any]]]:
             "snr_db": float(mono_result.snr_db),
             "expected_snr_db": float(mono_expected),
             "error_db": float(mono_error),
+            "reference_mean": float(SPATIAL_MEANS[0]),
+            "reference_sigma": float(SPATIAL_SIGMA),
+            "sample_expected_snr_db": float(mono_sample_expected),
+            "sample_consistency_error_db": float(mono_consistency_error),
             "valid": bool(mono_result.valid),
             "channels": mono_channels,
+        },
+        "consistency": {
+            "max_abs_error_db": float(max(consistency_errors)),
+            "note": (
+                "Estimator against the same patch's sample mean and standard "
+                "deviation. This is zero by construction; it is reported as a "
+                "diagnostic and is not the gate reference. The gate compares "
+                "against the generating means and sigmas."
+            ),
         },
     }
     return section, checks
@@ -989,9 +1094,11 @@ def _synthetic_chart(layout: ChartLayout) -> tuple[NDArray[np.float32], NDArray[
 
     Each patch is filled with the reference colour plus a deterministic Lab
     perturbation, encoded with the sRGB OETF, clipped to the display range, and
-    darkened by a small display-domain noise field so every SNR patch has a
-    nonzero standard deviation. The linear buffer is the EOTF decoding of the
-    clipped display, so SNR measures the image that is actually displayed.
+    lifted to a small display floor so no channel sits at zero with a
+    meaningless noise-only SNR. A small display-domain noise field then gives
+    every patch a nonzero standard deviation. The linear buffer is the EOTF
+    decoding of the clipped display, so SNR measures the image that is actually
+    displayed.
     """
     reference = layout.reference
     if reference is None:  # pragma: no cover - colorchecker_layout always binds one
@@ -1016,6 +1123,7 @@ def _synthetic_chart(layout: ChartLayout) -> tuple[NDArray[np.float32], NDArray[
         colour.cctf_encoding(np.clip(linear_target, 0.0, 1.0), function="sRGB"),
         dtype=np.float64,
     )
+    display_target = np.maximum(display_target, CHART_DISPLAY_FLOOR)
 
     height = max(patch.y + patch.height for patch in layout.patches)
     width = max(patch.x + patch.width for patch in layout.patches)
@@ -1055,6 +1163,17 @@ def _measure_all_sections(
     if chart_report.color is None or chart_report.snr is None:  # pragma: no cover
         raise RuntimeError("the synthetic RGB chart did not produce colour and SNR groups")
     channel_names = list(next(iter(chart_report.snr.values())))
+    snr_results = [
+        result for channel_map in chart_report.snr.values() for result in channel_map.values()
+    ]
+    all_snr_valid = all(result.valid for result in snr_results)
+    per_patch_snr: list[dict[str, Any]] = []
+    for patch in layout.patches:
+        channel_map = chart_report.snr[patch.name]
+        row: dict[str, Any] = {"patch": patch.name}
+        for channel in channel_names:
+            row[channel] = _optional_float(float(channel_map[channel].snr_db))
+        per_patch_snr.append(row)
     chart_section = {
         "shape": [int(chart_shape[0]), int(chart_shape[1])],
         "patch_count": len(layout.patches),
@@ -1068,6 +1187,8 @@ def _measure_all_sections(
         ],
         "snr_patch_count": len(chart_report.snr),
         "snr_channels": channel_names,
+        "all_snr_valid": bool(all_snr_valid),
+        "per_patch_snr_db": per_patch_snr,
         "mean_luma_snr_db": float(
             np.mean([channel_map["luma"].snr_db for channel_map in chart_report.snr.values()])
         ),
@@ -1170,21 +1291,27 @@ def _measure_all_sections(
     independence = {
         "passed": bool(completed.returncode == 0),
         "forbidden_modules": list(_FORBIDDEN_IMPORTS),
-        "command": f'{sys.executable} -c "{code}"',
+        # Record only the interpreter's basename: an absolute virtualenv path
+        # would bake a machine-specific location into the committed JSON.
+        "command": f'{Path(sys.executable).name} -c "{code}"',
         "stderr": completed.stderr.strip(),
     }
 
+    expected_channels = {"R", "G", "B", "luma"}
+    channel_layouts_ok = all(
+        set(channel_map) == expected_channels for channel_map in chart_report.snr.values()
+    )
     chart_complete = (
         chart_report.color.valid
         and len(chart_report.color.per_patch) == len(layout.patches)
         and len(chart_report.snr) == len(layout.patches)
-        and all(
-            set(channel_map) == {"R", "G", "B", "luma"} for channel_map in chart_report.snr.values()
-        )
+        and all_snr_valid
+        and channel_layouts_ok
     )
     edge_complete = edge_report.mtf is not None and edge_report.acutance is not None
     mono_complete = mono_report.color is None and all(
-        set(channel_map) == {"mono"} for channel_map in mono_report.snr.values()
+        set(channel_map) == {"mono"} and all(result.valid for result in channel_map.values())
+        for channel_map in mono_report.snr.values()
     )
     serialization_ok = all(serialization.values())
     checks = [
@@ -1322,8 +1449,10 @@ def measure_g4(*, quick: bool = False) -> dict[str, Any]:
     :class:`numpy.random.Generator` seeds, no global random state, and no
     wall-clock or environment-dependent values except the software versions
     recorded in ``environment``. The metric under test and the analytic
-    reference are independent code paths; the SNR references use the known
-    synthetic noise rather than the estimator under test.
+    reference are independent code paths; the SNR gate checks use the
+    **generating** means and sigmas rather than the estimator's own sample
+    statistics. The ``snr.consistency`` section records the identically zero
+    sample-statistics error as a diagnostic, not as gate evidence.
     """
     mtf_shape = QUICK_MTF_SHAPE if quick else FULL_MTF_SHAPE
     mtf, mtf_checks = _measure_mtf(mtf_shape)
