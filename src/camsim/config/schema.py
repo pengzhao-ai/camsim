@@ -643,6 +643,11 @@ class LSCConfig(ConfigModel):
     ``map`` is a positive 2-D gain map for ``mode="flat_field"`` (the reciprocal
     of a normalized flat field). The map may be supplied as nested JSON lists or
     as a NumPy array from the calibration helper.
+
+    ``center`` is the optical-axis position as ``(row, column)`` pixel
+    coordinates, matching NumPy's index order; ``None`` uses the geometric
+    image centre. It only affects ``mode="radial"`` and is ignored by the other
+    modes.
     """
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, arbitrary_types_allowed=True)
@@ -651,6 +656,7 @@ class LSCConfig(ConfigModel):
     mode: Literal["none", "radial", "flat_field"] = "none"
     coefficients: list[float] | None = None
     map: Array2D | None = None
+    center: tuple[float, float] | None = None
 
     @model_validator(mode="after")
     def _validate_mode_parameters(self) -> Self:

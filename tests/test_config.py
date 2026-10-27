@@ -426,3 +426,19 @@ def test_lsc_radial_requires_coefficients() -> None:
     with pytest.raises(ValidationError, match="radial"):
         LSCConfig(mode="radial")
     assert LSCConfig(mode="radial", coefficients=[1.0, -0.2]).coefficients == [1.0, -0.2]
+
+
+def test_lsc_center_is_optional_and_round_trips() -> None:
+    config = LSCConfig(mode="radial", coefficients=[1.0, 0.2], center=(10.0, 20.0))
+    assert config.center == (10.0, 20.0)
+    restored = LSCConfig.model_validate(config.model_dump(mode="json"))
+    assert restored.center == (10.0, 20.0)
+    assert LSCConfig(mode="radial", coefficients=[1.0]).center is None
+    assert "center" in json.dumps(isp_schema())
+
+
+def test_lsc_center_rejects_non_finite_values() -> None:
+    with pytest.raises(ValidationError):
+        LSCConfig(mode="radial", coefficients=[1.0], center=(float("nan"), 0.0))
+    with pytest.raises(ValidationError):
+        LSCConfig(mode="radial", coefficients=[1.0], center=(0.0, float("inf")))
