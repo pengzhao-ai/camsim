@@ -1147,12 +1147,16 @@ import camsim
 from camsim.characterization import characterize_sensor
 from camsim.config.io import load_sensor
 
-def test_preset_linearity_and_dynamic_range():
+def test_preset_g2_recovery():
     cfg = load_sensor("src/camsim/config/presets/sensors/flagship_phone_50mp.json")
     sensor = camsim.Sensor(cfg, seed=5)
-    report = characterize_sensor(sensor, irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 4e-2, 8e-2], frames_per_level=8, mode="LCG", exposure_s=0.01, base_seed=9)
+    report = characterize_sensor(sensor, irradiance_levels=[2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 4e-2, 8e-2], frames_per_level=32, mode="LCG", exposure_s=0.01, base_seed=9)
     assert report.linearity_residual < 0.05
     assert 30.0 < report.dynamic_range_db < 90.0
+    assert report.read_noise_e == pytest.approx(2.0, rel=0.05)
+    assert report.dsnu_e == pytest.approx(0.5, rel=0.10)
+    assert report.prnu_percent == pytest.approx(0.5, rel=0.10)
+    assert report.saturation_capacity_e == pytest.approx(6000.0, rel=0.10)
 ```
 
 - [ ] **Step 2: Run it to confirm failure**
@@ -1162,7 +1166,7 @@ Expected: FAIL until the preset/report are complete.
 
 - [ ] **Step 3: Finalize the preset, datasheet guide, and examples**
 
-Fill the flagship preset with value-justified QE/CFA/IR-cut curves and provenance; document how each datasheet field maps to JSON and which values are assumptions. Add the optional `spatial_crosstalk` kernel to `SensorConfig` and apply it per channel plane after spectral crosstalk and before read noise (default identity/none), closing the Task 15 helper-only gap. Add the EMVA example and sensor notebook sections. Generate G2 plots: QE/CFA/IR-cut curves, PTC, SNR vs irradiance, dark current vs temperature, LCG/HCG comparison, DSNU/PRNU histograms.
+Fill the flagship preset with value-justified QE/CFA/IR-cut curves and provenance; document how each datasheet field maps to JSON and which values are assumptions. Add the optional `spatial_crosstalk` kernel to `SensorConfig` and apply it per channel plane after spectral crosstalk and before read noise (default identity/none), closing the Task 15 helper-only gap. Move/package the spectral CSVs so an installed wheel can construct the sensor, and update the preset paths and tests accordingly; keep the datasheet-grounded values representative, not claims about a specific commercial part. Add the EMVA example and sensor notebook sections. Generate G2 plots: QE/CFA/IR-cut curves, PTC, SNR vs irradiance, dark current vs temperature, LCG/HCG comparison, DSNU/PRNU histograms.
 
 - [ ] **Step 4: Run the G2 gate**
 
