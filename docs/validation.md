@@ -34,7 +34,7 @@ comparisons use tolerances because floating-point reduction order may differ.
 | G0 | 0 | install, lint, typecheck, tests, docs build | this page | Green locally; CI runs the same commands |
 | G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | Green locally; report PASS and the G1 tests pass |
 | G2 | 2 | sensor model and characterization | `results/reports/g2_sensor.md` | Green locally; report PASS and the G2 tests pass |
-| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` | Red locally: ColorChecker ΔE2000 fails with the shipped CFA; all other measured G3 checks pass |
+| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` | Green locally; report PASS and the G3 tests pass |
 | G4 | 4 | metrics harness | `results/reports/g4_metrics.md` | Planned |
 | G5 | 5 | consolidated human sign-off | `results/reports/validation_report.md` | Planned |
 
@@ -140,22 +140,22 @@ seed 3; 16 dark frames per temperature at 0.1 s with base seed 21):
 
 | Check | Measured | Tolerance | Result |
 |---|---|---|---|
-| LCG read noise | 2.0449 e- rms | 2.0 +/- 5 % | PASS |
-| LCG DSNU | 0.4995 e- | 0.5 +/- 10 % | PASS |
-| LCG PRNU | 0.4959 % | 0.5 +/- 10 % | PASS |
-| LCG saturation capacity | 6026.6 e- | 6000 +/- 10 % | PASS |
-| LCG linearity residual | 1.79e-5 | < 0.05 | PASS |
-| LCG dynamic range | 69.39 dB | 30-90 dB | PASS |
-| LCG system gain relative error | 0.476 % | < 2 % | PASS |
-| HCG read noise | 0.7153 e- rms | 0.7 +/- 5 % | PASS |
-| HCG DSNU | 0.4989 e- | 0.5 +/- 10 % | PASS |
-| HCG PRNU | 0.5014 % | 0.5 +/- 10 % | PASS |
-| HCG saturation capacity | 2000.9 e- | 2000 +/- 10 % | PASS |
-| HCG linearity residual | 6.81e-5 | < 0.05 | PASS |
-| HCG dynamic range | 68.94 dB | 30-90 dB | PASS |
-| HCG system gain relative error | 0.073 % | < 2 % | PASS |
-| Dark current at 65 C (differential) | 60.98 e-/s | 61.80 +/- 5 % | PASS |
-| Dark current at 70 C (differential) | 100.39 e-/s | 102.17 +/- 5 % | PASS |
+| LCG read noise | 2.0264 e- rms | 2.0 +/- 5 % | PASS |
+| LCG DSNU | 0.4775 e- | 0.5 +/- 10 % | PASS |
+| LCG PRNU | 0.4993 % | 0.5 +/- 10 % | PASS |
+| LCG saturation capacity | 5996.8 e- | 6000 +/- 10 % | PASS |
+| LCG linearity residual | 4.19e-5 | < 0.05 | PASS |
+| LCG dynamic range | 69.42 dB | 30-90 dB | PASS |
+| LCG system gain relative error | 0.018 % | < 2 % | PASS |
+| HCG read noise | 0.7211 e- rms | 0.7 +/- 5 % | PASS |
+| HCG DSNU | 0.5031 e- | 0.5 +/- 10 % | PASS |
+| HCG PRNU | 0.4971 % | 0.5 +/- 10 % | PASS |
+| HCG saturation capacity | 2015.3 e- | 2000 +/- 10 % | PASS |
+| HCG linearity residual | 7.33e-5 | < 0.05 | PASS |
+| HCG dynamic range | 68.93 dB | 30-90 dB | PASS |
+| HCG system gain relative error | 0.788 % | < 2 % | PASS |
+| Dark current at 65 C (differential) | 60.68 e-/s | 61.80 +/- 5 % | PASS |
+| Dark current at 70 C (differential) | 99.89 e-/s | 102.17 +/- 5 % | PASS |
 
 The report records these assumptions and known limitations:
 
@@ -177,13 +177,13 @@ The report records these assumptions and known limitations:
 - **dark-current points below 60 C** are differential measurements compressed
   by the zero-charge clamp and sub-LSB ADC, so only 65 C and 70 C are
   gate criteria; those agree with the differential doubling model
-  `D(T) - D(25 C)` within 1.3 % and 1.7 % under a 5 % tolerance;
+  `D(T) - D(25 C)` within 1.8 % and 2.2 % under a 5 % tolerance;
 - **determinism** is promised within one environment; cross-platform runs
   compare tolerances, not bit patterns.
 
 ## G3 — ISP stages and pipeline
 
-**Status: red locally.** The full report is
+**Status: green locally.** The full report is
 <a href="../results/reports/g3_isp.md"><code>results/reports/g3_isp.md</code></a>
 (a repository artifact, not a page in the published docs site); its
 machine-readable results are `results/reports/g3_isp_results.json`, and its
@@ -212,13 +212,13 @@ ColorChecker, 2x oversampling, flagship preset at LCG):
 
 | Check | Measured | Tolerance | Result |
 |---|---:|---|---|
-| ColorChecker mean ΔE2000, D65 | 5.580 | < 2.0 | FAIL |
-| ColorChecker mean ΔE2000, 3000 K | 6.626 | < 4.0 | FAIL |
-| AWB R gain relative error, D65 | 0.484 % | < 5 % | PASS |
-| AWB B gain relative error, D65 | 0.506 % | < 5 % | PASS |
-| AWB R gain relative error, 3000 K | 0.477 % | < 5 % | PASS |
-| AWB B gain relative error, 3000 K | 0.434 % | < 5 % | PASS |
-| AWB injected-cast max relative error | 0.500 % | < 5 % | PASS |
+| ColorChecker mean ΔE2000, D65 | 0.919 | < 2.0 | PASS |
+| ColorChecker mean ΔE2000, 3000 K | 3.834 | < 4.0 | PASS |
+| AWB R gain relative error, D65 | 0.465 % | < 5 % | PASS |
+| AWB B gain relative error, D65 | 0.443 % | < 5 % | PASS |
+| AWB R gain relative error, 3000 K | 0.497 % | < 5 % | PASS |
+| AWB B gain relative error, 3000 K | 0.517 % | < 5 % | PASS |
+| AWB injected-cast max relative error | 0.667 % | < 5 % | PASS |
 | Bilinear demosaic max abs vs `colour-demosaicing` | 1.19e-7 | < 1e-5 | PASS |
 | MHC demosaic max abs vs `colour-demosaicing` | 2.16e-7 | < 1e-4 | PASS |
 | sRGB OETF max abs vs `colour-science` | 2.98e-8 | < 1e-7 | PASS |
@@ -232,16 +232,17 @@ ColorChecker, 2x oversampling, flagship preset at LCG):
 | Sharpen positive overshoot | 0.117 | > 0 | PASS |
 | RCCC baseline output | `(64, 64, 3)`, finite | 3 channels | PASS |
 
-The ColorChecker criterion fails because the shipped preset's CFA curves are
-synthetic and very broad: the red and green spectral sensitivities have a
-correlation of 0.940, the projection matrix condition number is 12.8, and the
-best 3x3 fit to the CIE 1931 observer leaves a **45.6 %** spectral residual
-(the Luther condition). The in-sample CCM fit RMS is about 0.043 linear RGB at
-both illuminants, and the worst patches are saturated green, yellow, cyan,
-and red. This is a sensor-CFA design finding, not an ISP implementation error;
-the threshold is not relaxed in the report and the physical gate assertion is
-kept visible as a strict xfail in the test suite. A controller ruling is needed
-to re-author the CFA curves or to revisit the design threshold.
+The ColorChecker criterion now passes because the shipped preset's CFA curves
+were re-authored as synthetic conventional Bayer bands centred near 448 nm
+(blue), 542 nm (green), and 610 nm (red) with moderate out-of-band leakage and
+peak transmittance 0.86-0.90. The superseded broad, nearly collinear curves had
+a red/green correlation of 0.940 and left a 45.6 % Luther-condition residual,
+so no 3x3 matrix could colour-correct them. The conventional bands reduce the
+correlation to 0.187, the projection condition number to 1.56, and the
+Luther-condition residual to 12.6 %, and the in-sample CCM fit RMS is about
+0.008 linear RGB at both illuminants. The ΔE thresholds (2.0 / 4.0) were not
+changed. The fit remains in-sample: it measures calibration-scene
+representability, not held-out generalisation or colour constancy.
 
 The report records these assumptions and known limitations:
 

@@ -1,16 +1,14 @@
 {
   "HCG": {
-    "absolute_sensitivity_threshold_e": 1.3727218746301095,
-    "dsnu_e": 0.49891520150292085,
-    "dynamic_range_db": 68.93503064283632,
+    "absolute_sensitivity_threshold_e": 1.3774957037380244,
+    "dsnu_e": 0.5031001439174068,
+    "dynamic_range_db": 68.9266244705905,
     "kind": "EMVA1288StyleReport",
-    "linearity_residual": 6.807392223080534e-05,
-    "prnu_percent": 0.5013867484190104,
+    "linearity_residual": 7.327710513430988e-05,
+    "prnu_percent": 0.49709940420324406,
     "provenance": {
       "absolute_sensitivity_threshold_definition": "mu_min = (1 + sqrt(1 + 4*read_noise_e^2))/2, the signal where SNR(mu) = mu/sqrt(mu + read_noise_e^2) = 1",
-      "added_low_levels_w_per_m2_nm": [
-        2.5e-07
-      ],
+      "added_low_levels_w_per_m2_nm": [],
       "analog_gain_db": 0.0,
       "base_seed": 3,
       "cfa": "RGGB",
@@ -24,7 +22,7 @@
       "dsnu_definition": "pre-zero-clamp, input-referred dark-signal non-uniformity in electrons rms (the configured DSNU parameter); the raw post-clamp fixed-pattern spread is recorded separately",
       "dsnu_method": "dark-frame fixed-pattern standard deviation after removing temporal variance of the mean, inverted through the exact pre-clamp forward model Poisson(max(0, d)) + Gaussian read noise + zero-charge clip + integer ADC rounding",
       "dsnu_observed_fixed_pattern_definition": "raw post-clamp, post-quantization fixed-pattern spread of the averaged dark frame in electrons (not deconvolved); this is what a naive dark-frame standard deviation reports",
-      "dsnu_observed_fixed_pattern_e": 0.2637566444177129,
+      "dsnu_observed_fixed_pattern_e": 0.265655853732723,
       "emva_assumptions": [
         "spatially uniform flat-field illumination",
         "one conversion-gain mode per report",
@@ -53,7 +51,7 @@
         0.0002,
         0.0004,
         0.001,
-        2.5e-07
+        0.002
       ],
       "lens": null,
       "level_x_unit": "W/m^2/nm",
@@ -68,7 +66,7 @@
         0.0002,
         0.0004,
         0.001,
-        2.5e-07
+        0.002
       ],
       "levels_source": "caller_supplied_irradiance",
       "limitations": [
@@ -79,7 +77,7 @@
       ],
       "linearity_channel": "G",
       "linearity_residual_definition": "maximum |mean_DN - linear fit| / fit over unsaturated levels between 5 % and 95 % of the saturation code; dimensionless fraction",
-      "low_levels_appended": true,
+      "low_levels_appended": false,
       "lux_levels": null,
       "mode_requested": "HCG",
       "mode_resolved": "HCG",
@@ -89,158 +87,157 @@
       ],
       "nominal_system_gain_dn_per_e": 0.359625,
       "primary_channel": "G",
-      "prnu_measurement_level_w_per_m2_nm": 0.0004,
-      "prnu_measurement_mean_dn": 618.547812345067,
+      "prnu_measurement_level_w_per_m2_nm": 0.001,
+      "prnu_measurement_mean_dn": 648.3124690133862,
       "prnu_method": "spatial standard deviation of the averaged flat field at the level nearest 70 % of saturation, corrected for temporal variance and DSNU, normalised by the mean and reported in percent",
       "ptc_fit": "nonlinear least squares against the exact quantized PTC model: Poisson(mu) + Gaussian read noise, zero-charge clip, integer ADC rounding; parameters K and read noise",
       "ptc_min_mean_dn": 1.0,
-      "ptc_points": 26,
+      "ptc_points": 27,
       "read_noise_definition": "input-referred Gaussian read-noise sigma in the exact quantized PTC model, after per-row common-mode removal and n/(n-1) correction; zero-charge clipping is part of the forward model",
       "row_noise_handling": "each frame row-demeaned per CFA plane; n/(n-1) restores independent shot and read-noise variance",
       "saturation_clipped_fraction": 1.0,
-      "saturation_cross_check_ratio": 1.0004727276892957,
-      "saturation_level_appended": false,
+      "saturation_cross_check_ratio": 1.0076329508389925,
+      "saturation_level_appended": true,
       "saturation_source": "clipped_flat_field",
       "seed_policy": "every measured frame uses seed base_seed + global_frame_index; probe frames use base_seed + 1000000 + attempt and do not advance the sequence",
-      "sensor_config_hash": "e6b3f6a5162d60b805cfba2651aa5e9c705d86bf84a534ba8dcde4a09f42d4a2",
+      "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55",
       "sensor_config_name": "flagship_phone_50mp",
       "snr_curve_definition": "mean signal and measured temporal noise per unsaturated level. The primary noise fields are row-demeaned pixel-temporal noise (ADC quantization included, common-mode row noise removed); the *_total fields are raw-frame noise including row noise. snr_db = 20 log10(mean_signal_e / noise_e)",
       "standard": "EMVA Standard 1288 (release 4.0) style",
       "system_gain_method": "joint photon-transfer fit across all CFA channels in DN per electron",
-      "system_gain_relative_error": -0.000733069364001846,
+      "system_gain_relative_error": -0.007876962623567683,
       "temperature_c": 25.0
     },
-    "read_noise_e": 0.7152925768228638,
-    "saturation_capacity_e": 2000.9454553785918,
+    "read_noise_e": 0.721109360692739,
+    "saturation_capacity_e": 2015.2659016779853,
     "schema_version": "1.0",
     "snr_curve": [
       {
-        "irradiance_w_per_m2_nm": 2.5e-07,
-        "mean_signal_dn": 0.3995723847297967,
-        "mean_signal_e": 1.111895763330549,
-        "noise_dn": 0.4997971588783329,
-        "noise_dn_total": 0.5208827029980915,
-        "noise_e": 1.3907926691612096,
-        "noise_e_total": 1.449467712958676,
-        "snr_db": -1.9439663484744338,
-        "snr_db_total": -2.3028894081667186
-      },
-      {
         "irradiance_w_per_m2_nm": 1e-06,
-        "mean_signal_dn": 1.547812345066931,
-        "mean_signal_e": 4.307119447392342,
-        "noise_dn": 0.836680392258162,
-        "noise_dn_total": 0.8550860387342716,
-        "noise_e": 2.328242438582664,
-        "noise_e_total": 2.379460093055921,
-        "snr_db": 5.343174296954956,
-        "snr_db_total": 5.154169811291705
+        "mean_signal_dn": 0.6559246405552801,
+        "mean_signal_e": 1.83839375852085,
+        "noise_dn": 0.6036959412424401,
+        "noise_dn_total": 0.6257514234801208,
+        "noise_e": 1.6920096941089642,
+        "noise_e_total": 1.7538257296410253,
+        "snr_db": 0.7207137990440053,
+        "snr_db_total": 0.4090419949167916
       },
       {
         "irradiance_w_per_m2_nm": 2e-06,
-        "mean_signal_dn": 3.102751611303917,
-        "mean_signal_e": 8.63407107978399,
-        "noise_dn": 1.1285089841939675,
-        "noise_dn_total": 1.142230000564838,
-        "noise_e": 3.140318015856522,
-        "noise_e_total": 3.178499683445179,
-        "snr_db": 8.784839778504672,
-        "snr_db_total": 8.679868942798503
+        "mean_signal_dn": 1.2955503222607834,
+        "mean_signal_e": 3.6311055859673442,
+        "noise_dn": 0.7783453994871015,
+        "noise_dn_total": 0.7992509227519173,
+        "noise_e": 2.1815087220677616,
+        "noise_e_total": 2.2401017083841688,
+        "snr_db": 4.425638477564195,
+        "snr_db_total": 4.195422806712822
       },
       {
         "irradiance_w_per_m2_nm": 5e-06,
-        "mean_signal_dn": 7.719493678730788,
-        "mean_signal_e": 21.481144955104927,
-        "noise_dn": 1.710411744233438,
-        "noise_dn_total": 1.7186874122614906,
-        "noise_e": 4.759587110230429,
-        "noise_e_total": 4.782615929465132,
-        "snr_db": 13.089762920665633,
-        "snr_db_total": 13.04783839445809
+        "mean_signal_dn": 3.24194348041646,
+        "mean_signal_e": 9.086361894911443,
+        "noise_dn": 1.1438409566717316,
+        "noise_dn_total": 1.1557153573045436,
+        "noise_e": 3.2059019367006183,
+        "noise_e_total": 3.2391829306743425,
+        "snr_db": 9.04879592395776,
+        "snr_db_total": 8.959091097396549
       },
       {
         "irradiance_w_per_m2_nm": 1e-05,
-        "mean_signal_dn": 15.463559742191373,
-        "mean_signal_e": 43.030667835011805,
-        "noise_dn": 2.3794329254272246,
-        "noise_dn_total": 2.3845854023419375,
-        "noise_e": 6.621281875374939,
-        "noise_e_total": 6.635619746236566,
-        "snr_db": 16.256720193978193,
-        "snr_db_total": 16.237931910552422
+        "mean_signal_dn": 6.4920519335647,
+        "mean_signal_e": 18.195608179248918,
+        "noise_dn": 1.5758909665654568,
+        "noise_dn_total": 1.5872262497651204,
+        "noise_e": 4.416830742310195,
+        "noise_e_total": 4.448600724099088,
+        "snr_db": 12.297116385942463,
+        "snr_db_total": 12.234862960842332
       },
       {
         "irradiance_w_per_m2_nm": 2e-05,
-        "mean_signal_dn": 30.92496591472484,
-        "mean_signal_e": 86.05534290107818,
-        "noise_dn": 3.3525356501186963,
-        "noise_dn_total": 3.357601279767316,
-        "noise_e": 9.329148680538504,
-        "noise_e_total": 9.343244880276407,
-        "snr_db": 19.29871649772031,
-        "snr_db_total": 19.285602157761673
+        "mean_signal_dn": 12.96885845314824,
+        "mean_signal_e": 36.34848725186555,
+        "noise_dn": 2.187881229298129,
+        "noise_dn_total": 2.196589310274831,
+        "noise_e": 6.132087358269661,
+        "noise_e_total": 6.156493945134139,
+        "snr_db": 15.45756015833928,
+        "snr_db_total": 15.42305768918347
       },
       {
         "irradiance_w_per_m2_nm": 5e-05,
-        "mean_signal_dn": 77.31408031730292,
-        "mean_signal_e": 215.14299194810286,
-        "noise_dn": 5.272554814606687,
-        "noise_dn_total": 5.277653099171487,
-        "noise_e": 14.672013343098499,
-        "noise_e_total": 14.686200412136534,
-        "snr_db": 23.32474981376395,
-        "snr_db_total": 23.31635507104756
+        "mean_signal_dn": 32.41289662865642,
+        "mean_signal_e": 90.84529406801806,
+        "noise_dn": 3.428524790034387,
+        "noise_dn_total": 3.433506395307284,
+        "noise_e": 9.609302936991924,
+        "noise_e_total": 9.623265138554219,
+        "snr_db": 19.512211003499424,
+        "snr_db_total": 19.499599670191973
       },
       {
         "irradiance_w_per_m2_nm": 0.0001,
-        "mean_signal_dn": 154.62169992563213,
-        "mean_signal_e": 430.2680055893694,
-        "noise_dn": 7.4827126980625085,
-        "noise_dn_total": 7.483000970792101,
-        "noise_e": 20.822251149367208,
-        "noise_e_total": 20.823053329995716,
-        "snr_db": 26.304227460275328,
-        "snr_db_total": 26.303892841403073
+        "mean_signal_dn": 64.81646628656421,
+        "mean_signal_e": 181.66444695494604,
+        "noise_dn": 4.869628979424545,
+        "noise_dn_total": 4.875921694147401,
+        "noise_e": 13.64835983979452,
+        "noise_e_total": 13.665996755311,
+        "snr_db": 22.483789537640146,
+        "snr_db_total": 22.472572555648362
       },
       {
         "irradiance_w_per_m2_nm": 0.0002,
-        "mean_signal_dn": 309.2847514873575,
-        "mean_signal_e": 860.6510809651805,
-        "noise_dn": 10.51588259406983,
-        "noise_dn_total": 10.523009005678627,
-        "noise_e": 29.262696199424752,
-        "noise_e_total": 29.282526966460694,
-        "snr_db": 29.37025560002219,
-        "snr_db_total": 29.364371333085092
+        "mean_signal_dn": 129.64692302925135,
+        "mean_signal_e": 363.3681056815272,
+        "noise_dn": 6.848036146353156,
+        "noise_dn_total": 6.851330097666124,
+        "noise_e": 19.193343459277784,
+        "noise_e_total": 19.202575586202464,
+        "snr_db": 25.543923397597492,
+        "snr_db_total": 25.539746430923365
       },
       {
         "irradiance_w_per_m2_nm": 0.0004,
-        "mean_signal_dn": 618.547812345067,
-        "mean_signal_e": 1721.24180310645,
-        "noise_dn": 14.889527535192133,
-        "noise_dn_total": 14.895909852294972,
-        "noise_e": 41.43330024062874,
-        "noise_e_total": 41.451060405289965,
-        "snr_db": 32.369847160437956,
-        "snr_db_total": 32.36612479758542
+        "mean_signal_dn": 259.3009729796728,
+        "mean_signal_e": 726.7561863519272,
+        "noise_dn": 9.670077768196661,
+        "noise_dn_total": 9.670741076223674,
+        "noise_e": 27.1028247976998,
+        "noise_e_total": 27.10468388525566,
+        "snr_db": 28.567483592516048,
+        "snr_db_total": 28.566887814191745
+      },
+      {
+        "irradiance_w_per_m2_nm": 0.001,
+        "mean_signal_dn": 648.3124690133862,
+        "mean_signal_e": 1817.0587334491272,
+        "noise_dn": 15.308384112479526,
+        "noise_dn_total": 15.307032407878065,
+        "noise_e": 42.905596261176406,
+        "noise_e_total": 42.901807769101175,
+        "snr_db": 32.53710047263479,
+        "snr_db_total": 32.53786745596108
       }
     ],
-    "system_gain_dn_per_e": 0.3593613699299708
+    "system_gain_dn_per_e": 0.35679224731649944
   },
   "LCG": {
-    "absolute_sensitivity_threshold_e": 2.605140295291808,
-    "dsnu_e": 0.4995294570675105,
-    "dynamic_range_db": 69.38799504646477,
+    "absolute_sensitivity_threshold_e": 2.587159873957121,
+    "dsnu_e": 0.4774666974520326,
+    "dynamic_range_db": 69.42400961942492,
     "kind": "EMVA1288StyleReport",
-    "linearity_residual": 1.7903944639414405e-05,
-    "prnu_percent": 0.49590230976574845,
+    "linearity_residual": 4.185916931978447e-05,
+    "prnu_percent": 0.49926696843489543,
     "provenance": {
       "absolute_sensitivity_threshold_definition": "mu_min = (1 + sqrt(1 + 4*read_noise_e^2))/2, the signal where SNR(mu) = mu/sqrt(mu + read_noise_e^2) = 1",
       "added_low_levels_w_per_m2_nm": [
         5e-05,
         1.25e-05,
-        3.125e-06,
-        7.8125e-07
+        3.125e-06
       ],
       "analog_gain_db": 0.0,
       "base_seed": 9,
@@ -255,7 +252,7 @@
       "dsnu_definition": "pre-zero-clamp, input-referred dark-signal non-uniformity in electrons rms (the configured DSNU parameter); the raw post-clamp fixed-pattern spread is recorded separately",
       "dsnu_method": "dark-frame fixed-pattern standard deviation after removing temporal variance of the mean, inverted through the exact pre-clamp forward model Poisson(max(0, d)) + Gaussian read noise + zero-charge clip + integer ADC rounding",
       "dsnu_observed_fixed_pattern_definition": "raw post-clamp, post-quantization fixed-pattern spread of the averaged dark frame in electrons (not deconvolved); this is what a naive dark-frame standard deviation reports",
-      "dsnu_observed_fixed_pattern_e": 0.1460028086867228,
+      "dsnu_observed_fixed_pattern_e": 0.13770431720456072,
       "emva_assumptions": [
         "spatially uniform flat-field illumination",
         "one conversion-gain mode per report",
@@ -270,7 +267,7 @@
         64,
         64
       ],
-      "frames_exposed": 448,
+      "frames_exposed": 416,
       "frames_per_level": 32,
       "illuminant": null,
       "irradiance_levels_w_per_m2_nm": [
@@ -285,8 +282,7 @@
         0.08,
         5e-05,
         1.25e-05,
-        3.125e-06,
-        7.8125e-07
+        3.125e-06
       ],
       "lens": null,
       "level_x_unit": "W/m^2/nm",
@@ -302,8 +298,7 @@
         0.08,
         5e-05,
         1.25e-05,
-        3.125e-06,
-        7.8125e-07
+        3.125e-06
       ],
       "levels_source": "caller_supplied_irradiance",
       "limitations": [
@@ -324,115 +319,115 @@
       ],
       "nominal_system_gain_dn_per_e": 0.119875,
       "primary_channel": "G",
-      "prnu_measurement_level_w_per_m2_nm": 0.001,
-      "prnu_measurement_mean_dn": 515.4234165840357,
+      "prnu_measurement_level_w_per_m2_nm": 0.002,
+      "prnu_measurement_mean_dn": 432.1873450669311,
       "prnu_method": "spatial standard deviation of the averaged flat field at the level nearest 70 % of saturation, corrected for temporal variance and DSNU, normalised by the mean and reported in percent",
       "ptc_fit": "nonlinear least squares against the exact quantized PTC model: Poisson(mu) + Gaussian read noise, zero-charge clip, integer ADC rounding; parameters K and read noise",
       "ptc_min_mean_dn": 1.0,
-      "ptc_points": 18,
+      "ptc_points": 19,
       "read_noise_definition": "input-referred Gaussian read-noise sigma in the exact quantized PTC model, after per-row common-mode removal and n/(n-1) correction; zero-charge clipping is part of the forward model",
       "row_noise_handling": "each frame row-demeaned per CFA plane; n/(n-1) restores independent shot and read-noise variance",
       "saturation_clipped_fraction": 1.0,
-      "saturation_cross_check_ratio": 1.004432042740442,
+      "saturation_cross_check_ratio": 0.9994733110556605,
       "saturation_level_appended": false,
       "saturation_source": "clipped_flat_field",
       "seed_policy": "every measured frame uses seed base_seed + global_frame_index; probe frames use base_seed + 1000000 + attempt and do not advance the sequence",
-      "sensor_config_hash": "e6b3f6a5162d60b805cfba2651aa5e9c705d86bf84a534ba8dcde4a09f42d4a2",
+      "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55",
       "sensor_config_name": "flagship_phone_50mp",
       "snr_curve_definition": "mean signal and measured temporal noise per unsaturated level. The primary noise fields are row-demeaned pixel-temporal noise (ADC quantization included, common-mode row noise removed); the *_total fields are raw-frame noise including row noise. snr_db = 20 log10(mean_signal_e / noise_e)",
       "standard": "EMVA Standard 1288 (release 4.0) style",
       "system_gain_method": "joint photon-transfer fit across all CFA channels in DN per electron",
-      "system_gain_relative_error": -0.0047585369903090985,
+      "system_gain_relative_error": 0.00017919903730117046,
       "temperature_c": 25.0
     },
-    "read_noise_e": 2.044899915120855,
-    "saturation_capacity_e": 6026.592256442652,
+    "read_noise_e": 2.026385042250536,
+    "saturation_capacity_e": 5996.839866333963,
     "schema_version": "1.0",
     "snr_curve": [
       {
-        "irradiance_w_per_m2_nm": 7.8125e-07,
-        "mean_signal_dn": 0.3771845562716906,
-        "mean_signal_e": 3.1615264618591494,
-        "noise_dn": 0.4774409036865159,
-        "noise_dn_total": 0.48181138899294257,
-        "noise_e": 4.001865998701167,
-        "noise_e_total": 4.038499006913416,
-        "snr_db": -2.0473144225658486,
-        "snr_db_total": -2.1264631845817252
-      },
-      {
         "irradiance_w_per_m2_nm": 3.125e-06,
-        "mean_signal_dn": 1.612837754090233,
-        "mean_signal_e": 13.51865858094375,
-        "noise_dn": 0.5865648871149192,
-        "noise_dn_total": 0.5896679489498406,
-        "noise_e": 4.91653324977459,
-        "noise_e_total": 4.942542830338708,
-        "snr_db": 8.785492386567547,
-        "snr_db_total": 8.739663169187224
+        "mean_signal_dn": 0.6885380515617253,
+        "mean_signal_e": 5.742771122521925,
+        "noise_dn": 0.4970856689619036,
+        "noise_dn_total": 0.5014278435536367,
+        "noise_e": 4.1459571023839095,
+        "noise_e_total": 4.182173132562334,
+        "snr_db": 2.8299340734128293,
+        "snr_db_total": 2.7543900040225564
       },
       {
         "irradiance_w_per_m2_nm": 1.25e-05,
-        "mean_signal_dn": 6.440056395637085,
-        "mean_signal_e": 53.97996384561952,
-        "noise_dn": 0.9577791259237979,
-        "noise_dn_total": 0.9591804044678601,
-        "noise_e": 8.02801705657131,
-        "noise_e_total": 8.039762445198244,
-        "snr_db": 16.552486056192045,
-        "snr_db_total": 16.53978745430624
+        "mean_signal_dn": 2.697214303420922,
+        "mean_signal_e": 22.49619229874934,
+        "noise_dn": 0.6842519075582227,
+        "noise_dn_total": 0.6871401066890744,
+        "noise_e": 5.707022417051755,
+        "noise_e_total": 5.731111523713511,
+        "snr_db": 11.913988745578246,
+        "snr_db_total": 11.877403122018638
       },
       {
         "irradiance_w_per_m2_nm": 5e-05,
-        "mean_signal_dn": 25.777918939018345,
-        "mean_signal_e": 216.0681594785735,
-        "noise_dn": 1.7937196025287354,
-        "noise_dn_total": 1.795731591958399,
-        "noise_e": 15.034793695172558,
-        "noise_e_total": 15.051658006600729,
-        "snr_db": 23.149865987148882,
-        "snr_db_total": 23.14012861002777
+        "mean_signal_dn": 10.806240704015865,
+        "mean_signal_e": 90.12975668851618,
+        "noise_dn": 1.204043080057666,
+        "noise_dn_total": 1.20412401224993,
+        "noise_e": 10.04235541484471,
+        "noise_e_total": 10.043030432086766,
+        "snr_db": 19.060652219622586,
+        "snr_db_total": 19.06006839959392
       },
       {
         "irradiance_w_per_m2_nm": 0.0002,
-        "mean_signal_dn": 103.09044992563213,
-        "mean_signal_e": 864.0947249443722,
-        "noise_dn": 3.533691641278754,
-        "noise_dn_total": 3.533016513850898,
-        "noise_e": 29.619080225294386,
-        "noise_e_total": 29.613421368926062,
-        "snr_db": 29.29979571692124,
-        "snr_db_total": 29.301455353124993
+        "mean_signal_dn": 43.21958663857214,
+        "mean_signal_e": 360.4741865934132,
+        "noise_dn": 2.3074908813801978,
+        "noise_dn_total": 2.3088162912384327,
+        "noise_e": 19.24569305794557,
+        "noise_e_total": 19.256747676411624,
+        "snr_db": 25.450812308034063,
+        "snr_db_total": 25.445824613914205
       },
       {
         "irradiance_w_per_m2_nm": 0.0005,
-        "mean_signal_dn": 257.7198345314824,
-        "mean_signal_e": 2160.184087787362,
-        "noise_dn": 5.578369325604871,
-        "noise_dn_total": 5.581730666214249,
-        "noise_e": 46.757381615114795,
-        "noise_e_total": 46.78555606475005,
-        "snr_db": 33.29281159472095,
-        "snr_db_total": 33.28757934152013
+        "mean_signal_dn": 108.04871095686663,
+        "mean_signal_e": 901.1833343145106,
+        "noise_dn": 3.610494131543311,
+        "noise_dn_total": 3.6107215182191665,
+        "noise_e": 30.11342857469228,
+        "noise_e_total": 30.115325099703185,
+        "snr_db": 29.521058931892412,
+        "snr_db_total": 29.52051191718794
       },
       {
         "irradiance_w_per_m2_nm": 0.001,
-        "mean_signal_dn": 515.4234165840357,
-        "mean_signal_e": 4320.231948782427,
-        "noise_dn": 7.865345803681743,
-        "noise_dn_total": 7.862401567025859,
-        "noise_e": 65.9266093389598,
-        "noise_e_total": 65.9019310165238,
-        "snr_db": 36.32892648150093,
-        "snr_db_total": 36.332178481212935
+        "mean_signal_dn": 216.10014873574616,
+        "mean_signal_e": 1802.3894117652594,
+        "noise_dn": 5.07690743667821,
+        "noise_dn_total": 5.077935770912075,
+        "noise_e": 42.34409028367074,
+        "noise_e_total": 42.352667134476796,
+        "snr_db": 32.58111640948788,
+        "snr_db_total": 32.57935724934836
+      },
+      {
+        "irradiance_w_per_m2_nm": 0.002,
+        "mean_signal_dn": 432.1873450669311,
+        "mean_signal_e": 3604.670793633387,
+        "noise_dn": 7.229629371561189,
+        "noise_dn_total": 7.224005574276361,
+        "noise_e": 60.298928559383995,
+        "noise_e_total": 60.25202311883068,
+        "snr_db": 35.531120248637,
+        "snr_db_total": 35.53787947359473
       }
     ],
-    "system_gain_dn_per_e": 0.11930457037828669
+    "system_gain_dn_per_e": 0.11989648148459647
   },
   "characterization": "simulated EMVA 1288-style characterization; not a certified EMVA 1288 measurement",
   "checks": [
     {
-      "measured": 2.044899915120855,
+      "measured": 2.026385042250536,
       "name": "LCG read noise (e- rms)",
       "pass": true,
       "tolerance": {
@@ -441,7 +436,7 @@
       }
     },
     {
-      "measured": 0.4995294570675105,
+      "measured": 0.4774666974520326,
       "name": "LCG DSNU (e-)",
       "pass": true,
       "tolerance": {
@@ -450,7 +445,7 @@
       }
     },
     {
-      "measured": 0.49590230976574845,
+      "measured": 0.49926696843489543,
       "name": "LCG PRNU (%)",
       "pass": true,
       "tolerance": {
@@ -459,7 +454,7 @@
       }
     },
     {
-      "measured": 6026.592256442652,
+      "measured": 5996.839866333963,
       "name": "LCG saturation capacity (e-)",
       "pass": true,
       "tolerance": {
@@ -468,7 +463,7 @@
       }
     },
     {
-      "measured": 1.7903944639414405e-05,
+      "measured": 4.185916931978447e-05,
       "name": "LCG linearity residual",
       "pass": true,
       "tolerance": {
@@ -476,7 +471,7 @@
       }
     },
     {
-      "measured": 69.38799504646477,
+      "measured": 69.42400961942492,
       "name": "LCG dynamic range (dB)",
       "pass": true,
       "tolerance": {
@@ -485,7 +480,7 @@
       }
     },
     {
-      "measured": 0.0047585369903090985,
+      "measured": 0.00017919903730117046,
       "name": "LCG system gain relative error",
       "pass": true,
       "tolerance": {
@@ -493,7 +488,7 @@
       }
     },
     {
-      "measured": 0.7152925768228638,
+      "measured": 0.721109360692739,
       "name": "HCG read noise (e- rms)",
       "pass": true,
       "tolerance": {
@@ -502,7 +497,7 @@
       }
     },
     {
-      "measured": 0.49891520150292085,
+      "measured": 0.5031001439174068,
       "name": "HCG DSNU (e-)",
       "pass": true,
       "tolerance": {
@@ -511,7 +506,7 @@
       }
     },
     {
-      "measured": 0.5013867484190104,
+      "measured": 0.49709940420324406,
       "name": "HCG PRNU (%)",
       "pass": true,
       "tolerance": {
@@ -520,7 +515,7 @@
       }
     },
     {
-      "measured": 2000.9454553785918,
+      "measured": 2015.2659016779853,
       "name": "HCG saturation capacity (e-)",
       "pass": true,
       "tolerance": {
@@ -529,7 +524,7 @@
       }
     },
     {
-      "measured": 6.807392223080534e-05,
+      "measured": 7.327710513430988e-05,
       "name": "HCG linearity residual",
       "pass": true,
       "tolerance": {
@@ -537,7 +532,7 @@
       }
     },
     {
-      "measured": 68.93503064283632,
+      "measured": 68.9266244705905,
       "name": "HCG dynamic range (dB)",
       "pass": true,
       "tolerance": {
@@ -546,7 +541,7 @@
       }
     },
     {
-      "measured": 0.000733069364001846,
+      "measured": 0.007876962623567683,
       "name": "HCG system gain relative error",
       "pass": true,
       "tolerance": {
@@ -554,7 +549,7 @@
       }
     },
     {
-      "measured": 60.97632282211355,
+      "measured": 60.67529178055645,
       "name": "dark current at 65 C vs doubling model (e-/s)",
       "pass": true,
       "tolerance": {
@@ -563,7 +558,7 @@
       }
     },
     {
-      "measured": 100.38959305076618,
+      "measured": 99.89398455292796,
       "name": "dark current at 70 C vs doubling model (e-/s)",
       "pass": true,
       "tolerance": {
@@ -578,11 +573,11 @@
     "exposure_s": 0.1,
     "frames_per_level": 16,
     "measured_rates_e_per_s": [
-      0.6740064849617533,
-      3.407405633343933,
-      16.333380861195543,
-      60.97632282211355,
-      100.38959305076618
+      0.6706790151375036,
+      3.3905837782477275,
+      16.25274538786373,
+      60.67529178055645,
+      99.89398455292796
     ],
     "measured_temperatures_c": [
       35.0,
@@ -618,19 +613,19 @@
   },
   "fixed_pattern": {
     "dsnu_configured_e": 0.5,
-    "dsnu_raw_spatial_sigma_e": 0.3081966261579722,
-    "dsnu_reported_input_referred_e": 0.4995294570675105,
+    "dsnu_raw_spatial_sigma_e": 0.30667510522848984,
+    "dsnu_reported_input_referred_e": 0.4774666974520326,
     "pixels": 4065,
     "prnu_configured_percent": 0.5,
-    "prnu_raw_spatial_sigma_percent": 0.5920139714775938,
-    "prnu_reported_percent": 0.49590230976574845
+    "prnu_raw_spatial_sigma_percent": 0.5888291931125474,
+    "prnu_reported_percent": 0.49926696843489543
   },
   "gate_evidence": true,
   "kind": "camsim G2 sensor validation",
   "preset": {
     "name": "flagship_phone_50mp",
     "path": "src/camsim/config/presets/sensors/flagship_phone_50mp.json",
-    "sensor_config_hash": "e6b3f6a5162d60b805cfba2651aa5e9c705d86bf84a534ba8dcde4a09f42d4a2"
+    "sensor_config_hash": "bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55"
   },
   "schema_version": "1.0"
 }

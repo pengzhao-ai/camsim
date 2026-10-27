@@ -144,9 +144,11 @@ is self-contained.
 
 - Purpose: give the shipped flagship sensor preset representative, internally
   consistent spectral responses for simulation and the G2 characterization.
-- Shape: smooth representative QE (peak 0.82), overlapping RGGB colour-filter
-  passbands, and an IR-cut roll-off near 650 nm, interpolated by the sensor
-  onto the preset's 360-830 nm, 5 nm grid.
+- Shape: smooth representative QE (peak 0.82), conventional RGGB Bayer
+  colour-filter passbands (blue ~448 nm, green ~542 nm, red ~610 nm) with
+  moderate out-of-band leakage and peak transmittance 0.86-0.90, and an IR-cut
+  roll-off near 650 nm, interpolated by the sensor onto the preset's
+  360-830 nm, 5 nm grid.
 - Provenance: the assumptions are repeated in each CSV's comment header and in
   the preset's `provenance.assumptions`. No source URL is claimed because no
   vendor curve was digitized. A future measured replacement must record its

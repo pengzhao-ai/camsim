@@ -158,7 +158,7 @@ def test_shot_noise_variance_slope(sensor_config: SensorConfig) -> None:
     sensor = quiet_sensor(sensor_config)
     frames = np.stack(
         [
-            signal_dn(sensor.expose(make_irr(2.8e-4), 0.01, mode="HCG", seed=100 + index))
+            signal_dn(sensor.expose(make_irr(6.2e-4), 0.01, mode="HCG", seed=100 + index))
             for index in range(16)
         ]
     )
@@ -166,7 +166,10 @@ def test_shot_noise_variance_slope(sensor_config: SensorConfig) -> None:
     mean_e = float(frames.mean()) * e_per_dn
     variance_e = float(frames.var(axis=0).mean()) * e_per_dn**2
     # Read noise (0.7 e-) and quantization add a small offset, so the slope is
-    # allowed a fifteen percent band around the Poisson ideal.
+    # allowed a fifteen percent band around the Poisson ideal. The 6.2e-4
+    # W/m^2/nm level places the mean near 1000 e- with the conventional Bayer
+    # CFA; the narrower passbands collect less light than the superseded broad
+    # curves, and 2.8e-4 no longer reached the intended shot-noise regime.
     assert 800.0 < mean_e < 1600.0, "test must stay below HCG full well"
     assert variance_e == pytest.approx(mean_e, rel=0.15)
 

@@ -34,12 +34,15 @@ ISP_PRESET_PATH = REPO_ROOT / "src" / "camsim" / "config" / "presets" / "isp" / 
 _WAVELENGTHS_NM = np.arange(360.0, 831.0, 5.0)
 
 
-def flat_irradiance(level: float = 1e-5, shape: tuple[int, int] = (32, 32)) -> SpectralIrradiance:
+def flat_irradiance(level: float = 2e-5, shape: tuple[int, int] = (32, 32)) -> SpectralIrradiance:
     """Return a low-light flat spectral cube on the preset grid.
 
-    ``1e-5 W/m^2/nm`` is a dim laboratory scene that produces a few tens of
+    ``2e-5 W/m^2/nm`` is a dim laboratory scene that produces a few tens of
     electrons per pixel in the flagship part, so fixture frames exercise the
-    pipeline without reaching full well.
+    pipeline without reaching full well. The level was raised from 1e-5 when
+    the CFA was re-authored to conventional Bayer bands; the narrower passbands
+    collect less light, and the old level left the darkest pixels at the
+    zero-charge clamp.
     """
     data = np.full((*shape, _WAVELENGTHS_NM.size), level, dtype=np.float64)
     return SpectralIrradiance.from_array(

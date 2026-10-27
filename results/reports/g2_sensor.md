@@ -31,7 +31,7 @@ commercial part.
 | SciPy | `1.17.1` |
 | Platform | `Darwin` |
 | Preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
-| Preset hash | `e6b3f6a5162d60b805cfba2651aa5e9c705d86bf84a534ba8dcde4a09f42d4a2` |
+| Preset hash | `bd1f2044e5d26d05c0b015aade933439d93e988e4f61542efa174894798cdc55` |
 | Artifact generator | `uv run python examples/04_emva_characterization.py` |
 | Machine-readable results | `results/reports/g2_sensor_results.json` |
 | Gate tests | `uv run pytest tests/test_sensor.py tests/test_noise.py tests/test_defects.py tests/test_gain.py tests/test_adc.py tests/test_characterization.py tests/test_preset_validation.py -v` |
@@ -54,22 +54,22 @@ system gain, and dark current within 5 % of the differential doubling model at
 
 | Check | Measured | Tolerance | Result |
 |---|---:|---|---|
-| LCG read noise | 2.0449 e- rms | 2.0 +/- 5 % | PASS |
-| LCG DSNU | 0.4995 e- | 0.5 +/- 10 % | PASS |
-| LCG PRNU | 0.4959 % | 0.5 +/- 10 % | PASS |
-| LCG saturation capacity | 6026.6 e- | 6000 +/- 10 % | PASS |
-| LCG linearity residual | 1.79e-5 | < 0.05 | PASS |
-| LCG dynamic range | 69.39 dB | 30-90 dB | PASS |
-| LCG system gain relative error | -0.476 % | < 2 % | PASS |
-| HCG read noise | 0.7153 e- rms | 0.7 +/- 5 % | PASS |
-| HCG DSNU | 0.4989 e- | 0.5 +/- 10 % | PASS |
-| HCG PRNU | 0.5014 % | 0.5 +/- 10 % | PASS |
-| HCG saturation capacity | 2000.9 e- | 2000 +/- 10 % | PASS |
-| HCG linearity residual | 6.81e-5 | < 0.05 | PASS |
-| HCG dynamic range | 68.94 dB | 30-90 dB | PASS |
-| HCG system gain relative error | -0.073 % | < 2 % | PASS |
-| Dark current at 65 C (differential) | 60.98 e-/s | 61.80 +/- 5 % | PASS |
-| Dark current at 70 C (differential) | 100.39 e-/s | 102.17 +/- 5 % | PASS |
+| LCG read noise | 2.0264 e- rms | 2.0 +/- 5 % | PASS |
+| LCG DSNU | 0.4775 e- | 0.5 +/- 10 % | PASS |
+| LCG PRNU | 0.4993 % | 0.5 +/- 10 % | PASS |
+| LCG saturation capacity | 5996.8 e- | 6000 +/- 10 % | PASS |
+| LCG linearity residual | 4.19e-5 | < 0.05 | PASS |
+| LCG dynamic range | 69.42 dB | 30-90 dB | PASS |
+| LCG system gain relative error | +0.018 % | < 2 % | PASS |
+| HCG read noise | 0.7211 e- rms | 0.7 +/- 5 % | PASS |
+| HCG DSNU | 0.5031 e- | 0.5 +/- 10 % | PASS |
+| HCG PRNU | 0.4971 % | 0.5 +/- 10 % | PASS |
+| HCG saturation capacity | 2015.3 e- | 2000 +/- 10 % | PASS |
+| HCG linearity residual | 7.33e-5 | < 0.05 | PASS |
+| HCG dynamic range | 68.93 dB | 30-90 dB | PASS |
+| HCG system gain relative error | -0.788 % | < 2 % | PASS |
+| Dark current at 65 C (differential) | 60.68 e-/s | 61.80 +/- 5 % | PASS |
+| Dark current at 70 C (differential) | 99.89 e-/s | 102.17 +/- 5 % | PASS |
 
 ## 1. Spectral response and packaging
 
@@ -109,17 +109,17 @@ scaled by `n/(n-1)` to restore the independent degrees of freedom.
 
 | Quantity | LCG | HCG |
 |---|---:|---:|
-| Fitted system gain K | 0.11930 DN/e- | 0.35936 DN/e- |
+| Fitted system gain K | 0.11990 DN/e- | 0.35679 DN/e- |
 | Nominal ADC system gain | 0.119875 DN/e- | 0.359625 DN/e- |
-| Relative gain error | -0.476 % | -0.073 % |
-| Read noise | 2.0449 e- rms | 0.7153 e- rms |
+| Relative gain error | +0.018 % | -0.788 % |
+| Read noise | 2.0264 e- rms | 0.7211 e- rms |
 | Configured read noise | 2.0 e- rms | 0.7 e- rms |
-| Saturation capacity | 6026.6 e- | 2000.9 e- |
+| Saturation capacity | 5996.8 e- | 2015.3 e- |
 | Configured full well | 6000 e- | 2000 e- |
-| PTC channel-level points | 18 | 26 |
+| PTC channel-level points | 19 | 27 |
 
-The measured saturation cross-check is 1.0044x the configured full well for LCG
-and 1.0005x for HCG, consistent with the clipped flat field landing on the
+The measured saturation cross-check is 0.9995x the configured full well for LCG
+and 1.0076x for HCG, consistent with the clipped flat field landing on the
 full-well-limited code. Both modes are full-well limited at unity analog gain:
 600000 uV at full well is below the 800000 uV ADC full scale.
 
@@ -136,7 +136,7 @@ levels.
 Linearity is the maximum relative deviation from a straight-line fit over
 unsaturated levels between 5 % and 95 % of the saturation code. Both modes are
 linear to better than 0.0001, far inside the 0.05 gate. Dynamic range is
-`20 log10(saturation_capacity / read_noise)`: 69.39 dB for LCG and 68.94 dB for
+`20 log10(saturation_capacity / read_noise)`: 69.42 dB for LCG and 68.93 dB for
 HCG. The small HCG advantage in read noise is almost exactly offset by its
 smaller full well, which is the expected dual-conversion-gain trade.
 
@@ -146,9 +146,9 @@ smaller full well, which is the expected dual-conversion-gain trade.
 
 | Metric | LCG | HCG | Trade |
 |---|---:|---:|---|
-| Read noise | 2.0449 e- rms | 0.7153 e- rms | 2.9x lower in HCG |
-| Saturation capacity | 6026.6 e- | 2000.9 e- | 3.0x higher in LCG |
-| Dynamic range | 69.39 dB | 68.94 dB | within 0.5 dB |
+| Read noise | 2.0264 e- rms | 0.7211 e- rms | 2.8x lower in HCG |
+| Saturation capacity | 5996.8 e- | 2015.3 e- | 3.0x higher in LCG |
+| Dynamic range | 69.42 dB | 68.93 dB | within 0.5 dB |
 
 The full-well ratio and read-noise ratio are both about three, so the dynamic
 range is nearly unchanged: high conversion gain buys low-light SNR at the cost
@@ -171,21 +171,21 @@ apparent error by the reference term.
 
 | Temperature | Measured | Differential model | Difference |
 |---:|---:|---:|---:|
-| 35 C | 0.674 e-/s | 2.030 e-/s | -66.8 % |
-| 45 C | 3.407 e-/s | 7.495 e-/s | -54.5 % |
-| 55 C | 16.333 e-/s | 22.205 e-/s | -26.4 % |
-| 65 C | 60.976 e-/s | 61.802 e-/s | -1.3 % |
-| 70 C | 100.390 e-/s | 102.165 e-/s | -1.7 % |
+| 35 C | 0.671 e-/s | 2.030 e-/s | -67.0 % |
+| 45 C | 3.391 e-/s | 7.495 e-/s | -54.8 % |
+| 55 C | 16.253 e-/s | 22.205 e-/s | -26.8 % |
+| 65 C | 60.675 e-/s | 61.802 e-/s | -1.8 % |
+| 70 C | 99.894 e-/s | 102.165 e-/s | -2.2 % |
 
 Only the 65 C and 70 C points are gate criteria, with a 5 % tolerance. Below
 about 60 C the differential signal per 0.1 s exposure is well under one ADC
 code (LCG resolves about 8.4 e- per DN), and the zero-charge clamp plus
 phase-dependent quantization compress the mean, so the differential estimate
 is biased low. Those points are shown for the model shape, not as a pass/fail
-claim. At 65 C and 70 C the differential dark signal is about 0.74 DN and
-1.22 DN; still around one code, but averaging 16 frames over roughly 4,000
+claim. At 65 C and 70 C the differential dark signal is about 0.73 DN and
+1.20 DN; still around one code, but averaging 16 frames over roughly 4,000
 valid pixels resolves the mean well enough that the measured rates agree with
-the differential doubling model within 1.3 % and 1.7 %.
+the differential doubling model within 1.8 % and 2.2 %.
 
 ![Dark current versus temperature](../figures/g2_dark_current_vs_temperature.png)
 
@@ -201,16 +201,16 @@ The report values come from the characterization:
 
 - DSNU is measured from dark frames and inverted through the exact pre-clamp
   model `Poisson(max(0, d)) + N(0, sigma_read)` with the zero-charge clip and
-  integer ADC rounding. The raw post-clamp spread is only 0.146 e- in LCG and
-  0.264 e- in HCG because the dark offset is sub-LSB; the input-referred values
-  recover the configured 0.5 e- within 0.1 % (LCG) and 0.22 % (HCG).
+  integer ADC rounding. The raw post-clamp spread is only 0.138 e- in LCG and
+  0.266 e- in HCG because the dark offset is sub-LSB; the input-referred values
+  recover the configured 0.5 e- within 4.5 % (LCG) and 0.6 % (HCG).
 - PRNU is measured from the unsaturated flat field nearest 70 % of saturation,
   corrected for temporal variance and DSNU, then normalised by the mean. The
-  measured 0.4959 % (LCG) and 0.5014 % (HCG) recover the configured 0.5 %.
+  measured 0.4993 % (LCG) and 0.4971 % (HCG) recover the configured 0.5 %.
 
 The figure shows the measured per-pixel distributions. The dark histogram is
 the averaged dark frame: it contains the fixed pattern plus residual temporal
-noise of the 32-frame mean (raw spread 0.308 e-), which is why it is not the
+noise of the 32-frame mean (raw spread 0.307 e-), which is why it is not the
 input-referred 0.500 e- value. The PRNU histogram normalises each CFA channel
 separately; normalising the RGGB mosaic as one population would report the
 colour pattern itself as roughly 25 % PRNU, a classic analysis error.

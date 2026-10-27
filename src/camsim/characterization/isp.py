@@ -234,11 +234,14 @@ def measure_g3(*, quick: bool = False) -> dict[str, Any]:
     ``json.dumps(..., allow_nan=False)`` succeeds.
 
     The ColorChecker criterion is reported honestly. The shipped flagship
-    preset uses synthetic, deliberately broad CFA curves; its red and green
-    spectral sensitivities are highly correlated and the best in-sample 3x3
-    matrix leaves saturated patches far from the CIE reference. The two
-    ΔE2000 checks therefore carry ``pass=False`` and the overall ``status`` is
-    ``"FAIL"``. The thresholds themselves are not relaxed.
+    preset uses synthetic **conventional Bayer bands** (blue ~448 nm, green
+    ~542 nm, red ~610 nm) with moderate out-of-band leakage. The in-sample 3x3
+    CCM meets the design thresholds under both illuminants; the
+    Luther-condition residual is reported as a diagnostic of how well the CFA
+    spans the CIE observer. The original broad, nearly collinear CFA curves were
+    replaced after the G3 gate showed that no 3x3 matrix could colour-correct
+    them. The CCM is still fitted and evaluated in-sample, which is a stated
+    limitation.
     """
     sensor_config, isp_config = _load_configs()
     colorchecker_shape = QUICK_COLORCHECKER_SHAPE if quick else FULL_COLORCHECKER_SHAPE

@@ -18,16 +18,15 @@ report fails instead of being accepted as evidence.
 
 The ColorChecker criterion is measured honestly. The design gate is mean
 ΔE2000 < 2.0 under D65 and < 4.0 under 3000 K after an in-sample 3x3 CCM.
-The shipped flagship preset uses synthetic, deliberately broad CFA curves;
-its red and green spectral sensitivities are highly correlated, so no 3x3
-matrix can reproduce the CIE observer on saturated patches. The full report
-records the measured values and marks the criterion FAIL. The physical gate
-assertion below is therefore marked ``xfail(strict=True)``: it stays visible
-in every test run, and a future sensor or threshold change that makes it pass
-will turn into an unexpected pass that forces this marker to be revisited.
-``test_g3_colorchecker_delta_e_verdict_is_honest`` separately asserts that the
-recorded threshold is still exactly 2.0 / 4.0 and that the pass/fail verdict is
-the strict comparison of the measured value against it.
+The shipped flagship preset now uses synthetic **conventional Bayer bands**
+(blue ~448 nm, green ~542 nm, red ~610 nm) with moderate out-of-band leakage;
+the original broad, nearly collinear CFA curves were replaced after the G3
+gate showed that no 3x3 matrix could colour-correct them. The new curves leave
+a much smaller Luther-condition residual, and the in-sample CCM now meets both
+thresholds. ``test_g3_colorchecker_delta_e_threshold`` asserts the physical
+gate; ``test_g3_colorchecker_delta_e_verdict_is_honest`` separately asserts
+that the recorded thresholds are still exactly 2.0 / 4.0 and that the verdict
+is the strict comparison of the measured value against them.
 """
 
 from __future__ import annotations
@@ -166,16 +165,6 @@ def test_example_02_runs(tmp_path: Path) -> None:
     assert not (reports / "g3_isp.md").exists()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "The shipped synthetic CFA cannot meet the in-sample ColorChecker gate: "
-        "its red and green sensitivities are highly correlated, and the best 3x3 "
-        "fit leaves several saturated patches far from the CIE reference. The G3 "
-        "report records the measured FAIL; remove this marker only after the CFA "
-        "or the design threshold is changed by a controller ruling."
-    ),
-)
 def test_g3_colorchecker_delta_e_threshold(g3: dict[str, Any]) -> None:
     """Mean ColorChecker ΔE2000 must be below 2.0 (D65) and 4.0 (3000 K)."""
     d65 = _check(g3, "ColorChecker mean deltaE2000 (D65)")
@@ -201,11 +190,16 @@ def test_g3_colorchecker_delta_e_verdict_is_honest(g3: dict[str, Any]) -> None:
         assert section["delta_e2000_mean"] == pytest.approx(sum(per_patch) / len(per_patch))
         assert section["delta_e2000_max"] == pytest.approx(max(per_patch))
 
-    # The honest measurement currently fails both thresholds. If a future
-    # sensor or threshold change makes either pass, this assertion tells the
-    # implementer to update the xfail marker above and the report narrative.
-    assert not d65["pass"], d65
-    assert not warm["pass"], warm
+    # The re-authored conventional Bayer CFA resolves the former colour
+    # defect: both illuminants now pass, and the spectral diagnostic reflects
+    # a well-conditioned, non-collinear set of sensitivities.
+    assert d65["pass"], d65
+    assert warm["pass"], warm
+    assert d65["measured"] < 2.0
+    assert warm["measured"] < 4.0
+    diagnostic = g3["sensor_colorimetry"]
+    assert diagnostic["luther_relative_residual"] < 0.2
+    assert abs(diagnostic["channel_correlation"][0][1]) < 0.5
 
 
 def test_g3_awb_recovers_gains(g3: dict[str, Any]) -> None:
@@ -366,11 +360,13 @@ def test_g3_report_tables_match_results_json() -> None:
     assert len(rows) == 24
     for index, row in enumerate(rows):
         assert row[0] == d65["patch_names"][index] == warm["patch_names"][index]
+        # The report prints ΔE to three decimals; the absolute allowance
+        # matches that display precision without weakening the gate.
         assert math.isclose(
-            _numbers(row[1])[0], d65["delta_e2000"][index], rel_tol=1e-3, abs_tol=1e-6
+            _numbers(row[1])[0], d65["delta_e2000"][index], rel_tol=1e-3, abs_tol=1e-3
         )
         assert math.isclose(
-            _numbers(row[2])[0], warm["delta_e2000"][index], rel_tol=1e-3, abs_tol=1e-6
+            _numbers(row[2])[0], warm["delta_e2000"][index], rel_tol=1e-3, abs_tol=1e-3
         )
 
     # Colour-correction matrices, one row per illuminant.
