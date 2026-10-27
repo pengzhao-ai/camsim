@@ -1,8 +1,9 @@
 # Validation
 
-This page is the public index of camsim's phase-gate evidence. It is a stub in
-Phase 0: the G1–G5 sections are filled as each phase completes, and a gate is
-not marked green until its report is reproducible from a clean checkout.
+This page is the public index of camsim's phase-gate evidence. The project is
+in Phase 5 consolidation: **G1–G4 are PASS** with committed reports, and the
+**G5 human sign-off is pending**. A gate is not marked green until its report is
+reproducible from a clean checkout.
 
 ## Lines of evidence
 
@@ -32,11 +33,49 @@ comparisons use tolerances because floating-point reduction order may differ.
 | Gate | Phase | Scope | Report | Status |
 |---|---|---|---|---|
 | G0 | 0 | install, lint, typecheck, tests, docs build | this page | Green locally; CI runs the same commands |
-| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | Green locally; report PASS and the G1 tests pass |
-| G2 | 2 | sensor model and characterization | `results/reports/g2_sensor.md` | Green locally; report PASS and the G2 tests pass |
-| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` | Green locally; report PASS and the G3 tests pass |
-| G4 | 4 | metrics harness | `results/reports/g4_metrics.md` | Green locally; report PASS and the G4 tests pass |
-| G5 | 5 | consolidated human sign-off | `results/reports/validation_report.md` | Planned |
+| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | **PASS** |
+| G2 | 2 | sensor model and characterization | `results/reports/g2_sensor.md` | **PASS** |
+| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` | **PASS** |
+| G4 | 4 | metrics harness | `results/reports/g4_metrics.md` | **PASS** |
+| G5 | 5 | consolidated human sign-off | `results/reports/validation_report.md` | **Pending review** |
+
+## Coverage policy
+
+The coverage gate enforces **at least 90 % statement coverage** with:
+
+```bash
+uv run pytest --cov=camsim --cov-fail-under=90
+```
+
+`pyproject.toml` configures `[tool.coverage.run]` with an explicit omit for
+`*/camsim/viz/*`. The presentation layer is plotting code: it is exercised by
+the example scripts and notebooks that generate the committed gallery, not by
+the unit suite. Its correctness is judged by executed examples, while the
+simulation, metrics, configuration, characterization, and CLI modules — the
+code whose numbers the gates depend on — must meet the 90 % threshold. The
+same command is the Makefile `coverage` target and the CI test command; a
+release must not lower the threshold or delete tests to pass it.
+
+`tests/test_docs_smoke.py` additionally checks that the README gallery paths,
+documentation nav, `docs/images` mirror, API/release pages, and workflows exist;
+that the documented quickstart pipeline runs; and that the benchmark's
+`--quick` mode passes.
+
+## Gate figures
+
+The documentation site carries copies of selected committed figures so each
+gate is visible without leaving the site. The originals and the full set live
+under `results/figures/`; the reports carry the measured values and
+tolerances.
+
+| Gate | Figure |
+|---|---|
+| G1 | ![Photometric normalization](images/g1_lux_normalization.png) *Lux normalization across illuminants and 1–100,000 lux.* |
+| G1 | ![PSF and MTF](images/g1_psf_mtf.png) *Gaussian, Airy, and box PSFs with their transfer functions.* |
+| G2 | ![Photon transfer curve](images/g2_ptc.png) *LCG/HCG photon-transfer curves and system gain.* |
+| G2 | ![Sensor SNR](images/g2_snr_vs_irradiance.png) *SNR versus irradiance across the shot- and read-noise regimes.* |
+| G3 | ![ISP checks](images/g3_check_summary.png) *G3 check summary with tolerances.* |
+| G4 | ![Metrics checks](images/g4_check_summary.png) *G4 check summary with analytic references.* |
 
 ## G0 — Foundation
 
@@ -61,7 +100,7 @@ same commands locally.
 
 ## G1 — Scene and optics
 
-**Status: green locally.** The full report is
+**Status: PASS (green locally).** The full report is
 `results/reports/g1_scene_optics.md`; its four figures are
 `results/figures/g1_lux_normalization.png`, `g1_psf_mtf.png`,
 `g1_energy_conservation.png`, and `g1_edge_angle.png`. The report is generated
@@ -114,7 +153,7 @@ The report records these assumptions and known limitations:
 
 ## G2 — Sensor model and EMVA characterization
 
-**Status: green locally.** The full report is `results/reports/g2_sensor.md`,
+**Status: PASS (green locally).** The full report is `results/reports/g2_sensor.md`,
 its machine-readable results are `results/reports/g2_sensor_results.json`, and
 its six figures are `results/figures/g2_qe_cfa_ir_cut.png`, `g2_ptc.png`,
 `g2_snr_vs_irradiance.png`, `g2_dark_current_vs_temperature.png`,
@@ -183,17 +222,18 @@ The report records these assumptions and known limitations:
 
 ## G3 — ISP stages and pipeline
 
-**Status: green locally.** The full report is
-<a href="../results/reports/g3_isp.md"><code>results/reports/g3_isp.md</code></a>
-(a repository artifact, not a page in the published docs site); its
-machine-readable results are `results/reports/g3_isp_results.json`, and its
-figures are `results/figures/02_isp_stage_contact_sheet.png`,
+**Status: PASS (green locally).** The full report is
+`results/reports/g3_isp.md` (a repository artifact, not a page in the published
+docs site); its machine-readable results are
+`results/reports/g3_isp_results.json`, and its figures are
+`results/figures/02_isp_stage_contact_sheet.png`,
 `02_isp_stage_zoom.png`, `02_isp_demosaic_comparison.png`,
 `02_isp_colorchecker_delta_e.png`, `02_isp_awb_gains.png`,
 `02_isp_rccc_baseline.png`, `g3_delta_e.png`, `g3_awb_gains.png`, and
 `g3_check_summary.png`. The artifacts are generated by
 `examples/02_isp_stage_gallery.py`; `tests/test_example_02.py` is the
-executable form of the gate.
+executable form of the gate. The stage contract is described on the
+[ISP stages](isp_stages.md) page.
 
 Reproduce from the repository root:
 
@@ -275,17 +315,18 @@ The report records these assumptions and known limitations:
 
 ## G4 — Metrics harness
 
-**Status: green locally.** The full report is
-<a href="../results/reports/g4_metrics.md"><code>results/reports/g4_metrics.md</code></a>
-(a repository artifact, not a page in the published docs site); its
-machine-readable results are `results/reports/g4_metrics_results.json`, and its
-figures are `results/figures/03_mtf_curves.png`, `03_snr_vs_lux.png`,
+**Status: PASS (green locally).** The full report is
+`results/reports/g4_metrics.md` (a repository artifact, not a page in the
+published docs site); its machine-readable results are
+`results/reports/g4_metrics_results.json`, and its figures are
+`results/figures/03_mtf_curves.png`, `03_snr_vs_lux.png`,
 `03_delta_e_heatmap.png`, `03_acutance_vs_blur.png`, `g4_mtf_curves.png`,
 `g4_snr_vs_lux.png`, `g4_delta_e_heatmap.png`, `g4_acutance_vs_blur.png`, and
 `g4_check_summary.png`. The artifacts are generated by
 `examples/03_measure_iq.py`; `tests/test_example_03.py` is the executable form
 of the gate. The measurement itself is shared by the example and the tests
-through `camsim.characterization.measure_g4`.
+through `camsim.characterization.measure_g4`. The definitions and limitations
+are described on the [Metrics](metrics.md) page.
 
 Reproduce from the repository root:
 
@@ -416,12 +457,23 @@ The G5 gate closes Phase 5 and opens the way to Phase 6. It requires:
 - G1–G4 green;
 - continuous integration green across Ubuntu and macOS on Python 3.11, 3.12,
   and 3.13;
-- test coverage of at least 90%;
-- a strict documentation build;
+- test coverage of at least 90%, enforced by
+  `--cov-fail-under=90` in the Makefile and CI (see the coverage policy
+  above);
+- a strict documentation build (`uv run mkdocs build --strict`);
+- the documentation smoke tests passing, including the README gallery paths,
+  the self-contained `docs/images` mirror, the nav, the API/release pages, the
+  quickstart pipeline, and the benchmark's `--quick` mode;
 - examples and notebooks executing headless within their runtime budgets
   (notebooks under two minutes each, examples under five minutes each);
 - a `results/reports/validation_report.md` with figures, tolerances,
-  assumptions, and known limitations, reviewed by the project owner.
+  assumptions, and known limitations, reviewed by the project owner;
+- a successful `uv build` and `uvx twine check dist/*` dry run of the release
+  workflow, without tagging or publishing.
+
+The G5 status is **pending** until the project owner reviews the consolidated
+report. `v0.1.0` is tagged only after that sign-off; see
+[Release](release.md).
 
 **No machine-vision code is written before this sign-off.** The CNN task
 engine, training protocol, and task-accuracy sweeps in `camsim.tasks` do not

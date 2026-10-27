@@ -15,8 +15,8 @@ sync:  ## Sync the uv environment with all extras
 test:  ## Run the test suite
 	$(UV) run pytest
 
-coverage:  ## Run the test suite with the same coverage command as CI
-	$(UV) run pytest --cov=camsim --cov-report=term-missing
+coverage:  ## Run the test suite with the same coverage gate as CI
+	$(UV) run pytest --cov=camsim --cov-report=term-missing --cov-fail-under=90
 
 lint:  ## Check lint and formatting
 	$(UV) run ruff check .
@@ -62,7 +62,7 @@ figures:  ## Regenerate the gallery figures from the example scripts
 	done; \
 	if [ "$$found" -eq 0 ]; then echo "No examples yet."; fi
 
-gate: sync lint typecheck test coverage docs build  ## Run the full G0 quality gate
+gate: sync lint typecheck test coverage docs build  ## Run the full local quality gate
 
 clean:  ## Remove local caches and build outputs
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .hypothesis htmlcov site dist build

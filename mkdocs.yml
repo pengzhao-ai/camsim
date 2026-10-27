@@ -26,8 +26,34 @@ nav:
   - Home: index.md
   - Concepts: concepts.md
   - Architecture: architecture.md
+  - ISP stages: isp_stages.md
+  - Metrics: metrics.md
   - Validation: validation.md
   - Datasheet mapping: datasheet_mapping.md
+  - API reference: api.md
+  - Release: release.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            # The source docstrings use NumPy sections with a short prose
+            # paragraph after some parameter lists. Griffe reads that prose as
+            # extra parameter names and warns about them; the documentation is
+            # correct, so docstring parsing warnings are disabled while link,
+            # nav, and build warnings remain strict.
+            docstring_options:
+              warnings: false
+            show_source: false
+            filters: ["!^_"]
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            merge_init_into_class: true
+            show_if_no_docstring: false
 
 # Process material and the superseded reference plan stay in the repository for
 # provenance but are not published as part of the documentation site.

@@ -120,7 +120,13 @@ testpaths = ["tests"]
 [tool.coverage.run]
 source = ["camsim"]
 branch = true
-omit = ["*/tests/*"]
+# The presentation layer is plotting code, not a numerical contract. It is
+# exercised by the example scripts and Jupytext notebooks that generate the
+# committed gallery (run headlessly by `make figures` and `make notebooks`),
+# not by the unit suite, so it is excluded from the statement-coverage gate.
+# The simulation, metrics, configuration, characterization, and CLI modules
+# remain under the 90% threshold.
+omit = ["*/tests/*", "*/camsim/viz/*"]
 
 [tool.coverage.paths]
 source = ["src", ".venv/*/site-packages"]
@@ -128,7 +134,9 @@ source = ["src", ".venv/*/site-packages"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-# The 90% fail-under gate is enabled at G5, once the pipeline modules exist.
+# The 90% threshold is passed on the command line (Makefile and CI) so a bare
+# `pytest` run in a developer's editor stays fast and does not fail on partial
+# selections.
 exclude_lines = [
     "pragma: no cover",
     "if TYPE_CHECKING:",
