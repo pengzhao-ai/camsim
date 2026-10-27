@@ -17,6 +17,7 @@ from typing import Any, Final
 from ._version import __version__
 
 __all__: Final[list[str]] = [
+    "ISP",
     "LensConfig",
     "Sensor",
     "SpectralIrradiance",
@@ -26,6 +27,7 @@ __all__: Final[list[str]] = [
 
 # Public name -> (module path, attribute name). Populated as public types land.
 _LAZY_EXPORTS: Final[dict[str, tuple[str, str]]] = {
+    "ISP": ("camsim.isp.pipeline", "ISP"),
     "LensConfig": ("camsim.config.schema", "LensConfig"),
     "Sensor": ("camsim.sensor", "Sensor"),
     "SpectralIrradiance": ("camsim.core.spectral", "SpectralIrradiance"),
