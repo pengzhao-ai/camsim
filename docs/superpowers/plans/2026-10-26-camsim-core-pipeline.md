@@ -532,7 +532,7 @@ Expected: FAIL with import errors.
 
 - [ ] **Step 3: Implement the lens and PSF functions**
 
-Gaussian PSF from a normalized sampled Gaussian; Airy PSF from `(2 J1(x)/x)²` with `x = π r / (1.22 λ N / pitch)`; normalize to sum 1. MTF via FFT magnitude with DC normalization. Lens FOV `2 atan(d/(2f))`; PPD from pixel pitch and focal length.
+Gaussian PSF from a normalized sampled Gaussian; Airy PSF from `(2 J1(x)/x)²` with `x = π r / (λ N / pitch)` (first dark ring at `r = 1.22 λ N / pitch`); normalize to sum 1. MTF via FFT magnitude with DC normalization. Lens FOV `2 atan(d/(2f))`; PPD from pixel pitch and focal length.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
