@@ -59,6 +59,7 @@ _SENSOR_KEYS: Final[frozenset[str]] = frozenset(
         "pixel",
         "cfa",
         "spectral",
+        "spatial_crosstalk",
         "modes",
         "analog_gain",
         "adc",

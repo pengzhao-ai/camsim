@@ -4,8 +4,10 @@
 # transmittance 0.84-0.92 and real out-of-band leakage. Values are
 # dimensionless fractions in [0, 1]. The columns are ordered canonically as
 # wavelength_nm,R,G,B; a MONO sensor ignores this file because it has no
-# colour filters. Task 17 replaces these curves with datasheet-grounded
-# measurements.
+# colour filters. Final Phase 2 provenance: original curves authored for this
+# repository under the Apache-2.0 licence; not copied or digitized from a
+# vendor datasheet. See THIRD_PARTY.md and the flagship preset's
+# provenance.assumptions.
 wavelength_nm,R,G,B
 360,0.010,0.010,0.020
 370,0.010,0.010,0.040

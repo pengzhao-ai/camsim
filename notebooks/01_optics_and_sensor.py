@@ -29,13 +29,17 @@ spectral irradiance:
   ``None``), and box-averages to sensor pixels.
 
 Real-world parameter ranges used here: phone lenses f/1.4-f/8, focal lengths
-1.5-50 mm, pixel pitch 0.6-2 um, and scene illuminance 1-100,000 lux. The
-reference lens is f/1.8, 6.4 mm, 11.46 mm diagonal, T = 0.9, and 1.12 um pitch.
+1.5-50 mm, pixel pitch 0.6-2 um, scene illuminance 1-100,000 lux, QE 0.1-0.9,
+read noise 0.3-10 e- rms, and full well 2-50 ke-. The reference lens is f/1.8,
+6.4 mm, 11.46 mm diagonal, T = 0.9, and 1.12 um pitch.
 
-The sensor and RAW stages (QE, CFA, shot/read noise, ADC) are not implemented
-yet. The final section is an explicit placeholder; no RAW frame or tone-mapped
-image is fabricated. Figures honour ``CAMSIM_FIG_DIR`` (default
-``results/figures``) and use deterministic ``01_*.png`` names.
+The final sections connect the scene to the implemented sensor model: the
+preset's QE/CFA/IR-cut curves, an irradiance-to-RAW exposure, a short EMVA
+1288-style characterization of the dual conversion-gain modes, and the dark
+fixed-pattern distribution. The characterization here uses eight frames per
+level to keep the notebook fast; the G2 gate uses 32 frames and stricter
+tolerances. Figures honour ``CAMSIM_FIG_DIR`` (default ``results/figures``) and
+use deterministic ``01_*.png`` names.
 
 Failure artefacts guarded here: a PSF sampled on the sensor grid but applied to
 the oversampled scene under-blurs by the oversampling factor; plotting MTF
@@ -45,12 +49,12 @@ figure directory silently sends outputs somewhere other than the gallery.
 """
 
 # %% [markdown]
-# # 01 - Optics and the sensor-plane scene
+# # 01 - Optics and the sensor plane
 #
-# This notebook walks from an illuminant spectrum to the irradiance a sensor
-# would receive. It does not model the sensor itself: everything below stays in
-# linear radiometric units, and the last section marks where the sensor/RAW
-# stage will attach.
+# This notebook walks from an illuminant spectrum through a lens to the
+# irradiance a sensor receives, then through the sensor's spectral response,
+# shot/read noise, and ADC to a RAW frame. It closes with a short EMVA
+# 1288-style characterization of the shipped flagship preset.
 #
 # Run it from the repository root (the `make notebooks` target does this), or
 # set `CAMSIM_FIG_DIR` to redirect the PNG output.
@@ -71,7 +75,11 @@ from IPython import get_ipython
 from matplotlib.ticker import NullFormatter
 from numpy.typing import NDArray
 
+import camsim
+from camsim.characterization import characterize_sensor
+from camsim.config.io import load_sensor
 from camsim.config.schema import LensConfig
+from camsim.core.spectral import SpectralIrradiance
 from camsim.optics.psf import airy_psf, box_psf, gaussian_psf, psf_mtf50
 from camsim.scene.illuminants import illuminant, photopic_luminous_efficiency
 from camsim.scene.spectral_data import load_colorchecker
@@ -79,8 +87,12 @@ from camsim.scene.targets import SceneResult, render
 from camsim.viz import (
     PALETTE,
     figure_dir,
+    plot_dark_current_vs_temperature,
     plot_mtf,
     plot_psf,
+    plot_ptc,
+    plot_sensor_spectral_response,
+    plot_snr_vs_irradiance,
     plot_spectrum,
     save_figure,
     set_style,
@@ -117,6 +129,7 @@ COLORCHECKER_SHAPE = (96, 128)
 EDGE_SHAPE = (96, 96)
 AIRY_F_NUMBER = 4.0
 AIRY_WAVELENGTH_NM = 550.0
+WAVELENGTHS_NM = np.arange(360.0, 831.0, 5.0)
 
 
 def reference_lens(f_number: float = REFERENCE_F_NUMBER) -> LensConfig:
@@ -423,30 +436,186 @@ save_figure(figure, FIGURES / "01_scene_contact_sheet.png")
 plt.show()
 
 # %% [markdown]
-# ## 6. Where the sensor and RAW stages attach
+# ## 6. The flagship sensor's spectral response
 #
-# The cube returned by `render` is a `SpectralIrradiance` in `W/m^2/nm` on the
-# sensor grid, before the sensor's IR-cut filter and CFA. The missing stages are
-# physical, not cosmetic:
+# The preset's spectral curves are what turn irradiance into electrons. A
+# photon at wavelength lambda is collected with probability
+# `QE(lambda) * T_IR(lambda) * T_CFA,c(lambda)`, where the IR-cut filter removes
+# out-of-band near-infrared light and the colour filter selects a band. The
+# three factors multiply before the spectral integral; adding them instead
+# would count photons more than once.
 #
-# - integrate each pixel's spectral irradiance against QE and CFA transmission
-#   to obtain electrons per second; aperture and lens transmittance are already
-#   included in the scene irradiance;
-# - multiply by exposure time to count electrons, then add shot noise
-#   (Poisson), read noise, and dark current;
-# - clip at full well, apply conversion gain, digitize with the ADC, and add the
-#   black-level pedestal.
-#
-# Those stages are deliberately absent from this phase. No RAW frame is
-# produced or simulated here; the placeholder below is the exact boundary a
-# later phase will fill.
+# The curves below are bundled `camsim.data` resources, so an installed wheel
+# constructs the same sensor without the repository checkout. They are
+# representative synthetic engineering estimates, not measurements of a
+# commercial part. Quantum efficiency and transmittance are dimensionless
+# fractions in [0, 1]; a percent-valued curve would be a 100x units error.
 
 # %%
-print("Sensor/RAW stage: not implemented in this phase.")
-print("This notebook ends at sensor-plane spectral irradiance; no RAW data are faked.")
+SENSOR_PRESET = (
+    REPO_ROOT / "src" / "camsim" / "config" / "presets" / "sensors" / "flagship_phone_50mp.json"
+)
+sensor_config = load_sensor(SENSOR_PRESET)
+
+figure, _axes = plot_sensor_spectral_response(
+    sensor_config,
+    title="Flagship preset spectral response (representative synthetic curves)",
+)
+save_figure(figure, FIGURES / "01_sensor_spectral_response.png")
+plt.show()
+
+print(f"sensor preset: {sensor_config.name}")
+print(f"  pixel pitch: {sensor_config.pixel.pitch_um:g} um, CFA {sensor_config.cfa.value}")
+print(f"  QE curve: {sensor_config.spectral.qe_csv}")
+print(f"  CFA curve: {sensor_config.spectral.cfa_csv}")
+print(f"  IR-cut curve: {sensor_config.spectral.ir_cut_csv}")
+
+# %% [markdown]
+# ## 7. From irradiance to RAW
+#
+# `Sensor.expose` integrates the spectral cube through those response curves,
+# multiplies by pixel area and exposure, draws Poisson photoelectrons, adds
+# dark current, DSNU, PRNU, and read noise, applies conversion gain and analog
+# gain, and quantizes to a 10-bit code with a 64 DN black pedestal. The frame
+# metadata records the resolved conversion-gain mode, exposure, temperature,
+# and a stable configuration hash.
+#
+# The table below exposes the same flat-field signal in both readout modes.
+# LCG has the larger full well (6000 e-) and higher read noise (2.0 e- rms);
+# HCG trades well capacity (2000 e-) for lower read noise (0.7 e- rms). At a
+# dim 2e-4 W/m^2/nm flat field, converting each mode's DN spread back through
+# its measured system gain puts both at the same shot-noise limit in
+# electrons; the larger DN spread in HCG is just its three times higher
+# conversion gain, not more noise.
+
+# %%
+FLAT_LEVEL = 2e-4  # W/m^2/nm
+FLAT_SHAPE = (64, 64)
+FLAT_FRAMES = 8
+flat_cube = SpectralIrradiance.from_array(
+    np.full((*FLAT_SHAPE, WAVELENGTHS_NM.size), FLAT_LEVEL, dtype=np.float64),
+    WAVELENGTHS_NM,
+    "W/m^2/nm",
+    pixel_pitch_um=PIXEL_PITCH_UM,
+)
+sensor = camsim.Sensor(sensor_config, seed=1)
+for mode_name in ("LCG", "HCG"):
+    frames = np.stack(
+        [
+            sensor.expose(flat_cube, 0.01, mode=mode_name, seed=100 + index).data.astype(np.float64)
+            - sensor_config.adc.black_level_dn
+            for index in range(FLAT_FRAMES)
+        ]
+    )
+    print(
+        f"  {mode_name}: mean {frames.mean():.2f} DN, "
+        f"temporal sigma {frames.std(axis=0, ddof=1).mean():.2f} DN"
+    )
+
+# %% [markdown]
+# ## 8. EMVA 1288-style characterization
+#
+# A photon transfer curve fits `variance_DN = K * mean_DN + sigma_read_DN**2`.
+# The slope `K` is the system gain in DN per electron, so dividing the
+# intercept by `K` gives read noise in electrons. Saturated levels are excluded
+# because their variance collapses at the full-well or ADC ceiling, and the two
+# conversion-gain modes are characterized separately because a mixed PTC has no
+# single slope.
+#
+# This notebook uses eight frames per level for speed; the G2 gate uses 32
+# frames and checks read noise within 5 %, saturation within 10 %, DSNU and
+# PRNU within 10 %, linearity below 5 %, and dynamic range between 30 and
+# 90 dB. The measured values below are therefore illustrative, not gate
+# evidence.
+
+# %%
+LCG_LEVELS = [2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 4e-2, 8e-2]
+HCG_LEVELS = [1e-6, 2e-6, 5e-6, 1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 4e-4, 1e-3]
+lcg_report = characterize_sensor(
+    camsim.Sensor(sensor_config, seed=5),
+    irradiance_levels=LCG_LEVELS,
+    frames_per_level=8,
+    mode="LCG",
+    exposure_s=0.01,
+    base_seed=9,
+)
+hcg_report = characterize_sensor(
+    camsim.Sensor(sensor_config, seed=1),
+    irradiance_levels=HCG_LEVELS,
+    frames_per_level=8,
+    mode="HCG",
+    exposure_s=0.01,
+    base_seed=3,
+)
+reports = {"LCG": lcg_report, "HCG": hcg_report}
+
+figure, _axes = plot_ptc(reports, title="Photon transfer curves (8-frame notebook run)")
+save_figure(figure, FIGURES / "01_sensor_ptc.png")
+plt.show()
+
+figure, _axes = plot_snr_vs_irradiance(
+    reports,
+    title="SNR versus sensor-plane irradiance (8-frame notebook run)",
+)
+save_figure(figure, FIGURES / "01_sensor_snr.png")
+plt.show()
+
+# The dark-current doubling model is worth seeing on a logarithmic axis: a
+# linear plot makes an exponential look like a straight line. The G2 example
+# measures differential dark-frame points relative to 25 C; below about 60 C
+# those points are compressed by the clamp and sub-LSB ADC and are not a gate
+# criterion, which is why this notebook shows the model curve alone.
+figure, _axes = plot_dark_current_vs_temperature(
+    sensor_config,
+    title="Dark-current doubling model",
+)
+save_figure(figure, FIGURES / "01_sensor_dark_current.png")
+plt.show()
+
+for mode_name, report in reports.items():
+    print(
+        f"  {mode_name}: K={report.system_gain_dn_per_e:.4f} DN/e-, "
+        f"read noise {report.read_noise_e:.3f} e-, "
+        f"saturation {report.saturation_capacity_e:.0f} e-, "
+        f"DR {report.dynamic_range_db:.1f} dB"
+    )
+    print(
+        f"          DSNU {report.dsnu_e:.3f} e-, PRNU {report.prnu_percent:.3f} %, "
+        f"linearity residual {report.linearity_residual:.2e}"
+    )
+
+# %% [markdown]
+# ## 9. What the sensor adds, and what it does not
+#
+# The scene and optics sections stay in linear radiometric units; the sensor
+# converts that irradiance into electrons and then into RAW codes. The
+# remaining non-idealities are explicit and measurable:
+#
+# - shot noise follows Poisson statistics, so SNR grows only as the square root
+#   of signal until read noise or full well limits the pixel;
+# - dual conversion gain changes the read-noise/full-well trade, not the
+#   optical image;
+# - DSNU and PRNU are spatial and fixed for the life of a part, while read
+#   noise and shot noise are temporal;
+# - the 10-bit ADC with a 64 DN black pedestal limits the smallest resolvable
+#   step, which is why the characterization fits the exact quantized model
+#   rather than an asymptotic `1/12 DN^2` correction.
+#
+# No demosaicing, white balance, colour correction, denoise, sharpening, or
+# tone curve is applied here. Those are ISP stages in Phase 3; the RAW mosaic
+# is the boundary this notebook reaches.
+
+# %%
 print(
     f"Reference lens: {reference.field_of_view_deg:.1f} deg diagonal, "
     f"{reference_scale:.1f} pixels/degree at {PIXEL_PITCH_UM:g} um pitch."
 )
 print(f"Rendered ColorChecker luminance shape: {colorchecker.shape}")
 print(f"Rendered slanted-edge luminance shape: {edge_gaussian.shape}")
+lcg_full_well = sensor_config.modes["LCG"].full_well_e
+hcg_full_well = sensor_config.modes["HCG"].full_well_e
+print(
+    "Sensor RAW: 10-bit codes with a "
+    f"{sensor_config.adc.black_level_dn} DN black pedestal, RGGB CFA, "
+    f"{lcg_full_well:g}/{hcg_full_well:g} e- LCG/HCG full well."
+)

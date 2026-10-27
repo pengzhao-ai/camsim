@@ -36,12 +36,14 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 import camsim
-from camsim.config.schema import DefectConfig, NoiseConfig, SensorConfig
+from camsim.config.schema import DefectConfig, NoiseConfig, PDAFConfig, SensorConfig
 from camsim.core.constants import C_LIGHT, H_PLANCK
 from camsim.core.frames import CFAPattern, RawFrame
 from camsim.core.spectral import SpectralIrradiance
+from camsim.data import data_path
 from camsim.sensor import Sensor
 from camsim.sensor.cfa import cfa_masks, spectral_projection
 from camsim.sensor.defects import defect_masks, pdaf_mask
@@ -51,7 +53,6 @@ from camsim.sensor.sensor import (
     apply_spectral_crosstalk,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 WAVELENGTHS_NM = np.arange(360.0, 831.0, 5.0)
 LOW_LEVEL = 1e-4  # W/m^2/nm: a few hundred electrons in a 10 ms exposure
 
@@ -110,9 +111,9 @@ def expected_signal_e(
         config.spectral.wavelength_nm.step,
     )
     projection = spectral_projection(
-        REPO_ROOT / config.spectral.qe_csv,
-        REPO_ROOT / config.spectral.cfa_csv,
-        REPO_ROOT / config.spectral.ir_cut_csv,
+        data_path(config.spectral.qe_csv),
+        data_path(config.spectral.cfa_csv),
+        data_path(config.spectral.ir_cut_csv),
         grid,
         config.cfa,
     )
@@ -543,6 +544,95 @@ def test_spatial_crosstalk_preserves_charge_and_spreads() -> None:
     assert mixed.sum() == pytest.approx(1.0)
     with pytest.raises(ValueError, match="sum"):
         apply_spatial_crosstalk(mosaic, kernel * 2.0)
+
+
+def _mono_quiet_config(config: SensorConfig) -> SensorConfig:
+    """Return a mono preset with every stochastic and fixed-pattern source off.
+
+    The spatial-crosstalk wiring test isolates charge mixing: read noise, dark
+    current, DSNU, PRNU, row noise, defects, and PDAF are disabled so every DN
+    in the frame is attributable to the Poisson sample convolved with the
+    kernel. The Poisson sampler itself is deterministic for a per-call seed.
+    """
+    modes = {
+        name: mode.model_copy(update={"read_noise_e_rms": 0.0, "dark_current_e_per_s": 0.0})
+        for name, mode in config.modes.items()
+    }
+    return config.model_copy(
+        update={
+            "cfa": CFAPattern.MONO,
+            "modes": modes,
+            "noise": NoiseConfig(
+                dsnu_e=0.0,
+                prnu_fraction=0.0,
+                row_noise_e_rms=0.0,
+                hot_pixel_dark_multiplier=1.0,
+            ),
+            "defects": DefectConfig(dead_rate=0.0, hot_rate=0.0, stuck_rate=0.0, seed=1234),
+            "pdaf": PDAFConfig(fraction=0.0, qe_factor=0.5, pattern="none"),
+        }
+    )
+
+
+def _single_pixel_irradiance(
+    level: float,
+    shape: tuple[int, int] = (9, 9),
+) -> SpectralIrradiance:
+    """Return a dark cube with one bright pixel at the array centre."""
+    data = np.zeros((*shape, WAVELENGTHS_NM.size), dtype=np.float64)
+    data[shape[0] // 2, shape[1] // 2] = level
+    return SpectralIrradiance.from_array(
+        data,
+        WAVELENGTHS_NM,
+        "W/m^2/nm",
+        pixel_pitch_um=1.12,
+    )
+
+
+def test_spatial_crosstalk_kernel_is_validated(sensor_config: SensorConfig) -> None:
+    """A kernel must be rectangular, non-negative, finite, and sum to one."""
+    payload = sensor_config.model_dump(mode="json")
+    for bad_kernel in (
+        [[0.9, 0.2], [0.0, 0.0]],
+        [[-0.1, 0.6, 0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+        [[0.5, 0.5, 0.0], [0.0, 0.5]],
+    ):
+        with pytest.raises(ValidationError):
+            SensorConfig.model_validate({**payload, "spatial_crosstalk": bad_kernel})
+
+
+def test_sensor_applies_spatial_crosstalk_before_read_noise(
+    sensor_config: SensorConfig,
+) -> None:
+    """A configured kernel mixes neighbouring pixels and preserves interior charge.
+
+    The kernel is applied per CFA channel plane after spectral crosstalk and
+    before read noise, so an interior single-pixel impulse is redistributed by
+    the kernel while the total charge stays on the frame. The centre weight is
+    0.6 and the four edge neighbours carry 0.1 each, summing to one.
+    """
+    kernel = [
+        [0.0, 0.1, 0.0],
+        [0.1, 0.6, 0.1],
+        [0.0, 0.1, 0.0],
+    ]
+    quiet = _mono_quiet_config(sensor_config)
+    plain = quiet.model_copy(update={"spatial_crosstalk": None})
+    spread = quiet.model_copy(update={"spatial_crosstalk": kernel})
+    irradiance = _single_pixel_irradiance(1e-4)
+
+    reference = signal_dn(Sensor(plain, seed=1).expose(irradiance, 0.01, mode="HCG", seed=7))
+    mixed = signal_dn(Sensor(spread, seed=1).expose(irradiance, 0.01, mode="HCG", seed=7))
+
+    centre = (4, 4)
+    assert reference[centre] > 0.0
+    assert float(reference.sum()) == pytest.approx(float(reference[centre]))
+    # The centre keeps most of the charge; each edge neighbour receives a
+    # quarter of the 0.4 total that leaves it.
+    assert mixed[centre] == pytest.approx(0.6 * reference[centre], rel=0.03)
+    for neighbour in ((3, 4), (5, 4), (4, 3), (4, 5)):
+        assert mixed[neighbour] == pytest.approx(0.1 * reference[centre], rel=0.05)
+    assert float(mixed.sum()) == pytest.approx(float(reference.sum()), rel=0.03)
 
 
 def test_blooming_spreads_saturated_charge() -> None:

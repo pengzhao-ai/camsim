@@ -31,6 +31,7 @@ src/camsim/
 ├── cli.py               # validate / schema / info
 ├── core/                # units, spectral cubes, frames, colour references
 ├── config/              # Pydantic schemas, JSON I/O, presets
+├── data/                # bundled QE/CFA/IR-cut CSVs (package resources)
 ├── scene/               # targets, glyphs, illuminants, spectral data
 ├── optics/              # lens, PSF, propagation, vignetting
 ├── sensor/              # CFA, noise, gain, ADC, defects, binning, expose()
@@ -67,7 +68,10 @@ Configuration uses Pydantic v2 models with `extra="forbid"` and units in every
 field name. Cross-field validators reject physically inconsistent combinations.
 Every preset carries `provenance` metadata distinguishing datasheet values from
 engineering assumptions. JSON Schema export and config validation are exposed
-through the `camsim schema` and `camsim validate` subcommands.
+through the `camsim schema` and `camsim validate` subcommands. Spectral data
+referenced by a preset live under `camsim.data` and resolve through
+`importlib.resources`, so an installed wheel constructs the same sensor without
+a source checkout.
 
 ## Quality gates
 

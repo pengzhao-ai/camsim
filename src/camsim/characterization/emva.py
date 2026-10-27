@@ -109,11 +109,13 @@ shading, stationary DSNU/PRNU maps, Gaussian read noise, Poisson shot noise,
 and an ideal linear ADC. ``mode="auto"`` is resolved once to a single mode,
 because a photon transfer curve that mixes HCG and LCG frames has no single
 slope; the resolved mode is recorded in the provenance. Dark current versus
-temperature is **not** measured here; that sweep is scoped to Task 17. A small
-residual row-noise/quantization coupling leaves a few percent uncertainty in
-HCG read noise at the sub-LSB operating point; the exact-model fit is still
-within the 5 % G2 criterion at the documented test seed, and provenance records
-the model limitations.
+temperature is **not** part of this report; the G2 artifact generator measures
+it separately from dark-frame means because the fixed-pattern and read-noise
+terms need different averaging than a flat-field PTC. A small residual
+row-noise/quantization coupling leaves a few percent uncertainty in HCG read
+noise at the sub-LSB operating point; the exact-model fit is still within the
+5 % G2 criterion at the documented test seed, and provenance records the model
+limitations.
 
 Real-world ranges: system gain 0.01-10 DN/e-, read noise 0.3-10 e- rms,
 full well 2-50 ke-, dark current 0.01-100 e-/s, DSNU 0.1-10 e-, PRNU 0.1-2 %,
@@ -587,7 +589,8 @@ def characterize_sensor(
             "20 log10(mean_signal_e / noise_e)"
         ),
         "dark_current_characterization": (
-            "not measured here; temperature-dependent dark current is scoped to Task 17"
+            "not measured by this flat-field report; the G2 artifact generator "
+            "measures differential dark current versus temperature from dark frames"
         ),
         "emva_assumptions": [
             "spatially uniform flat-field illumination",
@@ -600,7 +603,8 @@ def characterize_sensor(
         ],
         "limitations": [
             "simulated sensor, not a physical camera or a certified measurement",
-            "no dark-current-versus-temperature sweep (Task 17)",
+            "no dark-current-versus-temperature sweep in this report; "
+            "measured separately by the G2 example",
             "no lens or illumination non-uniformity in the flat field",
             "residual row-noise/quantization coupling leaves a few percent "
             "uncertainty in HCG read noise at the sub-LSB operating point",

@@ -1,4 +1,4 @@
-"""Colorblind-friendly plotting helpers for spectra, PSFs, MTF, and figures.
+"""Colorblind-friendly plotting helpers for spectra, PSFs, MTF, sensors, figures.
 
 A camsim figure is a projection of a physical quantity, not a measurement in
 itself. A spectral plot carries wavelength in nanometres and either relative
@@ -23,22 +23,37 @@ aliasing can make it appear to rise; a rainbow colormap that invents structure;
 a figure path whose parent does not exist; and Matplotlib's environment-
 dependent metadata, which would make repeated runs differ byte for byte.
 
-The public surface is intentionally small for the current phase: a style
-initializer, three physical plot types (spectrum, PSF profile, MTF), and a
+The public surface covers the Phase 1 optics figures (spectrum, PSF profile,
+MTF) and the Phase 2 sensor figures (spectral response, photon transfer curve,
+SNR, dark current, dual-gain comparison, DSNU/PRNU histograms), plus a
 deterministic figure saver. Later phases extend the same namespace with ISP,
 colour, and metric plots without changing these entry points.
 """
 
 from __future__ import annotations
 
+from camsim.viz.sensor import (
+    plot_dark_current_vs_temperature,
+    plot_fixed_pattern_histograms,
+    plot_mode_comparison,
+    plot_ptc,
+    plot_sensor_spectral_response,
+    plot_snr_vs_irradiance,
+)
 from camsim.viz.spectra import figure_dir, plot_mtf, plot_psf, plot_spectrum, save_figure
 from camsim.viz.style import PALETTE, set_style
 
 __all__ = [
     "PALETTE",
     "figure_dir",
+    "plot_dark_current_vs_temperature",
+    "plot_fixed_pattern_histograms",
+    "plot_mode_comparison",
     "plot_mtf",
     "plot_psf",
+    "plot_ptc",
+    "plot_sensor_spectral_response",
+    "plot_snr_vs_irradiance",
     "plot_spectrum",
     "save_figure",
     "set_style",

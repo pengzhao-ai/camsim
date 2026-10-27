@@ -24,7 +24,7 @@ The signal chain, in the order implemented, is::
 
     spectral integration -> PRNU -> dark current + DSNU
     -> Poisson sampling + full-well clip -> optional blooming
-    -> spectral crosstalk -> read noise + clip
+    -> spectral crosstalk -> optional spatial crosstalk -> read noise + clip
     -> row noise (electrons, before conversion)
     -> conversion gain -> analog gain -> ADC -> digital gain
 
@@ -64,9 +64,11 @@ Non-idealities
   to the Bayer channel planes before mosaicing. Mono has one channel and skips
   it. RCCC has two channels, so a non-identity 3x3 matrix is rejected as
   incompatible; the preset ships an identity matrix.
-* **Spatial crosstalk** is provided by :func:`apply_spatial_crosstalk` for
-  callers with a measured optical kernel. Schema version 1.0 has no kernel
-  field, so the preset sensor applies only the spectral matrix.
+* **Spatial crosstalk** is an optional normalised charge-diffusion kernel
+  applied to each CFA channel plane after spectral crosstalk and before read
+  noise. ``SensorConfig.spatial_crosstalk = None`` disables it; a non-identity
+  kernel mixes neighbouring pixels of the same colour without changing total
+  interior charge.
 * **Blooming** redistributes a fraction of the charge above full well to the
   four nearest neighbours for a bounded number of iterations. It is off by
   default because pinned photodiodes suppress it well.
@@ -122,6 +124,7 @@ from camsim.config.schema import GainMode, GainModeConfig, SensorConfig
 from camsim.core.frames import RawFrame
 from camsim.core.spectral import SpectralIrradiance, WavelengthGrid
 from camsim.core.units import photon_energy_j
+from camsim.data import data_path
 from camsim.sensor.adc import adc_quantize
 from camsim.sensor.binning import BinningPlan, binning_plan, mean_blocks, reduce_mask, sum_blocks
 from camsim.sensor.cfa import cfa_masks, mosaic_from_channels, spectral_projection
@@ -166,9 +169,10 @@ _WAVELENGTH_ATOL_NM: Final[float] = 1e-6
 # One DN of matrix/row-sum tolerance absorbs decimal rounding in preset JSON.
 _ROW_SUM_ATOL: Final[float] = 1e-6
 
-# The repository root lets the shipped preset's relative data/spectra paths
-# resolve even when the process working directory is not the repository root.
-# No path is guessed: a candidate must exist before it is used.
+# The repository root supports source-checkout runs whose preset still carries
+# an older repo-relative CSV path. The packaged camsim.data directory is the
+# authoritative installed location. No path is guessed: a candidate must exist
+# before it is used.
 _REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
 
@@ -190,9 +194,11 @@ class Sensor:
     config:
         Validated :class:`~camsim.config.schema.SensorConfig`. Spectral CSVs
         referenced by ``config.spectral`` are read once at construction. A
-        relative path is resolved against the working directory first and
-        then against the repository root, which is where the shipped preset's
-        ``data/spectra`` files live; no implicit resampling is performed.
+        relative path is resolved against the working directory, then the
+        repository root (for source-checkout compatibility), and finally the
+        bundled ``camsim.data`` package, which is where the shipped preset's
+        ``spectra/*.csv`` files live after installation; no implicit
+        resampling is performed.
     seed:
         Non-negative seed of the frame stream used when ``expose`` is called
         without an explicit per-call seed.
@@ -344,6 +350,7 @@ class Sensor:
             plan,
         )
         charges = self._apply_spectral_crosstalk(charges)
+        charges = self._apply_spatial_crosstalk(charges)
         charges = self._add_read_and_row_noise(charges, full_well_e, mode_config, rng)
         dn_planes = self._quantize(charges, mode_config, gain_db, applied_digital_gain, plan)
         data = cast(
@@ -605,6 +612,28 @@ class Sensor:
         )
         return np.stack([mixed[channel] for channel in self._channels], axis=0)
 
+    def _apply_spatial_crosstalk(
+        self,
+        charges: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Convolve each CFA channel plane with the configured diffusion kernel.
+
+        The kernel mixes neighbouring pixels of the same colour, so it is
+        applied to the explicit channel planes rather than to the mosaicked
+        frame: convolving a Bayer mosaic directly would average different
+        colour filters together and create a colour error. Applying it after
+        spectral crosstalk but before read noise keeps both mixing processes in
+        the charge domain, where physical crosstalk happens.
+        """
+        kernel = self.config.spatial_crosstalk
+        if kernel is None:
+            return charges
+        stencil = np.asarray(kernel, dtype=np.float64)
+        planes = [
+            apply_spatial_crosstalk(charges[index], stencil) for index in range(charges.shape[0])
+        ]
+        return np.stack(planes, axis=0)
+
     def _add_read_and_row_noise(
         self,
         charges: NDArray[np.float64],
@@ -842,10 +871,12 @@ def apply_spatial_crosstalk(
 
     Notes
     -----
-    Schema version 1.0 has no spatial-kernel field, so ``Sensor.expose`` does
-    not call this function; it is the explicit entry point for callers with a
-    measured kernel. Spectral crosstalk is a colour-mixing matrix and belongs
-    before mosaicing; spatial crosstalk is a convolution and belongs after it.
+    :meth:`Sensor` calls this function once per CFA channel plane when
+    ``SensorConfig.spatial_crosstalk`` is configured. It remains public because
+    a caller may have a measured kernel outside the preset. Spectral crosstalk
+    is a colour-mixing matrix and belongs before mosaicing; spatial crosstalk is
+    a same-colour convolution and therefore also belongs on the channel planes,
+    not on the mosaicked frame.
     """
     image = _finite_2d(mosaic, "mosaic")
     stencil = _finite_2d(kernel, "kernel")
@@ -952,12 +983,26 @@ def _sensor_wavelength_grid(config: SensorConfig) -> WavelengthGrid:
 
 
 def _resolve_spectral_path(path: str) -> Path:
-    """Resolve a preset CSV path against the working directory then repo root."""
+    """Resolve a preset CSV path against the working tree, then package data.
+
+    Order matters for overrides: an absolute path or a file that exists relative
+    to the current working directory wins, so a caller can replace a shipped
+    curve without editing the preset. The repository root keeps source-checkout
+    presets with older ``data/spectra`` paths working. Finally the path is
+    looked up inside the installed ``camsim.data`` package, which is what makes
+    a wheel self-contained. If none exists, the original candidate is returned
+    so the reader raises a message naming the path the caller asked for.
+    """
     candidate = Path(path).expanduser()
     if candidate.is_absolute() or candidate.exists():
         return candidate
     fallback = _REPO_ROOT / candidate
-    return fallback if fallback.exists() else candidate
+    if fallback.exists():
+        return fallback
+    try:
+        return data_path(candidate)
+    except FileNotFoundError:
+        return candidate
 
 
 def _sensor_config_hash(config: SensorConfig) -> str:

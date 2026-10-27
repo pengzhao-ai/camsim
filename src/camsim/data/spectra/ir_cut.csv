@@ -2,7 +2,9 @@
 # Synthetic engineering estimate for a blue-glass / interference IR-cut filter
 # with a 650 nm cut-on and roughly two decades of rejection above 750 nm. The
 # visible band passes at 0.97; values are dimensionless fractions in [0, 1].
-# Task 17 replaces this curve with a datasheet-grounded measurement.
+# Final Phase 2 provenance: original curve authored for this repository under
+# the Apache-2.0 licence; not copied or digitized from a vendor datasheet. See
+# THIRD_PARTY.md and the flagship preset's provenance.assumptions.
 wavelength_nm,transmittance
 360,0.96
 370,0.97

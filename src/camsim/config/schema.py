@@ -34,7 +34,12 @@ ADC 8-16 bits with a 0.3-1.2 V reference; exposure 10 us-10 s; black level
 64 DN at 10 bits and 256 DN at 12 bits. CSV paths (``qe_csv``, ``cfa_csv``,
 ``ir_cut_csv``, spectral lens transmittance) are deliberately kept as strings:
 presets may be written before the datasets land, and the files are resolved at
-sensor construction time, not at schema-validation time.
+sensor construction time, not at schema-validation time. The shipped preset
+uses package-relative ``spectra/*.csv`` paths that resolve inside
+``camsim.data`` after installation; an absolute or working-directory path still
+overrides them. An optional ``spatial_crosstalk`` kernel is a normalised 2-D
+stencil applied per CFA channel plane in the electron domain; ``None`` disables
+charge diffusion.
 
 Failure artefacts guarded here: negative or non-finite gains; an ADC black
 level outside the code range (bright pedestal after black-level subtraction);
@@ -118,6 +123,55 @@ Matrix3x3: TypeAlias = Annotated[
     AfterValidator(_rows_sum_to_one),
 ]
 """A 3x3 row-normalised matrix stored as nested JSON-friendly lists."""
+
+
+def _normalized_kernel(value: list[list[float]]) -> list[list[float]]:
+    """Reject spatial-crosstalk kernels that are malformed or non-conservative.
+
+    Optical and electrical charge diffusion moves signal between neighbouring
+    pixels; it does not create or destroy charge. A kernel must therefore be a
+    non-empty rectangular grid of finite, non-negative weights whose sum is one.
+    ``math.fsum`` avoids the cancellation error of naive summation. Rescaling a
+    kernel that misses unity is deliberately not attempted: a calibration that
+    sums to 0.87 is a bug in the caller's data, and silently normalising it
+    would hide the gain error.
+    """
+    if not value:
+        raise ValueError("spatial crosstalk kernel must contain at least one row")
+    widths = {len(row) for row in value}
+    if len(widths) != 1:
+        raise ValueError(
+            f"spatial crosstalk kernel must be rectangular; row widths are {sorted(widths)}"
+        )
+    if 0 in widths:
+        raise ValueError("spatial crosstalk kernel rows must contain at least one weight")
+    for row_index, row in enumerate(value):
+        for column_index, weight in enumerate(row):
+            if not math.isfinite(weight):
+                raise ValueError(
+                    "spatial crosstalk kernel weights must be finite; "
+                    f"got {weight!r} at row {row_index}, column {column_index}"
+                )
+            if weight < 0.0:
+                raise ValueError(
+                    "spatial crosstalk kernel weights must be non-negative; "
+                    f"got {weight:g} at row {row_index}, column {column_index}"
+                )
+    total = math.fsum(math.fsum(row) for row in value)
+    if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=_ROW_SUM_ABS_TOLERANCE):
+        raise ValueError(
+            f"spatial crosstalk kernel must sum to 1.0 (got {total:g}); "
+            "a normalised kernel conserves total charge"
+        )
+    return value
+
+
+Kernel2D: TypeAlias = Annotated[
+    list[Annotated[list[float], Field(min_length=1)]],
+    Field(min_length=1),
+    AfterValidator(_normalized_kernel),
+]
+"""A non-empty, rectangular, non-negative 2-D kernel whose sum is one."""
 
 
 def _as_gain_map(value: Any) -> NDArray[np.float64]:
@@ -446,6 +500,14 @@ class SensorConfig(ConfigModel):
     :meth:`validation_warnings`. ``auto_hcg_threshold_e`` is the mean signal
     (electrons per pixel, before noise) below which ``mode="auto"`` selects the
     high-conversion-gain readout.
+
+    ``spatial_crosstalk`` is an optional normalised charge-diffusion kernel
+    applied to each CFA channel plane in the electron domain after spectral
+    crosstalk and before read noise. ``None`` (the default) disables it. Unlike
+    the 3x3 spectral-crosstalk matrix, which mixes colours at one pixel site,
+    this kernel mixes neighbouring pixels of the same colour filter. A typical
+    measured kernel is a small odd-sized stencil with most weight on the centre
+    and a few percent on the four nearest neighbours.
     """
 
     schema_version: SchemaVersion
@@ -454,6 +516,7 @@ class SensorConfig(ConfigModel):
     pixel: PixelConfig
     cfa: CFAPattern
     spectral: SpectralConfig
+    spatial_crosstalk: Kernel2D | None = None
     modes: dict[GainMode, GainModeConfig]
     analog_gain: AnalogGainConfig
     adc: ADCConfig

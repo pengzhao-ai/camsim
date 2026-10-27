@@ -316,6 +316,7 @@ def test_schema_export_contains_units() -> None:
         "stuck_rate",
         "qe_factor",
         "factor",
+        "spatial_crosstalk",
     ):
         assert field_name in sensor_text, field_name
 
