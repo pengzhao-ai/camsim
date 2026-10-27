@@ -55,8 +55,9 @@ physically about 215 x 280 mm; its proportions, not its absolute size, are what
 the simulation reproduces.
 
 Failure artefacts guarded here: reflectance outside ``[0, 1]`` invents energy;
-a chart whose patch ROIs overlap or leave the frame reports the wrong colour;
-an edge angle near 45 degrees runs out of the frame and biases the estimate;
+a chart whose patch ROIs overlap, leave the frame, or include a sensor pixel
+whose oversampling block straddles a patch edge reports the wrong colour; an
+edge angle near 45 degrees runs out of the frame and biases the estimate;
 rendering at the sensor grid aliases the edge; applying a sensor-grid PSF to an
 oversampled cube under-blurs; forgetting the ``1 / (4 N**2)`` or lens
 transmittance term makes absolute exposure meaningless; and any global random
@@ -66,7 +67,7 @@ state would make two renders with the same seed differ.
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final, Literal, TypeAlias
 
@@ -492,15 +493,24 @@ def siemens_star_target(
     return star
 
 
-def _colorchecker_cells(shape: tuple[int, int]) -> tuple[tuple[str, int, int, int, int], ...]:
+def _colorchecker_cells(
+    shape: tuple[int, int],
+    patch_names: Sequence[str],
+) -> tuple[tuple[str, int, int, int, int], ...]:
     """Return ``(name, x, y, width, height)`` paint rectangles for 24 patches.
 
     Patches are square and fitted inside a 6 % margin; the grid is centred in
     the frame, so a non-3:2 sensor shape gains extra margin along the long
-    axis. The returned rectangles describe the full painted patch; ROIs are
-    inset from them by :func:`_colorchecker_layout`.
+    axis. The returned rectangles describe the full painted patch on the grid
+    given by ``shape``; sensor-grid ROIs are derived from these rectangles by
+    :func:`_layout_from_painted_cells` so that paint rounding and ROI rounding
+    cannot drift apart.
     """
     height, width = _validate_shape(shape)
+    if len(patch_names) != _CHART_COLUMNS * _CHART_ROWS:
+        raise ValueError(
+            f"ColorChecker geometry requires exactly 24 patch names; got {len(patch_names)}"
+        )
     usable_height = height * (1.0 - 2.0 * _CHART_MARGIN_FRACTION)
     usable_width = width * (1.0 - 2.0 * _CHART_MARGIN_FRACTION)
     cell = min(
@@ -519,10 +529,9 @@ def _colorchecker_cells(shape: tuple[int, int]) -> tuple[tuple[str, int, int, in
     y_origin = (height - grid_height) / 2.0
     gap = _CHART_GAP_FRACTION * cell
     patch_size = cell - gap
-    names = load_colorchecker().patches
 
     cells: list[tuple[str, int, int, int, int]] = []
-    for index, name in enumerate(names):
+    for index, name in enumerate(patch_names):
         row, column = divmod(index, _CHART_COLUMNS)
         left = x_origin + column * cell + gap / 2.0
         top = y_origin + row * cell + gap / 2.0
@@ -534,14 +543,63 @@ def _colorchecker_cells(shape: tuple[int, int]) -> tuple[tuple[str, int, int, in
     return tuple(cells)
 
 
-def _colorchecker_layout(shape: tuple[int, int]) -> SceneLayout:
-    """Return sensor-grid ROIs inset from each painted ColorChecker patch."""
+def _paint_colorchecker(
+    shape: tuple[int, int],
+    cells: tuple[tuple[str, int, int, int, int], ...],
+    spectra: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Paint the chart reflectance cube from the given cell rectangles."""
+    height, width = _validate_shape(shape)
+    cube = np.full(
+        (height, width, spectra.shape[1]),
+        _CHART_BACKGROUND_REFLECTANCE,
+        dtype=np.float64,
+    )
+    if len(cells) != spectra.shape[0]:
+        raise ValueError(f"ColorChecker has {spectra.shape[0]} spectra but {len(cells)} cells")
+    for index, (_name, x, y, cell_width, cell_height) in enumerate(cells):
+        cube[y : y + cell_height, x : x + cell_width, :] = spectra[index]
+    return cube
+
+
+def _layout_from_painted_cells(
+    cells: tuple[tuple[str, int, int, int, int], ...],
+    oversampling: int,
+    sensor_shape: tuple[int, int],
+) -> SceneLayout:
+    """Derive sensor-pixel ROIs from the patch rectangles actually painted.
+
+    A sensor pixel is pure patch colour only when its entire
+    ``oversampling x oversampling`` block lies inside the painted rectangle on
+    the oversampled grid. The ROI is placed inside that fully covered sensor
+    range, so its centre and every other ROI pixel are guaranteed clean even
+    when a patch is only a couple of sensor pixels wide and the 15 % inset
+    rounds to one pixel. If a patch has no fully covered sensor pixel, the
+    shape is rejected rather than returning a surround-contaminated ROI.
+    """
+    height, width = _validate_shape(sensor_shape)
+    factor = _require_integer(oversampling, "oversampling", 1)
     patches: list[PatchROI] = []
-    for name, x, y, width, height in _colorchecker_cells(shape):
-        roi_width = max(1, round(width * (1.0 - 2.0 * _CHART_ROI_INSET_FRACTION)))
-        roi_height = max(1, round(height * (1.0 - 2.0 * _CHART_ROI_INSET_FRACTION)))
-        roi_x = x + (width - roi_width) // 2
-        roi_y = y + (height - roi_height) // 2
+    for name, x, y, cell_width, cell_height in cells:
+        first_column = (x + factor - 1) // factor
+        last_column = (x + cell_width) // factor - 1
+        first_row = (y + factor - 1) // factor
+        last_row = (y + cell_height) // factor - 1
+        if first_column > last_column or first_row > last_row:
+            raise ValueError(
+                f"shape {sensor_shape} is too small for a clean ColorChecker ROI at "
+                f"oversampling {factor}; patch {name!r} has no fully covered sensor pixel"
+            )
+        span_width = last_column - first_column + 1
+        span_height = last_row - first_row + 1
+        inset_width = round(span_width * _CHART_ROI_INSET_FRACTION)
+        inset_height = round(span_height * _CHART_ROI_INSET_FRACTION)
+        roi_width = max(1, span_width - 2 * inset_width)
+        roi_height = max(1, span_height - 2 * inset_height)
+        roi_x = first_column + (span_width - roi_width) // 2
+        roi_y = first_row + (span_height - roi_height) // 2
+        if roi_x < 0 or roi_y < 0 or roi_x + roi_width > width or roi_y + roi_height > height:
+            raise RuntimeError("ColorChecker ROI escaped the sensor grid")
         patches.append(PatchROI(name, roi_x, roi_y, roi_width, roi_height))
     return SceneLayout("colorchecker", tuple(patches))
 
@@ -567,7 +625,8 @@ def colorchecker_target(
         margin is a neutral 0.05 reflectance.
     layout:
         A :class:`SceneLayout` whose 24 ROIs are inset 15 % from each patch
-        edge and use the physical chart order and names.
+        edge, lie entirely inside the painted patch, and use the physical chart
+        order and names.
 
     Reflectance is not colour: the same spectra look different under D65 and
     3000 K, and the colour ground truth for a particular illuminant comes from
@@ -575,15 +634,9 @@ def colorchecker_target(
     """
     height, width = _validate_shape(shape)
     chart = load_colorchecker()
-    cube = np.full(
-        (height, width, len(chart.wavelengths_nm)),
-        _CHART_BACKGROUND_REFLECTANCE,
-        dtype=np.float64,
-    )
-    cells = _colorchecker_cells((height, width))
-    for index, (_name, x, y, cell_width, cell_height) in enumerate(cells):
-        cube[y : y + cell_height, x : x + cell_width, :] = chart.spectra[index]
-    return cube, _colorchecker_layout((height, width))
+    cells = _colorchecker_cells((height, width), chart.patches)
+    cube = _paint_colorchecker((height, width), cells, chart.spectra)
+    return cube, _layout_from_painted_cells(cells, 1, (height, width))
 
 
 def _centered_roi(name: str, shape: tuple[int, int]) -> PatchROI:
@@ -703,6 +756,13 @@ def render(
     physical falloff. The PSF is wavelength-independent and applied to every
     spectral plane; a wavelength-dependent PSF would require one kernel per
     plane.
+
+    ColorChecker ROIs are derived from the cells actually painted on the
+    oversampled grid. Every ROI pixel's full ``oversampling x oversampling``
+    block must lie inside its patch, so a compact chart can never return an ROI
+    whose centre mixes patch and surround reflectance. If any patch has no such
+    sensor pixel, the shape is rejected instead of returning a contaminated
+    layout.
     """
     if target not in _TARGET_NAMES:
         raise ValueError(f"unsupported target {target!r}; expected one of {_TARGET_NAMES}")
@@ -726,8 +786,10 @@ def render(
     reflectance: NDArray[np.float64]
     layout: SceneLayout
     if target == "colorchecker":
-        reflectance, _ = colorchecker_target(scene_shape)
-        layout = _colorchecker_layout(sensor_shape)
+        chart = load_colorchecker()
+        scene_cells = _colorchecker_cells(scene_shape, chart.patches)
+        reflectance = _paint_colorchecker(scene_shape, scene_cells, chart.spectra)
+        layout = _layout_from_painted_cells(scene_cells, sample_factor, sensor_shape)
     elif target == "slanted_edge":
         reflectance = slanted_edge_target(scene_shape)
         layout = SceneLayout(

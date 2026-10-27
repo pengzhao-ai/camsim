@@ -348,6 +348,52 @@ def test_render_colorchecker_patch_radiance_follows_patch_spectrum() -> None:
     np.testing.assert_allclose(measured, expected, rtol=1e-12)
 
 
+@pytest.mark.parametrize(
+    ("shape", "oversampling"),
+    [
+        ((10, 14), 2),
+        ((10, 14), 3),
+        ((10, 14), 4),
+        ((11, 17), 2),
+        ((11, 17), 3),
+        ((11, 17), 4),
+        ((12, 19), 2),
+        ((12, 19), 3),
+        ((12, 19), 4),
+    ],
+)
+def test_render_colorchecker_compact_shapes_have_clean_rois(
+    shape: tuple[int, int], oversampling: int
+) -> None:
+    # Regression: the layout used to be rounded independently on the sensor
+    # grid while patches were painted on the oversampled grid. At compact
+    # shapes the two roundings drifted, so ROI-centre pixels landed on the dark
+    # surround. Every one of the 24 ROI centres must carry its own spectrum.
+    result = render(
+        "colorchecker",
+        lens=_lens(),
+        lux=100.0,
+        shape=shape,
+        oversampling=oversampling,
+        optics=None,
+    )
+    chart = load_colorchecker()
+    scene = lux_to_spectral_irradiance(100.0, illuminant("D65")).data[0, 0]
+    scale = scene * 0.9 / (4.0 * 1.8**2)
+
+    assert len(result.layout.patches) == 24
+    for index, patch in enumerate(result.layout.patches):
+        centre = result.irradiance.data[patch.y + patch.height // 2, patch.x + patch.width // 2]
+        np.testing.assert_allclose(centre, chart.spectra[index] * scale, rtol=1e-12)
+
+
+def test_render_rejects_a_colorchecker_shape_without_a_clean_sensor_pixel() -> None:
+    # At four samples per pixel this shape leaves no sensor pixel whose whole
+    # 4x4 rendering block sits inside a patch, so no uncontaminated ROI exists.
+    with pytest.raises(ValueError, match="fully covered sensor pixel"):
+        render("colorchecker", lens=_lens(), shape=(4, 6), oversampling=4, optics=None)
+
+
 def test_render_scales_with_inverse_f_number_squared() -> None:
     wide = _render_flat(lens=_lens(f_number=1.8))
     narrow = _render_flat(lens=_lens(f_number=3.6))
@@ -426,6 +472,71 @@ def test_render_applies_cos4_vignetting() -> None:
 
     np.testing.assert_allclose(image / image[32, 32], falloff, rtol=1e-12, atol=1e-15)
     assert image[0, 0] < 0.7 * image[32, 32]
+
+
+@pytest.mark.parametrize("oversampling", [2, 4])
+def test_render_vignetting_uses_the_oversampled_pixel_pitch(oversampling: int) -> None:
+    # The vignetting map is sampled on the rendering grid, so render must pass
+    # pixel_pitch_um / oversampling. Passing the sensor pitch would make the
+    # falloff nearly flat at N = 2-4 and fail this comparison by many per cent.
+    lens = _lens(vignetting=1.0)
+    shape = (33, 33)
+    pitch_um = 80.0
+    result = render(
+        "flat_patch",
+        lens=lens,
+        shape=shape,
+        pixel_pitch_um=pitch_um,
+        oversampling=oversampling,
+        optics=None,
+    )
+    image = result.irradiance.data.mean(axis=2)
+    falloff = vignetting_map(shape, lens, pitch_um)
+
+    # The oversampled map is box-averaged into each sensor pixel, which differs
+    # from the point-sampled map by O((pitch / focal_length)**2) ~ 1e-5.
+    np.testing.assert_allclose(image / image[16, 16], falloff, rtol=1e-4, atol=1e-7)
+    assert image[0, 0] < 0.9 * image[16, 16]
+
+
+def _edge_width_10_90(profile: np.ndarray) -> float:
+    """Return the 10-90 % ascending-edge width of a monotonic 1-D profile."""
+    low = float(profile.min())
+    high = float(profile.max())
+    normalized = (profile - low) / (high - low)
+    columns = np.arange(profile.size, dtype=np.float64)
+    return float(np.interp(0.9, normalized, columns) - np.interp(0.1, normalized, columns))
+
+
+def test_render_psf_width_matches_the_oversampled_sampling_convention() -> None:
+    # gaussian_psf(2.0) passed to a 2x render is a one-sensor-pixel Gaussian.
+    # A Gaussian edge has a 10-90 % width of 2 * 1.2816 * sigma = 2.563 sensor
+    # pixels; pixel-aperture averaging and the 5 degree tilt add a few per cent.
+    # Passing a sensor-grid gaussian_psf(1.0) instead would measure ~1.9 px.
+    shape = (128, 128)
+    sigma_sensor_px = 1.0
+    oversampling = 2
+    result = render(
+        "slanted_edge",
+        lens=_lens(),
+        shape=shape,
+        oversampling=oversampling,
+        optics=gaussian_psf(sigma_sensor_px * oversampling, size=41),
+    )
+    profile = result.irradiance.data[64].mean(axis=1)
+    width = _edge_width_10_90(profile)
+
+    assert width == pytest.approx(2.563, rel=0.15)
+
+    wider = render(
+        "slanted_edge",
+        lens=_lens(),
+        shape=shape,
+        oversampling=oversampling,
+        optics=gaussian_psf(2.0 * sigma_sensor_px * oversampling, size=41),
+    )
+    wider_profile = wider.irradiance.data[64].mean(axis=1)
+    assert _edge_width_10_90(wider_profile) == pytest.approx(2.0 * width, rel=0.08)
 
 
 def test_render_records_scene_parameters_as_ground_truth() -> None:

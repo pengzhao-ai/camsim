@@ -15,9 +15,11 @@ Convolution is performed as one FFT over all wavelength planes at once, with an
 explicitly reflected pad so the result is equivalent to direct convolution with
 reflecting boundaries. The kernel origin is the sample at index ``size // 2``
 in each axis, which is the exact centre for the odd-sized kernels returned by
-:mod:`camsim.optics.psf`; even-sized kernels place the origin one sample right
-and below the geometric centre, so references should use odd sizes when
-sub-pixel centring matters.
+:mod:`camsim.optics.psf`. An even-sized kernel has no single-sample centre:
+index ``size // 2`` is the second of its two central samples, so a delta kernel
+there is an exact identity while a symmetric even-sized Gaussian splits its
+response across the central pair (a half-pixel phase). References that need
+sub-pixel centring should therefore use odd kernel sizes.
 
 The second operation models the pixel aperture. A sensor pixel integrates
 irradiance over its footprint, so rendering a scene on a grid that is ``N``
@@ -99,8 +101,12 @@ def _reflect_convolution(
 ) -> NDArray[np.float64]:
     """Convolve every plane of ``cube`` with ``kernel`` using reflected borders."""
     kernel_height, kernel_width = kernel.shape
-    top = kernel_height // 2
-    left = kernel_width // 2
+    # Pad by (size - 1) // 2 in front and the remainder behind. With the
+    # "valid" crop this puts the kernel origin at index size // 2: the exact
+    # centre for odd sizes, and the second of the two central samples for even
+    # sizes. A delta kernel at that index is therefore an exact identity.
+    top = (kernel_height - 1) // 2
+    left = (kernel_width - 1) // 2
     padding: tuple[tuple[int, int], ...] = (
         (top, kernel_height - 1 - top),
         (left, kernel_width - 1 - left),
@@ -144,10 +150,12 @@ def apply_psf(cube: ArrayLike, psf: ArrayLike) -> NDArray[np.float64]:
     Notes
     -----
     The border is extended by half-sample symmetry (reflection that repeats the
-    edge value), so a constant field stays exactly constant and a compact
-    kernel conserves total energy to floating-point precision even when the
-    signal touches the frame border. A kernel wider than the image is legal:
-    reflection is repeated as needed, and the output keeps the input shape.
+    edge value), so a constant field stays exactly constant for any normalized
+    kernel. For a symmetric kernel, total energy is conserved at the border to
+    floating-point precision; an asymmetric kernel's reflected wrap can change
+    the total by a fraction of a per cent, within the 1 % energy budget. A
+    kernel wider than the image is legal: reflection is repeated as needed, and
+    the output keeps the input shape.
 
     Real images are usually convolved once with a kernel sampled on the same
     grid. When a scene is rendered oversampled, the kernel must be sampled on

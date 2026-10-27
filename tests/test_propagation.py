@@ -84,13 +84,15 @@ def test_box_downsample_rejects_invalid_factor(factor: object) -> None:
         box_downsample(np.ones((8, 8)), factor)  # type: ignore[arg-type]
 
 
-def test_apply_psf_preserves_a_constant_field_to_the_border() -> None:
+@pytest.mark.parametrize("size", [8, 9])
+def test_apply_psf_preserves_a_constant_field_to_the_border(size: int) -> None:
     image = np.full((32, 24, 2), 3.0)
 
-    blurred = apply_psf(image, gaussian_psf(1.0, size=9))
+    blurred = apply_psf(image, gaussian_psf(1.0, size=size))
 
     # Reflection padding is the point: a constant field remains constant even
-    # at the frame border, so no energy is absorbed by the boundary.
+    # at the frame border, so no energy is absorbed by the boundary. Even
+    # kernels exercise the half-pixel origin path as well.
     np.testing.assert_allclose(blurred, 3.0, rtol=1e-12)
 
 
@@ -115,13 +117,31 @@ def test_apply_psf_normalizes_the_kernel() -> None:
     np.testing.assert_allclose(scaled, unit, rtol=1e-12, atol=1e-15)
 
 
-def test_apply_psf_with_a_delta_kernel_is_the_identity() -> None:
+@pytest.mark.parametrize("size", [4, 5, 6, 7])
+def test_apply_psf_with_a_delta_kernel_is_the_identity(size: int) -> None:
     rng = np.random.default_rng(5)
     image = rng.random((12, 12, 2))
-    delta = np.zeros((5, 5))
-    delta[2, 2] = 1.0
+    delta = np.zeros((size, size))
+    # The documented origin is index size // 2 in each axis. This must hold for
+    # even sizes too: an off-by-one padding convention shifts even kernels by
+    # one pixel down and right.
+    delta[size // 2, size // 2] = 1.0
 
     np.testing.assert_allclose(apply_psf(image, delta), image, atol=1e-12)
+
+
+def test_apply_psf_conserves_border_energy_within_one_percent_for_asymmetric_kernels() -> None:
+    rng = np.random.default_rng(6)
+    image = rng.random((16, 16))
+    kernel = rng.random((7, 7))
+    kernel /= kernel.sum()
+
+    blurred = apply_psf(image, kernel)
+
+    # Reflection is exact for symmetric kernels. An asymmetric kernel wraps
+    # some mass across the border, so the guarantee is the documented ~1 %
+    # energy budget rather than floating-point precision.
+    assert blurred.sum() == pytest.approx(image.sum(), rel=1e-2)
 
 
 def test_apply_psf_keeps_a_non_negative_cube_non_negative() -> None:
