@@ -18,10 +18,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from camsim.camera import Camera
 from camsim.config.io import load_isp, load_sensor
-from camsim.config.schema import ISPConfig, SensorConfig
+from camsim.config.schema import ISPConfig, LensConfig, SensorConfig
 from camsim.core.frames import CFAPattern, RawFrame
 from camsim.core.spectral import SpectralIrradiance
+from camsim.isp.pipeline import ISP
+from camsim.scene.targets import SceneResult, render
 from camsim.sensor import Sensor
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -98,3 +101,64 @@ def mono_sensor(mono_sensor_config: SensorConfig) -> Sensor:
 def mono_raw_frame(mono_sensor: Sensor) -> RawFrame:
     """A low-signal 32x32 mono RAW frame (single-channel mosaic)."""
     return mono_sensor.expose(flat_irradiance(), 0.01, mode="LCG", seed=7)
+
+
+# ---------------------------------------------------------------------------
+# Camera and rendered scenes
+# ---------------------------------------------------------------------------
+
+
+def _reference_lens() -> LensConfig:
+    """The design's reference phone lens: f/1.8, 6.4 mm, 11.46 mm, T = 0.9."""
+    return LensConfig(
+        f_number=1.8,
+        focal_length_mm=6.4,
+        sensor_diagonal_mm=11.46,
+        transmittance=0.9,
+    )
+
+
+def _flat_scene(lux: float) -> SceneResult:
+    """Render a D65 flat patch on the flagship sensor's 1.12 um pixel grid.
+
+    ``oversampling=2`` keeps the render fast while resolving the patch edge
+    cleanly; a flat target has no edge to resolve, but using the same render
+    path as the chart scenes keeps the photometry representative.
+    """
+    return render(
+        "flat_patch",
+        illuminant="D65",
+        lux=lux,
+        shape=(64, 64),
+        oversampling=2,
+    )
+
+
+@pytest.fixture
+def camera(sensor: Sensor, isp_config: ISPConfig) -> Camera:
+    """A camera with the flagship sensor, default ISP, and reference lens."""
+    return Camera(_reference_lens(), sensor, ISP(isp_config))
+
+
+@pytest.fixture
+def scene() -> SceneResult:
+    """A 2000 lux D65 flat patch that already sits near the 18 % target."""
+    return _flat_scene(2000.0)
+
+
+@pytest.fixture
+def bright_scene() -> SceneResult:
+    """A 50000 lux flat patch that saturates the default exposure."""
+    return _flat_scene(50_000.0)
+
+
+@pytest.fixture
+def dark_scene() -> SceneResult:
+    """A 20 lux flat patch that needs a longer exposure and some gain."""
+    return _flat_scene(20.0)
+
+
+@pytest.fixture
+def very_dark_scene() -> SceneResult:
+    """A 0.01 lux flat patch that needs HCG, every stop, and digital gain."""
+    return _flat_scene(0.01)

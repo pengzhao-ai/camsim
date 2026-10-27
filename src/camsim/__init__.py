@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     # ``__getattr__`` below, so mirror the public map with type-checking-only
     # aliases. This block is never imported at runtime and therefore adds no
     # cost to ``import camsim``.
+    from camsim.camera.camera import Camera as Camera
     from camsim.config.schema import LensConfig as LensConfig
     from camsim.core.spectral import SpectralIrradiance as SpectralIrradiance
     from camsim.core.spectral import WavelengthGrid as WavelengthGrid
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 
 __all__: Final[list[str]] = [
     "ISP",
+    "Camera",
     "LensConfig",
     "Sensor",
     "SpectralIrradiance",
@@ -38,6 +40,7 @@ __all__: Final[list[str]] = [
 
 # Public name -> (module path, attribute name). Populated as public types land.
 _LAZY_EXPORTS: Final[dict[str, tuple[str, str]]] = {
+    "Camera": ("camsim.camera.camera", "Camera"),
     "ISP": ("camsim.isp.pipeline", "ISP"),
     "LensConfig": ("camsim.config.schema", "LensConfig"),
     "Sensor": ("camsim.sensor", "Sensor"),
