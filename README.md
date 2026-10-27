@@ -282,7 +282,7 @@ A single test can be run with
 `uv run pytest tests/test_package.py::test_import_and_version -v`.
 
 Benchmarks time the reference pipeline at 512 × 512, 128 × 128 in quick mode,
-or 1024 × 1024 in the realistic large-frame case (1× oversampling, about 1.8 GB
+or 1024 × 1024 in the realistic large-frame case (1× oversampling, about 2.2 GiB
 estimated peak):
 
 ```bash

@@ -37,7 +37,7 @@ comparisons use tolerances because floating-point reduction order may differ.
 | G0 | 0 | install, lint, typecheck, tests, docs build | this page; `.github/workflows/ci.yml` | 11/11 commands | **PASS** (local gate run) |
 | G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | 7/7 checks | **PASS** |
 | G2 | 2 | sensor model and EMVA characterization | `results/reports/g2_sensor.md` + `g2_sensor_results.json` | 16/16 checks | **PASS** |
-| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 19/19 checks | **PASS** |
+| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 21/21 checks | **PASS** |
 | G4 | 4 | metrics harness | `results/reports/g4_metrics.md` + `g4_metrics_results.json` | 31/31 checks | **PASS** |
 | G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 16/16 cross-cutting checks; sign-off pending | **Awaiting human sign-off** |
 
@@ -281,7 +281,8 @@ ColorChecker, 2x oversampling, flagship preset at LCG):
 | sRGB OETF max abs vs `colour-science` | 2.98e-8 | < 1e-7 | PASS |
 | Stage-trace display reproduction max abs | 0 | < 1e-6 | PASS |
 | Stage-trace `linear_rgb` reproduction max abs (Display P3) | 0 | < 1e-6 | PASS |
-| Linear pre-tone scaling max relative error | 0 | < 1e-5 | PASS |
+| Linear pre-tone scaling with AWB and CCM max relative error | 0 | < 1e-5 | PASS |
+| CCM pre-clamp minimum on linearity data | 0.0248 | > 0 | PASS |
 | LSC flat-field residual after correction | 0.618 % | < 2 % | PASS |
 | Denoise SNR gain | 13.06 dB | > 3 dB | PASS |
 | Denoise edge-contrast relative change | 4.3e-5 | < 10 % | PASS |

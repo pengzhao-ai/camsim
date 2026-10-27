@@ -30,7 +30,8 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | colour-demosaicing | `0.2.7` |
 | Matplotlib | `3.11.2` |
 | Platform | `Darwin (arm64)` |
-| Validated source commit | `9d73b076d7c40c848b248b831d9211241db22ef0 + uncommitted working tree` |
+| Validated code commit | `d5e6abb7a88b9a86423e79849ff45c69d96053dc` |
+| Tag target | the commit containing this report (`HEAD` at sign-off) |
 | Branch | `feat/camsim-core` |
 | Report date | `2026-10-27` |
 | Sensor preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
@@ -38,7 +39,7 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | Sensor config hash | `dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591` |
 | ISP config hash | `790c97d8f00b352fe31f2ffd26fd46e89c47caf308622db51d397308ed49a627` |
 
-The phase reports and this candidate were produced from the same source tree and software environment. This candidate includes the release-blocking fixes from the whole-branch review: physical dead/stuck/hot defect behaviour and a separate hot mask, Display P3 luma conversion, an AWB+CCM linearity check, a two-sided denoise MTF bound with an edge-ringing check, a simulation-memory guard, and the CI/notebook runners. G3 evidence was regenerated; G1, G2, and G4 remained byte-identical. All numbers are simulated measurements, not measurements of physical hardware.
+The code commit validated by this report is `d5e6abb`; the report itself, its tests, and the documentation corrections are committed alongside it, and the commit containing this report is the intended `v0.1.0` tag target. The report was generated from the working tree that became `d5e6abb`; later changes to this file are report, test, and documentation corrections only. The phase reports and this candidate were produced from the same source tree and software environment. This candidate includes the release-blocking fixes from the whole-branch review: physical dead/stuck/hot defect behaviour and a separate hot mask, Display P3 luma conversion, an AWB+CCM linearity check, a two-sided denoise MTF bound with an edge-ringing check, a simulation-memory guard, and the CI/notebook runners. G3 evidence was regenerated; G1, G2, and G4 remained byte-identical. All numbers are simulated measurements, not measurements of physical hardware.
 
 ## 3. Gate status
 
@@ -340,7 +341,7 @@ The timing JSON files are committed as local evidence: `results/reports/examples
 7. **No HDR, 3-D, motion blur, or autofocus.** The model has a single linear exposure, a planar scene, static optics, and no focus search, rolling shutter, or multi-frame HDR. These are Phase 6-9 or later scope, not G5 claims.
 8. **RCCC is a baseline only.** The clear channel is a luma placeholder for G and B; Bayer colour and MTF thresholds do not apply, and advanced RCCC demosaicing is deferred.
 9. **Identity default CCM is not colour accurate.** The default preset renders a ColorChecker at roughly 40 mean delta-E2000 at its default 10 ms exposure (measured 37.6 at 300 lux), about 11 when well exposed, and about 16 under 3000 K. The G3 values near 1-4 come from a per-illuminant fitted matrix, not from the shipped preset. `measure_all` records an identity-CCM warning in its metadata when colour is measured through the default.
-10. **Full 50 MP spectral simulation is not supported at v0.1.0.** A 50 MP frame on the 95-wavelength grid would need about 38 GB for one float64 cube before working copies. `scene.render` and `Sensor.expose` estimate peak memory before allocating and reject a request above the default 8 GiB budget with guidance to reduce shape/oversampling or process in chunks. The validated practical large-frame case is 1024 x 1024 at 1x oversampling (about 1.8 GB estimated peak, measured in section 5.1); 512 x 512 at 4x oversampling has a 3.2 GB cube and fits only with sufficient RAM. Chunked spectral simulation and a full 50 MP path are future work.
+10. **Full 50 MP spectral simulation is not supported at v0.1.0.** A 50 MP frame on the 95-wavelength grid would need about 38 GB for one float64 cube before working copies. `scene.render` and `Sensor.expose` estimate peak memory before allocating and reject a request above the default 8 GiB budget with guidance to reduce shape/oversampling or process in chunks. The validated practical large-frame case is 1024 x 1024 at 1x oversampling (about 2.2 GiB estimated peak, measured in section 5.1); 512 x 512 at 4x oversampling has a 3.2 GB cube and fits only with sufficient RAM. The guard's peak estimate for a 50 MP render is about 106 GiB, of which one float64 cube alone is about 38 GB. Chunked spectral simulation and a full 50 MP path are future work.
 11. **CI is added but not executed here.** The workflow includes quality, test-matrix, docs, build, examples, and notebooks jobs. GitHub Actions cannot run in this environment; the local equivalents passed and CI execution is pending a push. The owner must accept that residual, and no claim that CI is green is made.
 12. **Polychromatic PSF and banding are not v0.1.0.** The optics model uses a wavelength-independent PSF, and row noise is modelled without periodic banding. Both are documented future capabilities, not silent omissions.
 13. **Display P3 files carry sidecar metadata only.** A P3 PNG is tagged in its sidecar; the PNG itself has no reliably interoperable P3 colour profile in this release. Consumers must read the sidecar.

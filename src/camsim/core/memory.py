@@ -24,9 +24,10 @@ the operating system, other processes, and library workspaces also need room.
 The limit defaults to 8 GiB and can be overridden per call with
 ``max_memory_bytes=`` or for a process with the
 ``CAMSIM_MAX_SIMULATION_BYTES`` environment variable. The default admits the
-validated 1024 x 1024, 1x-oversampling benchmark (about 1.8 GB estimated peak)
+validated 1024 x 1024, 1x-oversampling benchmark (about 2.2 GiB estimated peak)
 and the 512 x 512, 4x-oversampling scene (about 6.6 GB) on a machine with
-enough physical memory, while rejecting a 50 MP spectral render (about 80 GB).
+enough physical memory, while rejecting a 50 MP spectral render (about 106 GiB
+estimated peak; one float64 cube alone is about 38 GB).
 A caller who has the RAM can raise the limit explicitly; a caller who does not
 should reduce ``shape`` or ``oversampling``, or process the scene in chunks
 outside camsim and feed the resulting ``SpectralIrradiance`` to the sensor.
