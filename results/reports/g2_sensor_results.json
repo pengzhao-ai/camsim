@@ -558,8 +558,8 @@
       "name": "dark current at 65 C vs doubling model (e-/s)",
       "pass": true,
       "tolerance": {
-        "relative": 0.25,
-        "target": 63.00175534138659
+        "relative": 0.05,
+        "target": 61.80175534138659
       }
     },
     {
@@ -567,13 +567,16 @@
       "name": "dark current at 70 C vs doubling model (e-/s)",
       "pass": true,
       "tolerance": {
-        "relative": 0.25,
-        "target": 103.36513479416497
+        "relative": 0.05,
+        "target": 102.16513479416497
       }
     }
   ],
   "dark_current": {
+    "base_seed": 21,
     "doubling_k": 7.0,
+    "exposure_s": 0.1,
+    "frames_per_level": 16,
     "measured_rates_e_per_s": [
       0.6740064849617533,
       3.407405633343933,
@@ -589,12 +592,13 @@
       70.0
     ],
     "method": "differential dark-frame mean relative to 25 C, divided by the 0.1 s exposure and the measured LCG system gain",
+    "model": "D(T) - D(25 C) over the same temperature list",
     "model_rates_e_per_s": [
-      3.2301604623176545,
-      8.694947176933503,
-      23.405062160725926,
-      63.00175534138659,
-      103.36513479416497
+      2.030160462317655,
+      7.494947176933503,
+      22.205062160725927,
+      61.80175534138659,
+      102.16513479416497
     ],
     "model_temperatures_c": [
       35.0,

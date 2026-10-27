@@ -72,7 +72,7 @@ datasheet.
 
 | Datasheet parameter | Schema path | Unit | Source type | Preset value / note |
 |---|---|---|---|---|
-| Pixel pitch | `pixel.pitch_um` | µm | Datasheet | 1.12 |
+| Pixel pitch | `pixel.pitch_um` | µm | Representative (datasheet-style) | 1.12 |
 | Photodiode fill factor | `pixel.fill_factor` | – | Derived / assumption | 0.85 |
 | Microlens collection gain | `pixel.microlens_gain` | – | Assumption | 1.15; effective aperture clips at 1.0 |
 | Colour filter array | `cfa` | – | Datasheet | `RGGB` |
@@ -82,18 +82,18 @@ datasheet.
 | IR-cut transmission | `spectral.ir_cut_csv` | – | Synthetic engineering estimate | `spectra/ir_cut.csv`; 650 nm cut-on |
 | Spectral crosstalk matrix | `spectral.spectral_crosstalk` | – | Assumption | 3×3 identity; rows sum to one |
 | Spatial charge-diffusion kernel | `spatial_crosstalk` | – | Measured / assumption | `null`; optional normalized 2-D kernel |
-| LCG conversion gain | `modes.LCG.conversion_gain_uv_per_e` | µV/e⁻ | Datasheet or derived | 100.0 |
-| LCG full well | `modes.LCG.full_well_e` | e⁻ | Datasheet | 6000 |
-| LCG read noise | `modes.LCG.read_noise_e_rms` | e⁻ RMS | Datasheet | 2.0 |
-| LCG dark current at 25 °C | `modes.LCG.dark_current_e_per_s` | e⁻/s | Datasheet, normalized | 1.2 |
-| HCG conversion gain | `modes.HCG.conversion_gain_uv_per_e` | µV/e⁻ | Datasheet | 300.0 |
-| HCG full well | `modes.HCG.full_well_e` | e⁻ | Datasheet | 2000 |
-| HCG read noise | `modes.HCG.read_noise_e_rms` | e⁻ RMS | Datasheet | 0.7 |
-| HCG dark current at 25 °C | `modes.HCG.dark_current_e_per_s` | e⁻/s | Datasheet, normalized | 1.2 |
+| LCG conversion gain | `modes.LCG.conversion_gain_uv_per_e` | µV/e⁻ | Representative (datasheet-style) | 100.0 |
+| LCG full well | `modes.LCG.full_well_e` | e⁻ | Representative (datasheet-style) | 6000 |
+| LCG read noise | `modes.LCG.read_noise_e_rms` | e⁻ RMS | Representative (datasheet-style) | 2.0 |
+| LCG dark current at 25 °C | `modes.LCG.dark_current_e_per_s` | e⁻/s | Representative (datasheet-style), normalized | 1.2 |
+| HCG conversion gain | `modes.HCG.conversion_gain_uv_per_e` | µV/e⁻ | Representative (datasheet-style) | 300.0 |
+| HCG full well | `modes.HCG.full_well_e` | e⁻ | Representative (datasheet-style) | 2000 |
+| HCG read noise | `modes.HCG.read_noise_e_rms` | e⁻ RMS | Representative (datasheet-style) | 0.7 |
+| HCG dark current at 25 °C | `modes.HCG.dark_current_e_per_s` | e⁻/s | Representative (datasheet-style), normalized | 1.2 |
 | Analog-gain range and step | `analog_gain.min_db/max_db/step_db/default_db` | dB | Datasheet | 0 / 24 / 1 / 0 |
-| ADC resolution | `adc.bits` | bit | Datasheet | 10 |
-| ADC full-scale input | `adc.full_scale_uv` | µV | Datasheet | 800000.0 |
-| ADC black level | `adc.black_level_dn` | DN | Datasheet | 64 |
+| ADC resolution | `adc.bits` | bit | Representative (datasheet-style) | 10 |
+| ADC full-scale input | `adc.full_scale_uv` | µV | Representative (datasheet-style) | 800000.0 |
+| ADC black level | `adc.black_level_dn` | DN | Representative (datasheet-style) | 64 |
 | ADC digital gain | `adc.digital_gain` | – | Datasheet / model | 1.0 |
 | Exposure limits and default | `exposure.min_s/max_s/default_s` | s | Datasheet / derived | 1e-4 / 0.1 / 0.01 |
 | Reference and operating temperature | `temperature.reference_c/default_c` | °C | Datasheet | 25.0 / 25.0 |
@@ -118,19 +118,25 @@ datasheet.
 
 The single most common datasheet transcription error is a factor of 100:
 
-| Datasheet phrase | Wrong JSON | Correct JSON |
+| Datasheet phrase | Wrong value | Correct value |
 |---|---|---|
-| QE = 82 % | `"qe": 82` in the CSV | `0.82` |
-| CFA peak transmission = 90 % | `0.90` is correct | `0.90` |
+| QE = 82 % | `82` in the QE CSV | `0.82` |
+| CFA peak transmission = 90 % | `90` | `0.90` |
 | PRNU = 0.5 % | `"prnu_fraction": 0.5` | `"prnu_fraction": 0.005` |
-| Read noise = 2 e⁻ RMS | `2.0` e⁻ is correct | `2.0` |
-| Dark current = 1.2 e⁻/s | `1.2` e⁻/s is correct | `1.2` |
 
 `prnu_fraction` is validated as `< 1.0`, but a value of `0.5` is still legal
 and would mean 50 % — a 100× gain error that no downstream test can distinguish
 from a broken sensor. Always compare the preset against the datasheet's unit
 column, and remember that the EMVA report deliberately names its output
 `prnu_percent`.
+
+Not every row is a percent trap. Read noise, full well, dark current, pitch,
+conversion gain, and ADC codes carry their unit in the field name and are
+copied from the datasheet unchanged. Those fields fail differently: a read
+noise entered as `2000` instead of `2.0` is a 1000× noise error, not a
+fraction error, and a full well entered in ke⁻ instead of e⁻ clips every
+highlight. Check the datasheet's unit column for every row, not only the
+dimensionless ones.
 
 ## Worked conversions
 

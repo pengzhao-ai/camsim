@@ -62,10 +62,12 @@ def test_example_04_quick_runs_and_writes_g2_artifacts(tmp_path: Path) -> None:
         path = figures / name
         assert path.stat().st_size > 0, f"missing G2 figure: {name}"
 
-    report_path = reports / "g2_sensor_results.json"
+    report_path = reports / "g2_sensor_results_quick.json"
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["kind"] == "camsim G2 sensor validation"
+    assert payload["gate_evidence"] is False
     for mode in ("LCG", "HCG"):
         assert payload[mode]["read_noise_e"] > 0.0
     assert payload["checks"]
     assert all("pass" in check for check in payload["checks"])
+    assert not (reports / "g2_sensor_results.json").exists()

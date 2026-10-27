@@ -298,6 +298,7 @@ def plot_dark_current_vs_temperature(
     config: SensorConfig,
     *,
     measured: Mapping[str, tuple[Sequence[float], Sequence[float]]] | None = None,
+    differential_reference_c: float | None = None,
     note: str | None = None,
     ax: Axes | None = None,
     title: str | None = None,
@@ -314,6 +315,12 @@ def plot_dark_current_vs_temperature(
         points are plotted on the same logarithmic axis; a rate near the
         reference temperature may be quantization-limited and should be
         described in the caption or the ``note``.
+    differential_reference_c:
+        Optional reference temperature. When supplied, each model curve is
+        plotted as ``D(T) - D(T_ref)`` so it can be compared directly with
+        differential measured points. Comparing a differential measurement
+        with the absolute model biases every point by ``D(T_ref)``, which is
+        about 2 % at 70 C but dominates the low-temperature points.
     note:
         Optional annotation placed in the lower-right corner, for example a
         reminder that low-temperature differential points are compressed by the
@@ -337,12 +344,22 @@ def plot_dark_current_vs_temperature(
             dark_current_e_per_s(reference, float(temperature), config.temperature)
             for temperature in temperatures
         ]
+        if differential_reference_c is not None:
+            reference_rate = dark_current_e_per_s(
+                reference,
+                float(differential_reference_c),
+                config.temperature,
+            )
+            rates = [rate - reference_rate for rate in rates]
+            label = f"{mode_name} model: differential from {differential_reference_c:g} C"
+        else:
+            label = f"{mode_name} model: {reference:g} e-/s at {config.temperature.reference_c:g} C"
         axes.plot(
             temperatures,
             np.asarray(rates, dtype=np.float64),
             color=color,
             linestyle="-" if mode_name == "LCG" else "--",
-            label=f"{mode_name} model: {reference:g} e-/s at {config.temperature.reference_c:g} C",
+            label=label,
         )
         if measured is not None and mode_name in measured:
             measured_t, measured_rates = measured[mode_name]
@@ -357,7 +374,11 @@ def plot_dark_current_vs_temperature(
             )
     axes.set_yscale("log")
     axes.set_xlabel("Sensor temperature (C)")
-    axes.set_ylabel("Dark current (e-/s)")
+    axes.set_ylabel(
+        "Differential dark current (e-/s)"
+        if differential_reference_c is not None
+        else "Dark current (e-/s)"
+    )
     if title is not None:
         axes.set_title(title)
     if note is not None:

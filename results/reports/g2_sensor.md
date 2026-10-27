@@ -38,16 +38,19 @@ commercial part.
 
 The characterization uses 32 frames per level, a 10 ms exposure, and the G2 LCG
 sweep from the task brief. HCG uses a shorter low-to-saturation sweep because
-its 2000 e- full well clips near 2e-3 W/m²/nm. Every frame is seeded with
+its highlights begin to clip near 4.6e-4 W/m²/nm. Every frame is seeded with
 `base_seed + global_frame_index`; the fixed-pattern maps come from the preset's
-defect seed. Runs are deterministic within one software environment.
+defect seed. The dark-current sweep uses 16 dark frames per temperature at a
+0.1 s exposure with `base_seed=21`. Runs are deterministic within one software
+environment.
 
 ## Verdict summary
 
 All 16 checks pass. Tolerances are the G2 design gates: read noise within 5 %,
 DSNU/PRNU and saturation within 10 %, linearity residual below 0.05, dynamic
-range between 30 and 90 dB, and the PTC slope within 2 % of the configured ADC
-system gain.
+range between 30 and 90 dB, the PTC slope within 2 % of the configured ADC
+system gain, and dark current within 5 % of the differential doubling model at
+65 C and 70 C.
 
 | Check | Measured | Tolerance | Result |
 |---|---:|---|---|
@@ -65,8 +68,8 @@ system gain.
 | HCG linearity residual | 6.81e-5 | < 0.05 | PASS |
 | HCG dynamic range | 68.94 dB | 30-90 dB | PASS |
 | HCG system gain relative error | -0.073 % | < 2 % | PASS |
-| Dark current at 65 C | 60.98 e-/s | 63.00 +/- 25 % | PASS |
-| Dark current at 70 C | 100.39 e-/s | 103.37 +/- 25 % | PASS |
+| Dark current at 65 C (differential) | 60.98 e-/s | 61.80 +/- 5 % | PASS |
+| Dark current at 70 C (differential) | 100.39 e-/s | 102.17 +/- 5 % | PASS |
 
 ## 1. Spectral response and packaging
 
@@ -161,23 +164,28 @@ Dark current follows `D(T) = D_ref * 2**((T - T_ref) / T_double)` with
 differential dark-frame rates relative to 25 C: the sensor clamps charge at
 zero after read noise, so a dark frame has a positive mean code even without
 dark current, and subtracting the 25 C mean removes that constant
-rectification offset.
+rectification offset. The model column is therefore the same differential
+quantity, `D(T) - D(25 C) = D(T) - 1.2 e-/s`, not the absolute rate `D(T)`.
+Comparing a differential measurement with an absolute model would inflate the
+apparent error by the reference term.
 
-| Temperature | Measured | Doubling model | Difference |
+| Temperature | Measured | Differential model | Difference |
 |---:|---:|---:|---:|
-| 35 C | 0.674 e-/s | 3.230 e-/s | -79 % |
-| 45 C | 3.407 e-/s | 8.695 e-/s | -61 % |
-| 55 C | 16.333 e-/s | 23.405 e-/s | -30 % |
-| 65 C | 60.976 e-/s | 63.002 e-/s | -3.2 % |
-| 70 C | 100.390 e-/s | 103.365 e-/s | -2.9 % |
+| 35 C | 0.674 e-/s | 2.030 e-/s | -66.8 % |
+| 45 C | 3.407 e-/s | 7.495 e-/s | -54.5 % |
+| 55 C | 16.333 e-/s | 22.205 e-/s | -26.4 % |
+| 65 C | 60.976 e-/s | 61.802 e-/s | -1.3 % |
+| 70 C | 100.390 e-/s | 102.165 e-/s | -1.7 % |
 
-Only the 65 C and 70 C points are gate criteria. Below about 60 C the dark
-charge per 0.1 s exposure is a fraction of one ADC code (LCG resolves about
-8.4 e- per DN), so the zero-charge clamp and phase-dependent quantization
-compress the mean and bias the differential estimate low. Those points are
-shown for the model shape, not as a pass/fail claim. At 65-70 C, where the dark
-signal is several codes or more, the measured rates agree with the doubling
-model within 3.2 %.
+Only the 65 C and 70 C points are gate criteria, with a 5 % tolerance. Below
+about 60 C the differential signal per 0.1 s exposure is well under one ADC
+code (LCG resolves about 8.4 e- per DN), and the zero-charge clamp plus
+phase-dependent quantization compress the mean, so the differential estimate
+is biased low. Those points are shown for the model shape, not as a pass/fail
+claim. At 65 C and 70 C the differential dark signal is about 0.74 DN and
+1.22 DN; still around one code, but averaging 16 frames over roughly 4,000
+valid pixels resolves the mean well enough that the measured rates agree with
+the differential doubling model within 1.3 % and 1.7 %.
 
 ![Dark current versus temperature](../figures/g2_dark_current_vs_temperature.png)
 
@@ -195,7 +203,7 @@ The report values come from the characterization:
   model `Poisson(max(0, d)) + N(0, sigma_read)` with the zero-charge clip and
   integer ADC rounding. The raw post-clamp spread is only 0.146 e- in LCG and
   0.264 e- in HCG because the dark offset is sub-LSB; the input-referred values
-  recover the configured 0.5 e- within 0.1 %.
+  recover the configured 0.5 e- within 0.1 % (LCG) and 0.22 % (HCG).
 - PRNU is measured from the unsaturated flat field nearest 70 % of saturation,
   corrected for temporal variance and DSNU, then normalised by the mean. The
   measured 0.4959 % (LCG) and 0.5014 % (HCG) recover the configured 0.5 %.
@@ -262,7 +270,8 @@ above is the gate.
   observed dark fixed pattern raises rather than silently clamping.
 - **Dark-current differential.** Low-temperature dark-current points are
   compression-limited and are excluded from the gate; only 65 C and 70 C are
-  compared with the doubling model.
+  compared with the differential doubling model `D(T) - D(25 C)` under the
+  5 % tolerance.
 - **Determinism scope.** Determinism is promised within one environment; a
   different NumPy/SciPy build can change floating-point reduction order and
   therefore the last digits, which is why the report compares tolerances rather

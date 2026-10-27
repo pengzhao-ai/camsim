@@ -39,8 +39,9 @@ the fixed-pattern maps come from the preset's defect seed. It writes
 ``g2_sensor_results.json`` under ``--report-dir`` (default
 ``results/reports``). The JSON records the measured values, the design
 tolerances, and a pass/fail verdict for each check. ``--quick`` reduces the
-number of frames and temperature points for a smoke test; it is not gate
-evidence.
+number of frames and temperature points for a smoke test, and writes
+``g2_sensor_results_quick.json`` so it can never clobber the committed gate
+evidence; quick mode is not gate evidence.
 
 This is a **simulated, EMVA 1288-style characterization**, not a certified
 measurement of a physical sensor. The preset is a representative engineering
@@ -102,6 +103,8 @@ SENSOR_PRESET: Final[Path] = (
 )
 DEFAULT_REPORT_DIR: Final[Path] = REPO_ROOT / "results" / "reports"
 REPORT_NAME: Final[str] = "g2_sensor_results.json"
+QUICK_REPORT_NAME: Final[str] = "g2_sensor_results_quick.json"
+DARK_BASE_SEED: Final[int] = 21
 
 # G2 LCG sweep from the task brief: from about 0.4 DN to well above the
 # 6000 e- full well at a 10 ms exposure. The characterization appends
@@ -117,8 +120,9 @@ LCG_LEVELS: Final[tuple[float, ...]] = (
     4e-2,
     8e-2,
 )
-# HCG saturates near 2e-3 W/m^2/nm, so its sweep is shorter. It starts deep
-# enough in the noise floor to resolve the 0.7 e- read noise.
+# HCG highlights begin to clip near 4.6e-4 W/m^2/nm and the mean reaches the
+# 2000 e- full well near 5.7e-4 W/m^2/nm, so its sweep is shorter than LCG's.
+# It starts deep enough in the noise floor to resolve the 0.7 e- read noise.
 HCG_LEVELS: Final[tuple[float, ...]] = (
     1e-6,
     2e-6,
@@ -265,6 +269,11 @@ def measure_dark_current(
     divided by exposure and the measured system gain is the dark-current
     increase relative to 25 C. The reference-temperature point itself is
     therefore zero by construction and is not plotted as a rate.
+
+    The returned model rates are the same differential quantity,
+    ``D(T) - D(25 C)``, not the absolute rate ``D(T)``. Comparing a differential
+    measurement with an absolute model would bias every point by the 1.2 e-/s
+    reference term (about 2 % at 65-70 C and much more at low temperature).
     """
     gain = report.system_gain_dn_per_e
     sensor = camsim.Sensor(config, seed=1)
@@ -286,18 +295,25 @@ def measure_dark_current(
         assert valid is not None
         mean_dn = float(np.stack(values, axis=0).mean(axis=0)[valid].mean())
         mean_e_by_temperature[float(temperature)] = mean_dn / gain
-    reference = mean_e_by_temperature[float(temperatures_c[0])]
+    reference_temperature = float(temperatures_c[0])
+    reference = mean_e_by_temperature[reference_temperature]
     measured_temperatures = [float(temperature) for temperature in temperatures_c[1:]]
     measured_rates = [
         (mean_e_by_temperature[temperature] - reference) / DARK_EXPOSURE_S
         for temperature in measured_temperatures
     ]
+    reference_rate = dark_current_e_per_s(
+        float(config.modes["LCG"].dark_current_e_per_s),  # type: ignore[index]
+        reference_temperature,
+        config.temperature,
+    )
     model_rates = [
         dark_current_e_per_s(
             float(config.modes["LCG"].dark_current_e_per_s),  # type: ignore[index]
             temperature,
             config.temperature,
         )
+        - reference_rate
         for temperature in measured_temperatures
     ]
     return measured_temperatures, measured_rates, measured_temperatures, model_rates
@@ -361,13 +377,12 @@ def _build_checks(
             high=0.02,
         ),
     ]
-    # Dark-current measurements are differential relative to 25 C. Below about
-    # 60 C the dark charge is a fraction of one ADC code and the sensor's
-    # zero-charge clamp plus quantization compresses the mean, so the
-    # differential estimate is biased low; those points are shown on the figure
-    # but are not a pass/fail criterion. At 65-70 C the differential rate is
-    # within a few percent of the doubling model, and a 25 % envelope absorbs
-    # the 0.1 s exposure and finite-frame statistics.
+    # Dark-current measurements are differential relative to 25 C and are
+    # compared with the differential model D(T) - D(25 C). Below about 60 C the
+    # differential dark charge is well under one ADC code and the zero-charge
+    # clamp plus quantisation compresses the mean, so those points are shown but
+    # are not a pass/fail criterion. At 65-70 C the 32-frame, 64x64 dark average
+    # resolves the differential rate to better than 5 % of the doubling model.
     for temperature, measured, model in zip(
         measured_temperatures, measured_rates, model_rates, strict=True
     ):
@@ -377,7 +392,7 @@ def _build_checks(
                     f"dark current at {temperature:g} C vs doubling model (e-/s)",
                     measured,
                     target=model,
-                    rel=0.25,
+                    rel=0.05,
                 )
             )
     return checks
@@ -394,6 +409,8 @@ def _write_json(
     prnu_fraction: NDArray[np.float64],
     *,
     quick: bool,
+    dark_frames: int,
+    dark_base_seed: int,
 ) -> dict[str, Any]:
     """Assemble and write the deterministic G2 results JSON."""
     measured_temperatures, measured_rates, model_temperatures, model_rates = dark
@@ -423,6 +440,10 @@ def _write_json(
                 "differential dark-frame mean relative to 25 C, divided by the "
                 "0.1 s exposure and the measured LCG system gain"
             ),
+            "model": "D(T) - D(25 C) over the same temperature list",
+            "exposure_s": DARK_EXPOSURE_S,
+            "frames_per_level": dark_frames,
+            "base_seed": dark_base_seed,
             "measured_temperatures_c": measured_temperatures,
             "measured_rates_e_per_s": measured_rates,
             "model_temperatures_c": model_temperatures,
@@ -461,7 +482,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--report-dir",
         type=Path,
         default=DEFAULT_REPORT_DIR,
-        help=f"directory for {REPORT_NAME} (default: results/reports)",
+        help=(
+            f"directory for {REPORT_NAME} (default: results/reports); "
+            f"quick mode writes {QUICK_REPORT_NAME}"
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -508,12 +532,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         lcg,
         temperatures_c=temperatures,
         frames=dark_frames,
-        base_seed=21,
+        base_seed=DARK_BASE_SEED,
     )
     measured_temperatures, measured_rates, _model_temperatures, model_rates = dark
     figure, _axes = plot_dark_current_vs_temperature(
         config,
         measured={"LCG": (measured_temperatures, measured_rates)},
+        differential_reference_c=25.0,
         note=(
             "measured: differential vs 25 C\n"
             "below ~60 C the clamp and sub-LSB\n"
@@ -549,7 +574,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     plt.close(figure)
 
     checks = _build_checks(lcg, hcg, measured_temperatures, measured_rates, model_rates)
-    report_path = args.report_dir.expanduser() / REPORT_NAME
+    report_name = QUICK_REPORT_NAME if args.quick else REPORT_NAME
+    report_path = args.report_dir.expanduser() / report_name
     payload = _write_json(
         report_path,
         config,
@@ -560,6 +586,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         dsnu_e,
         prnu_fraction,
         quick=args.quick,
+        dark_frames=dark_frames,
+        dark_base_seed=DARK_BASE_SEED,
     )
 
     print("\nWritten figures:")

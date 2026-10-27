@@ -546,10 +546,13 @@ def test_spatial_crosstalk_preserves_charge_and_spreads() -> None:
         apply_spatial_crosstalk(mosaic, kernel * 2.0)
 
 
-def _mono_quiet_config(config: SensorConfig) -> SensorConfig:
-    """Return a mono preset with every stochastic and fixed-pattern source off.
+def _quiet_config(
+    config: SensorConfig,
+    cfa: CFAPattern = CFAPattern.MONO,
+) -> SensorConfig:
+    """Return a preset with every stochastic and fixed-pattern source off.
 
-    The spatial-crosstalk wiring test isolates charge mixing: read noise, dark
+    The spatial-crosstalk wiring tests isolate charge mixing: read noise, dark
     current, DSNU, PRNU, row noise, defects, and PDAF are disabled so every DN
     in the frame is attributable to the Poisson sample convolved with the
     kernel. The Poisson sampler itself is deterministic for a per-call seed.
@@ -560,7 +563,7 @@ def _mono_quiet_config(config: SensorConfig) -> SensorConfig:
     }
     return config.model_copy(
         update={
-            "cfa": CFAPattern.MONO,
+            "cfa": cfa,
             "modes": modes,
             "noise": NoiseConfig(
                 dsnu_e=0.0,
@@ -578,9 +581,26 @@ def _single_pixel_irradiance(
     level: float,
     shape: tuple[int, int] = (9, 9),
 ) -> SpectralIrradiance:
-    """Return a dark cube with one bright pixel at the array centre."""
+    """Return a dark cube with one broadband bright pixel at the array centre."""
     data = np.zeros((*shape, WAVELENGTHS_NM.size), dtype=np.float64)
     data[shape[0] // 2, shape[1] // 2] = level
+    return SpectralIrradiance.from_array(
+        data,
+        WAVELENGTHS_NM,
+        "W/m^2/nm",
+        pixel_pitch_um=1.12,
+    )
+
+
+def _narrowband_irradiance(
+    level: float,
+    wavelength_nm: float = 450.0,
+    shape: tuple[int, int] = (9, 9),
+) -> SpectralIrradiance:
+    """Return a single-pixel cube that excites only one wavelength sample."""
+    data = np.zeros((*shape, WAVELENGTHS_NM.size), dtype=np.float64)
+    index = int(np.flatnonzero(wavelength_nm == WAVELENGTHS_NM)[0])
+    data[shape[0] // 2, shape[1] // 2, index] = level
     return SpectralIrradiance.from_array(
         data,
         WAVELENGTHS_NM,
@@ -593,9 +613,13 @@ def test_spatial_crosstalk_kernel_is_validated(sensor_config: SensorConfig) -> N
     """A kernel must be rectangular, non-negative, finite, and sum to one."""
     payload = sensor_config.model_dump(mode="json")
     for bad_kernel in (
+        [],
+        [[]],
         [[0.9, 0.2], [0.0, 0.0]],
         [[-0.1, 0.6, 0.5], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         [[0.5, 0.5, 0.0], [0.0, 0.5]],
+        [[float("nan"), 1.0]],
+        [[float("inf"), 0.0]],
     ):
         with pytest.raises(ValidationError):
             SensorConfig.model_validate({**payload, "spatial_crosstalk": bad_kernel})
@@ -616,7 +640,7 @@ def test_sensor_applies_spatial_crosstalk_before_read_noise(
         [0.1, 0.6, 0.1],
         [0.0, 0.1, 0.0],
     ]
-    quiet = _mono_quiet_config(sensor_config)
+    quiet = _quiet_config(sensor_config)
     plain = quiet.model_copy(update={"spatial_crosstalk": None})
     spread = quiet.model_copy(update={"spatial_crosstalk": kernel})
     irradiance = _single_pixel_irradiance(1e-4)
@@ -633,6 +657,51 @@ def test_sensor_applies_spatial_crosstalk_before_read_noise(
     for neighbour in ((3, 4), (5, 4), (4, 3), (4, 5)):
         assert mixed[neighbour] == pytest.approx(0.1 * reference[centre], rel=0.05)
     assert float(mixed.sum()) == pytest.approx(float(reference.sum()), rel=0.03)
+
+
+def test_spatial_crosstalk_on_bayer_planes_does_not_mix_colours(
+    sensor_config: SensorConfig,
+) -> None:
+    """A red impulse stays in the red plane and does not land on green/blue sites.
+
+    The kernel is applied to each R/G/B plane independently, never to the
+    mosaicked frame. A narrowband 690 nm impulse at the centre (a red site in
+    RGGB) excites the red plane far more than green or blue. After a symmetric
+    3x3 diffusion kernel, the centre keeps the 0.2 centre weight and the eight
+    neighbouring sites would carry 0.1 each only if the mosaic were convolved
+    directly. With per-plane application, a cardinal green site reads the green
+    plane (about 1/20 of the red response at 690 nm) and a diagonal blue site
+    reads the nearly dark blue plane, so both must stay below 5 % of the mixed
+    red centre.
+    """
+    kernel = [
+        [0.1, 0.1, 0.1],
+        [0.1, 0.2, 0.1],
+        [0.1, 0.1, 0.1],
+    ]
+    quiet = _quiet_config(sensor_config, cfa=CFAPattern.RGGB)
+    plain = quiet.model_copy(update={"spatial_crosstalk": None})
+    spread = quiet.model_copy(update={"spatial_crosstalk": kernel})
+    # 690 nm is passed by the red CFA and strongly rejected by green/blue.
+    irradiance = _narrowband_irradiance(5e-2, wavelength_nm=690.0)
+    reference = signal_dn(Sensor(plain, seed=1).expose(irradiance, 0.01, mode="HCG", seed=7))
+    signal = signal_dn(Sensor(spread, seed=1).expose(irradiance, 0.01, mode="HCG", seed=7))
+
+    # (4, 4) is red in RGGB; the four diagonal neighbours are blue sites and
+    # the four cardinal neighbours are green sites.
+    centre = (4, 4)
+    blue_sites = ((3, 3), (3, 5), (5, 3), (5, 5))
+    green_sites = ((3, 4), (5, 4), (4, 3), (4, 5))
+    assert reference[centre] > 0.0
+    assert float(reference.sum()) == pytest.approx(float(reference[centre]))
+    mixed_centre = float(signal[centre])
+    assert mixed_centre == pytest.approx(0.2 * float(reference[centre]), rel=0.03)
+    for sites in (green_sites, blue_sites):
+        worst = max(float(signal[site]) for site in sites)
+        assert worst < 0.05 * mixed_centre, (
+            "spatial crosstalk leaked red charge into a non-red CFA site; "
+            "the kernel must be applied per channel plane, not to the mosaic"
+        )
 
 
 def test_blooming_spreads_saturated_charge() -> None:

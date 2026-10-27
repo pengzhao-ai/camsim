@@ -136,7 +136,7 @@ uv run python examples/04_emva_characterization.py
 
 Measured results against the G2 tolerances (32 frames per level, 10 ms
 exposure, G2 LCG sweep with base seed 9; HCG low-to-saturation sweep with base
-seed 3):
+seed 3; 16 dark frames per temperature at 0.1 s with base seed 21):
 
 | Check | Measured | Tolerance | Result |
 |---|---|---|---|
@@ -154,8 +154,8 @@ seed 3):
 | HCG linearity residual | 6.81e-5 | < 0.05 | PASS |
 | HCG dynamic range | 68.94 dB | 30-90 dB | PASS |
 | HCG system gain relative error | 0.073 % | < 2 % | PASS |
-| Dark current at 65 C | 60.98 e-/s | 63.00 +/- 25 % | PASS |
-| Dark current at 70 C | 100.39 e-/s | 103.37 +/- 25 % | PASS |
+| Dark current at 65 C (differential) | 60.98 e-/s | 61.80 +/- 5 % | PASS |
+| Dark current at 70 C (differential) | 100.39 e-/s | 102.17 +/- 5 % | PASS |
 
 The report records these assumptions and known limitations:
 
@@ -176,7 +176,8 @@ The report records these assumptions and known limitations:
   the G2 evidence;
 - **dark-current points below 60 C** are differential measurements compressed
   by the zero-charge clamp and sub-LSB ADC, so only 65 C and 70 C are
-  gate criteria; those agree with the doubling model within 3.2 %;
+  gate criteria; those agree with the differential doubling model
+  `D(T) - D(25 C)` within 1.3 % and 1.7 % under a 5 % tolerance;
 - **determinism** is promised within one environment; cross-platform runs
   compare tolerances, not bit patterns.
 
