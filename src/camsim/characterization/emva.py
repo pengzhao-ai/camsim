@@ -239,10 +239,12 @@ _REFERENCE_LENS_FOCAL_LENGTH_MM: Final[float] = 6.4
 _REFERENCE_LENS_DIAGONAL_MM: Final[float] = 11.46
 _REFERENCE_LENS_TRANSMITTANCE: Final[float] = 0.9
 
-# DSNU clipping inversion grid. The forward model is monotonic; 10 e- covers
-# the full real-world DSNU range (0.1-10 e-) while keeping the evaluation cheap.
-_DSNU_MODEL_MAX_E: Final[float] = 10.0
-_DSNU_MODEL_POINTS: Final[int] = 120
+# DSNU clipping inversion grid. The forward model is monotonic; 20 e- covers
+# the full real-world DSNU range (0.1-10 e-) and leaves headroom for stressed
+# configurations. An observation above the model range raises rather than
+# silently clamping.
+_DSNU_MODEL_MAX_E: Final[float] = 20.0
+_DSNU_MODEL_POINTS: Final[int] = 160
 _DSNU_QUADRATURE_POINTS: Final[int] = 301
 
 
@@ -1126,6 +1128,8 @@ def _fit_ptc(
         gtol=1e-6,
         max_nfev=80,
     )
+    if not result.success:
+        raise ValueError(f"photon transfer fit did not converge: {result.message}")
     gain = float(result.x[0])
     read_noise = float(result.x[1])
     if not math.isfinite(gain) or not math.isfinite(read_noise):
@@ -1256,6 +1260,12 @@ def _invert_clipped_dsnu(observed_dn: float, read_noise_e: float, gain: float) -
         raise ValueError(
             "DSNU inversion model is not monotonic in the offset standard deviation; "
             "the dark-frame statistics are too noisy for a unique inversion"
+        )
+    if observed_dn > float(model[-1]):
+        raise ValueError(
+            f"observed dark fixed-pattern spread ({observed_dn:g} DN) exceeds the "
+            f"DSNU model range ({_DSNU_MODEL_MAX_E:g} e-); increase the model range "
+            "rather than silently clamping the result"
         )
     return float(np.interp(observed_dn, model, grid))
 

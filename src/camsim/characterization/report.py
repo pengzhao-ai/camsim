@@ -102,9 +102,9 @@ class SNRPoint:
     mean_signal_e:
         The same mean expressed in electrons through the measured system gain.
     noise_dn:
-        Temporal noise standard deviation in DN. The characterization removes
-        common-mode row noise and the ADC quantization variance, so this is the
-        pixel-temporal noise of the analog signal chain.
+        Row-demeaned pixel-temporal noise standard deviation in DN.
+        Common-mode row noise is removed; ADC quantization is retained, so this
+        is the noise of the pixel signal chain after row-noise correction.
     noise_e:
         The same noise expressed in electrons.
     snr_db:
