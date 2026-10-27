@@ -10,20 +10,22 @@ spectral irradiance:
 * ColorChecker reflectance :math:`\\rho(\\lambda)` is a material property in
   ``[0, 1]``, not a colour. Reflectance times illuminant, integrated against the
   CIE observer, is what produces tristimulus values.
-* A lens maps field angle to sensor position. Focal length trades diagonal
-  field of view :math:`2\\arctan(d / 2f)` against angular sampling
-  :math:`1 / \\arctan(p / f)` pixels per degree, where :math:`p` is pixel pitch.
+* A lens maps field angle to sensor position. The diagonal field of view is
+  :math:`2\\arctan(d / 2f)` radians, converted to degrees by :math:`180/\\pi`.
+  A pixel of pitch :math:`p` subtends :math:`\\arctan(p / f)` radians, so
+  angular sampling is :math:`180 / (\\pi \\arctan(p / f))` pixels per degree.
 * A PSF is the normalized irradiance from a point source. Gaussian,
-  diffraction-limited Airy, and square pixel-aperture kernels cover the useful
-  range; profiles are normalized to peak one because unit-sum kernels would all
-  look equally flat.
+  diffraction-limited Airy, and square box kernels cover the useful range;
+  profiles are normalized to peak one because unit-sum kernels would all look
+  equally flat.
 * The MTF is the magnitude of the normalized discrete Fourier transform of the
   PSF. It is plotted only to Nyquist (0.5 cycles/pixel), where higher
   frequencies would alias, and MTF50/MTF20 crossings are marked only when they
   exist by that limit.
 * Scene rendering multiplies reflectance by illuminant and the lens formula
-  :math:`T / (4N^2)`, convolves the PSF on an oversampled grid, applies
-  vignetting, and box-averages to sensor pixels.
+  :math:`T / (4N^2)`, convolves the PSF on an oversampled grid, applies the
+  lens vignetting map (uniform for the reference lens, whose ``vignetting`` is
+  ``None``), and box-averages to sensor pixels.
 
 Real-world parameter ranges used here: phone lenses f/1.4-f/8, focal lengths
 1.5-50 mm, pixel pitch 0.6-2 um, and scene illuminance 1-100,000 lux. The
@@ -267,9 +269,11 @@ plt.show()
 #
 # A Gaussian with sigma = 1 pixel models aberration and defocus. The Airy
 # pattern is diffraction from a circular pupil; at f/4 and 550 nm its first dark
-# ring lies a few pixels from the centre at this pitch. The box is the pixel
-# aperture itself, 1.5 pixels wide here so its sinc-shaped transfer function
-# crosses half contrast inside the Nyquist band.
+# ring lies about 2.4 pixels from the centre at this pitch. The box kernel is a
+# deliberate 1.5-pixel box blur, not the physical 1-pixel aperture of this
+# sensor: `render` already integrates that footprint. At 1.5 pixels the box's
+# sinc-shaped transfer crosses half contrast inside the Nyquist band, which
+# makes it a useful deliberately-soft comparison.
 #
 # The radial profile averages every sample at each rounded radius. Profiles are
 # normalized to peak one: the kernels themselves sum to one, so plotting raw
@@ -279,7 +283,7 @@ plt.show()
 kernels = {
     "Gaussian (sigma = 1.0 px)": gaussian_psf(1.0),
     "Airy (f/4, 550 nm)": airy_psf(AIRY_F_NUMBER, AIRY_WAVELENGTH_NM, PIXEL_PITCH_UM),
-    "Box pixel aperture (1.5 px)": box_psf(1.5),
+    "Box blur (1.5 px)": box_psf(1.5),
 }
 
 figure, _axes = plot_psf(
@@ -314,7 +318,11 @@ plt.show()
 
 print("MTF50 in cycles/pixel and cycles/degree:")
 for name, kernel in kernels.items():
-    frequency = psf_mtf50(kernel)
+    try:
+        frequency = psf_mtf50(kernel)
+    except ValueError:
+        print(f"  {name}: no finite MTF50 (MTF stays above 0.5 through Nyquist)")
+        continue
     print(
         f"  {name}: {frequency:.3f} cycles/pixel ({frequency * reference_scale:.1f} cycles/degree)"
     )
@@ -325,7 +333,8 @@ for name, kernel in kernels.items():
 # `render` rasterizes the target on a 2x oversampled grid, multiplies by the
 # D65 illuminant (photometrically normalized to 200 lux) and by
 # `T / (4 N^2)`, applies the PSF on that same oversampled grid, applies the
-# lens's vignetting, and box-averages down to sensor pixels.
+# lens vignetting map (uniform here because the reference lens sets
+# `vignetting=None`), and box-averages down to sensor pixels.
 #
 # The panels show spectrally weighted luminance with a per-panel display
 # stretch. This is visualization only: no RAW data, white balance, demosaicing,
@@ -420,9 +429,10 @@ plt.show()
 # physical, not cosmetic:
 #
 # - integrate each pixel's spectral irradiance against QE and CFA transmission
-#   to obtain electrons;
-# - scale by exposure and aperture, then add shot noise (Poisson), read noise,
-#   and dark current;
+#   to obtain electrons per second; aperture and lens transmittance are already
+#   included in the scene irradiance;
+# - multiply by exposure time to count electrons, then add shot noise
+#   (Poisson), read noise, and dark current;
 # - clip at full well, apply conversion gain, digitize with the ADC, and add the
 #   black-level pedestal.
 #

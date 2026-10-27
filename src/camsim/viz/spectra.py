@@ -338,6 +338,7 @@ def plot_spectrum(
     ylabel: str | None = None,
     ax: Axes | None = None,
     show_legend: bool | None = None,
+    log_scale: bool = False,
     linewidth: float = 1.5,
     alpha: float = 0.9,
 ) -> tuple[Figure, Axes]:
@@ -367,6 +368,11 @@ def plot_spectrum(
     show_legend:
         ``None`` shows a legend only when labels exist and at most eight
         curves are present, keeping a 24-patch chart readable.
+    log_scale:
+        Use a logarithmic y axis. It can reveal a small out-of-band response or
+        a faint Airy-like feature, but it compresses the passband shape; the
+        default linear axis is the honest view of relative magnitudes. Exact
+        zero samples are not representable on a log axis.
     linewidth, alpha:
         Line styling in points and opacity.
 
@@ -398,7 +404,9 @@ def plot_spectrum(
     axes.set_xlabel("Wavelength (nm)")
     axes.set_ylabel(ylabel)
     axes.set_xlim(float(wavelengths[0]), float(wavelengths[-1]))
-    if all(float(curve.min()) >= 0.0 for curve in curves):
+    if log_scale:
+        axes.set_yscale("log")
+    elif all(float(curve.min()) >= 0.0 for curve in curves):
         axes.set_ylim(bottom=0.0)
     if title is not None:
         axes.set_title(title)

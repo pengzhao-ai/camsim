@@ -12,27 +12,32 @@ This walkthrough follows light through the implemented Phase 1 chain:
    angular sampling in pixels/degree. The reference phone lens is 6.4 mm at
    f/1.8 with an 11.46 mm sensor diagonal and a 1.12 um pixel pitch.
 4. **Point-spread functions** - a Gaussian aberration/defocus model, a
-   diffraction-limited Airy pattern, and the square pixel aperture. Each kernel
-   is normalized to unit energy; the figure normalizes profiles to peak one to
-   compare shape.
+   diffraction-limited Airy pattern, and a deliberately coarse 1.5 px square
+   box blur (not the physical 1 px pixel aperture, which the renderer already
+   integrates). Each kernel is normalized to unit energy; the figure normalizes
+   profiles to peak one to compare shape.
 5. **Modulation transfer** - the MTF of those kernels in cycles/pixel, with
    MTF50 and MTF20 crossings marked and a cycles/degree axis derived from the
    lens geometry.
 6. **Scene render** - a ColorChecker and a slanted edge are rendered to
    sensor-plane spectral irradiance. The scene renderer multiplies reflectance
    by photometrically normalized illuminance and the lens formula
-   ``T / (4 N**2)``, convolves the PSF on the oversampled grid, applies
-   vignetting, and box-averages to sensor pixels.
+   ``T / (4 N**2)``, convolves the PSF on the oversampled grid, applies the
+   lens vignetting map (uniform for the reference lens, whose ``vignetting`` is
+   ``None``), and box-averages to sensor pixels.
 
 The filename is aspirational for the full project. The sensor and RAW stages
 (QE, CFA, shot/read noise, ADC) do not exist yet, so this example stops at
 spectral irradiance and prints a clearly marked placeholder for the section a
 later phase will add. It never fabricates a RAW frame or a tone-mapped image.
 
-All figures use a display-only linear stretch of spectrally weighted luminance;
-that normalization is a plotting convenience, not an ISP stage or a calibrated
-photometric quantity. Output paths honour ``CAMSIM_FIG_DIR`` (default
-``results/figures``) and use deterministic ``01_*.png`` names.
+The contact sheet uses a display-only linear stretch of spectrally weighted
+luminance; that normalization is a plotting convenience, not an ISP stage or a
+calibrated photometric quantity. The spectrum, PSF, MTF, and lens figures plot
+their physical quantities directly (relative SPD, reflectance factor,
+peak-normalized PSF profile, and modulation transfer). Output paths honour
+``CAMSIM_FIG_DIR`` (default ``results/figures``) and use deterministic
+``01_*.png`` names.
 
 Failure artefacts guarded here: a sensor-grid PSF applied directly to the
 oversampled scene under-blurs by the oversampling factor; the Airy kernel is
@@ -92,7 +97,7 @@ GAUSSIAN_SIGMA_PX: Final[float] = 1.0
 EDGE_GAUSSIAN_SIGMA_PX: Final[float] = 1.5
 AIRY_F_NUMBER: Final[float] = 4.0
 AIRY_WAVELENGTH_NM: Final[float] = 550.0
-BOX_APERTURE_PX: Final[float] = 1.5
+BOX_BLUR_PX: Final[float] = 1.5
 
 ILLUMINANT_NAMES: Final[tuple[str, ...]] = ("D65", "3000K", "4000K")
 REFLECTANCE_PATCHES: Final[tuple[str, ...]] = (
@@ -251,11 +256,15 @@ def _save_lens_figure(directory: Path) -> tuple[Path, LensConfig, float]:
 def _sensor_psfs() -> dict[str, NDArray[np.float64]]:
     """Return the Gaussian, Airy, and box kernels used throughout the figures.
 
-    The Airy kernel is sampled at f/4 rather than the reference lens's f/1.8:
-    at 1.12 um pitch and 550 nm the f/1.8 diffraction cutoff sits above Nyquist,
-    so its MTF never reaches 0.5 and the standard MTF50 marker is undefined.
-    Stopping down to f/4 brings the cutoff just above Nyquist and produces a
-    measurable MTF50 while keeping the diffraction rings visible.
+    The Airy kernel is sampled at f/4 rather than the reference lens's f/1.8.
+    At f/1.8 the first dark ring lies at about 1.08 px, so the Airy core is
+    undersampled on the sensor grid and the discrete MTF stays above 0.5
+    through Nyquist; MTF50 is undefined for that sampled kernel. Stopping down
+    to f/4 moves the first zero to about 2.4 px, resolves the rings, and
+    produces a measurable MTF50 while the continuous diffraction cutoff remains
+    just above Nyquist. The box is a deliberate 1.5 px blur, not the physical
+    1 px pixel aperture; the wider box makes its sinc-shaped MTF cross 0.5
+    inside the Nyquist band.
     """
     return {
         "Gaussian (sigma = 1.0 px)": gaussian_psf(GAUSSIAN_SIGMA_PX),
@@ -264,7 +273,7 @@ def _sensor_psfs() -> dict[str, NDArray[np.float64]]:
             AIRY_WAVELENGTH_NM,
             PIXEL_PITCH_UM,
         ),
-        "Box pixel aperture (1.5 px)": box_psf(BOX_APERTURE_PX),
+        "Box blur (1.5 px)": box_psf(BOX_BLUR_PX),
     }
 
 

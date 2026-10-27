@@ -5,8 +5,8 @@ must be able to run it headlessly and obtain deterministic ``01_*.png`` figures
 without a display, a sensor model, or a network connection. Running it in a
 subprocess with a temporary ``CAMSIM_FIG_DIR`` proves three things at once:
 the script is importable as a ``__main__`` program, the environment variable
-overrides the default ``results/figures`` gallery, and no figure leaks into the
-repository during tests.
+redirects output to a caller-chosen directory, and the gallery can be
+regenerated from a clean temporary location.
 
 A zero exit status alone would not catch a silently empty gallery, so the test
 also requires at least three non-empty PNGs. It deliberately does not compare
