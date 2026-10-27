@@ -28,6 +28,19 @@ illuminant cannot correct every spectrum exactly. Fitting is a training
 operation and is deliberately out of scope here -- the pipeline applies a
 matrix supplied in the configuration.
 
+**Units and normalisation.** BLC is also the boundary between ADC codes and
+normalised linear light. After subtracting the pedestal, the pipeline divides
+by the white span ``(2**bit_depth - 1) - black_level_dn``, so an ADC-saturated
+pixel maps to exactly 1.0 and every later stage sees the ``[0, 1]`` linear
+units its own documentation assumes. White-balance gains are ratios and are
+unaffected by the common divisor; demosaic, CCM, denoise, sharpen, and tone all
+become scale-appropriate. The division is not a clip: the sensor ADC has
+already clipped at full scale, and ``linear_rgb`` is never clamped. Monochrome
+and RCCC frames use the same divisor. Disabling BLC is a diagnostic bypass: the
+pipeline then stays in raw code units, tone mapping saturates almost every
+pixel, and the absolute denoise/sharpen thresholds no longer mean what their
+documentation says.
+
 **Trace contract.** Tracing is opt-in. With ``trace=True`` the returned
 ``RenderedImage.stages`` is a dictionary whose insertion order is the pipeline
 order. It contains one ``StageOutput`` for every executed stage, plus a final
@@ -46,10 +59,10 @@ pipeline and gains its trailing channel axis only at the display boundary.
 RCCC has one red and three clear sites; its AWB and CCM are deferred, so those
 stages are skipped and the demosaic stage always uses the documented
 ``"rccc_baseline"`` reconstruction, whose ``(R, C, C)`` output is a
-shape/linearity placeholder rather than a colour-accurate image. A Bayer frame
-with demosaicing disabled is rejected: every downstream colour stage and the
-three-channel rendered image require an RGB image, so mono is the only
-supported no-demosaic path.
+shape/linearity placeholder rather than a colour-accurate image. A colour frame
+(Bayer or RCCC) with demosaicing disabled is rejected: every downstream colour
+stage and the three-channel rendered image require an RGB image, so mono is the
+only supported no-demosaic path.
 
 **Tone and output consistency.** ``config.output.color_space`` must equal
 ``config.tone.color_space``; the tone stage defines the primaries of both the
@@ -72,8 +85,9 @@ pipeline is deterministic: no random state is read or written, and identical
 frames and configurations produce bit-identical outputs within one environment.
 
 **Failure artefacts guarded here.** A pedestal left in place (a white-balance
-colour cast), a missing CCM matrix (silent desaturation or a runtime fit with
-no reference), a colour frame without demosaicing (shape/colour inconsistency),
+colour cast), a black level that leaves no positive white span (a division by
+zero), a missing CCM matrix (silent desaturation or a runtime fit with no
+reference), a colour frame without demosaicing (shape/colour inconsistency),
 mismatched tone and output colour spaces (a mislabelled buffer), P3 output with
 tone disabled (no defined primaries for the diagnostic buffer), reordered or
 identity-recorded stages (a trace that misrepresents the processing), mutating
@@ -142,17 +156,16 @@ class ISP:
 
     Notes
     -----
-    The configuration is captured by reference; construct a new :class:`ISP`
-    after changing it so the recorded configuration hash matches the stages
-    that actually ran. Individual stage functions re-validate mutated config
-    values they consume, so an accidental mutation fails loudly rather than
-    running with an out-of-domain parameter.
+    The configuration is captured by reference and the provenance hash is
+    recomputed from its current state on every ``process`` call, so a mutation
+    before processing cannot leave a stale hash. Individual stage functions
+    re-validate mutated config values they consume, so an accidental mutation
+    fails loudly rather than running with an out-of-domain parameter.
     """
 
     def __init__(self, config: ISPConfig) -> None:
         _validate_config(config)
         self._config = config
-        self._config_hash = _config_hash(config)
 
     @classmethod
     def from_json(cls, path: str | Path) -> Self:
@@ -172,14 +185,14 @@ class ISP:
 
     @property
     def config_hash(self) -> str:
-        """SHA-256 of the canonical JSON form of the configuration.
+        """SHA-256 of the canonical JSON form of the current configuration.
 
         The hash identifies the parameters that produced a rendered image and
         is copied into ``RenderedImage.metadata["isp_config_hash"]``. It is
-        computed once at construction; build a new pipeline after changing the
-        configuration.
+        computed on demand from the configuration's current state, so a
+        mutation after construction cannot leave a stale provenance value.
         """
-        return self._config_hash
+        return _config_hash(self._config)
 
     def process(self, raw: RawFrame, trace: bool = False) -> RenderedImage:
         """Run the configured ISP stages on one RAW frame.
@@ -200,20 +213,23 @@ class ISP:
         -------
         A :class:`~camsim.core.frames.RenderedImage` whose ``data`` is float32
         in ``[0, 1]`` with shape ``(H, W, 3)`` for Bayer/RCCC output and
-        ``(H, W, 1)`` for mono. ``linear_rgb`` is the matching pre-clamp,
-        pre-OETF linear buffer (unclipped), and ``metadata`` carries the ISP
-        name and hash, the sensor configuration hash, the colour space,
-        channel layout, container bit depth, exposure, pixel pitch, and the
-        white-balance gains and method (or ``None`` when AWB was skipped).
+        ``(H, W, 1)`` for mono. BLC subtracts the pedestal and normalises the
+        result by the white span, so the linear stages run in ``[0, 1]`` units.
+        ``linear_rgb`` is the matching pre-clamp, pre-OETF linear buffer
+        (unclipped), and ``metadata`` carries the ISP name and hash, the
+        sensor configuration hash, the colour space, channel layout, container
+        bit depth, exposure, pixel pitch, and the white-balance gains and
+        method (or ``None`` when AWB was skipped).
 
         Raises
         ------
         ValueError
-            If ``raw`` is not a :class:`RawFrame`; if a Bayer frame has the CCM
-            enabled without a supplied matrix; if a colour frame has
-            demosaicing disabled; or if a mutated configuration violates the
-            tone/output colour-space rules. Each condition would otherwise
-            produce a silently wrong image or trace.
+            If ``raw`` is not a :class:`RawFrame`; if the frame's black level
+            leaves no positive white span; if a Bayer frame has the CCM enabled
+            without a supplied matrix; if a colour frame has demosaicing
+            disabled; or if a mutated configuration violates the tone/output
+            colour-space rules. Each condition would otherwise produce a
+            silently wrong image or trace.
         """
         if not isinstance(raw, RawFrame):
             raise ValueError(f"raw must be a RawFrame; got {type(raw).__name__}")
@@ -221,6 +237,7 @@ class ISP:
         # Re-check the cross-field rules: a config mutated after construction
         # must fail here rather than produce a mislabelled image.
         _validate_config(config)
+        isp_config_hash = _config_hash(config)
         cfa = _coerce_cfa(raw.cfa)
         channels: ChannelLayout = "MONO" if cfa is CFAPattern.MONO else "RGB"
         stages: dict[str, StageOutput] | None = {} if trace else None
@@ -241,15 +258,34 @@ class ISP:
             # RAW codes as a float32 buffer.
             image = np.array(raw.data, dtype=np.float32, copy=True)
 
+        # Diagnostic bypass: without BLC the pipeline stays in raw code units.
+        # Tone mapping then saturates almost every pixel, and the absolute
+        # denoise/sharpen thresholds, documented for [0, 1] linear light, no
+        # longer have their usual meaning.
         if config.blc.enabled:
             image = subtract_black_level(image, raw.black_level_dn, bit_depth=raw.bit_depth)
+            white_span_dn = float(2**raw.bit_depth - 1) - float(raw.black_level_dn)
+            if white_span_dn <= 0.0:
+                raise ValueError(
+                    f"black_level_dn ({raw.black_level_dn:g}) leaves no positive white "
+                    f"span for bit_depth={raw.bit_depth}; the frame has no usable signal "
+                    "range to normalise against"
+                )
+            # ADC saturation maps to exactly 1.0. The division is not a clip:
+            # the sensor ADC already clipped at full scale.
+            image = np.ascontiguousarray(
+                image.astype(np.float64) / white_span_dn,
+                dtype=np.float32,
+            )
             _record_stage(
                 stages,
                 "blc",
                 image,
-                f"Black-level pedestal of {raw.black_level_dn:g} DN subtracted and clamped",
+                f"Black-level pedestal of {raw.black_level_dn:g} DN subtracted, then "
+                f"divided by the {white_span_dn:g} DN white span",
                 {
                     "black_level_dn": float(raw.black_level_dn),
+                    "white_span_dn": white_span_dn,
                     "bit_depth": raw.bit_depth,
                 },
             )
@@ -407,7 +443,7 @@ class ISP:
             stages=stages,
             metadata={
                 "isp_name": config.name,
-                "isp_config_hash": self._config_hash,
+                "isp_config_hash": isp_config_hash,
                 "sensor_config_hash": raw.sensor_config_hash,
                 "color_space": config.output.color_space,
                 "channels": channels,

@@ -8,8 +8,10 @@ Tasks 18-23 into the fixed reconstruction chain
 and returns a :class:`~camsim.core.frames.RenderedImage`. The order is not an
 implementation detail. The black pedestal must come out before any gain, lens
 shading before the white-balance estimate, white balance before the mosaic is
-interpolated, and the colour matrix while the data are still linear. Tone
-mapping is the only non-linear step.
+interpolated, and the colour matrix while the data are still linear. BLC also
+normalises the pedestal-free codes by the white span, so ADC saturation maps to
+1.0 and every later stage works in the ``[0, 1]`` linear units its config
+documents. Tone mapping is the only non-linear step.
 
 These tests pin the contract rather than the numerics of individual stages
 (which have their own suites): stage order and trace membership, opt-in
@@ -55,16 +57,28 @@ def _bright_frame(raw: RawFrame) -> RawFrame:
     return raw.with_data(full_scale)
 
 
+def _uniform_frame(raw: RawFrame, signal_fraction: float) -> RawFrame:
+    """Return a uniform frame at ``signal_fraction`` of the white span."""
+    white_span = float(2**raw.bit_depth - 1) - float(raw.black_level_dn)
+    code = round(float(raw.black_level_dn) + signal_fraction * white_span)
+    code = min(max(code, 0), 2**raw.bit_depth - 1)
+    return raw.with_data(np.full(raw.data.shape, code, dtype=np.uint16))
+
+
 def _linear_before_tone(raw: RawFrame, config: ISPConfig) -> np.ndarray:
     """Reproduce the default preset's linear chain with the stage functions.
 
     This is deliberately an independent transcription of the documented order,
     so the pipeline test fails if the pipeline reorders, skips, or re-applies a
     stage. It assumes the default preset: DPC, BLC, AWB, demosaic, and CCM are
-    enabled, LSC/denoise/sharpen are disabled.
+    enabled, LSC/denoise/sharpen are disabled. BLC is the stage that normalises
+    the pedestal-free codes by the white span, so the manual chain must divide
+    there too.
     """
     image = correct_defects(raw, config.dpc)
     image = subtract_black_level(image, raw.black_level_dn, bit_depth=raw.bit_depth)
+    white_span_dn = float(2**raw.bit_depth - 1) - float(raw.black_level_dn)
+    image = np.ascontiguousarray(image.astype(np.float64) / white_span_dn, dtype=np.float32)
     awb = estimate_awb(image, raw.cfa, config.awb)
     image = apply_awb(image, awb.gains, cfa=raw.cfa)
     image = demosaic(image, raw.cfa, config.demosaic.method)
@@ -150,6 +164,57 @@ def test_final_output_matches_manual_chain(isp_config, raw_frame):
     np.testing.assert_array_equal(out.stages["ccm"].data, expected)
     np.testing.assert_array_equal(out.linear_rgb, expected)
     np.testing.assert_array_equal(out.data, apply_tone(expected, isp_config.tone))
+
+
+def test_blc_stage_normalizes_to_the_white_span(isp_config, raw_frame):
+    """The BLC trace data is pedestal-free and scaled so ADC full scale maps to one."""
+    config = isp_config.model_copy(deep=True)
+    config.dpc.enabled = False
+    isp = camsim.ISP(config)
+    out = isp.process(raw_frame, trace=True)
+    black = float(raw_frame.black_level_dn)
+    white_span_dn = float(2**raw_frame.bit_depth - 1) - black
+    expected = np.maximum(raw_frame.data.astype(np.float64) - black, 0.0) / white_span_dn
+    np.testing.assert_array_equal(out.stages["blc"].data, expected.astype(np.float32))
+    assert out.stages["blc"].metadata["white_span_dn"] == white_span_dn
+
+    saturated = isp.process(_bright_frame(raw_frame), trace=True)
+    np.testing.assert_array_equal(
+        saturated.stages["blc"].data,
+        np.ones(raw_frame.data.shape, dtype=np.float32),
+    )
+
+
+def test_default_pipeline_renders_a_usable_low_light_image(isp_config, raw_frame):
+    """Normalisation keeps the default profile finite, unclipped, and non-constant."""
+    out = camsim.ISP(isp_config).process(raw_frame)
+    height, width = raw_frame.data.shape
+    assert out.data.shape == (height, width, 3)
+    assert np.all(np.isfinite(out.data))
+    assert float(out.data.max()) < 1.0
+    assert float(out.data.min()) > 0.0
+    assert 0.0 < float(out.data.mean()) < 1.0
+    assert float(np.ptp(out.data)) > 0.0
+    assert not np.all(out.data == 1.0)
+
+
+def test_brighter_frame_has_higher_linear_signal_and_only_tone_clips(isp_config, raw_frame):
+    """The linear chain is monotonic; only the tone stage clips the display."""
+    config = isp_config.model_copy(deep=True)
+    # A pinned blue gain lets a bright frame exceed one before tone while the
+    # raw codes themselves still fit the ADC, isolating the tone stage's clip.
+    config.awb.gains = (1.0, 1.0, 3.0)
+    isp = camsim.ISP(config)
+    dim = isp.process(_uniform_frame(raw_frame, 0.25), trace=True)
+    bright = isp.process(_uniform_frame(raw_frame, 0.8), trace=True)
+    assert bright.stages["ccm"].data.mean() > dim.stages["ccm"].data.mean()
+    assert np.all(np.isfinite(bright.stages["ccm"].data))
+    assert float(bright.stages["ccm"].data.max()) > 1.0
+    assert float(bright.stages["ccm"].data.min()) >= 0.0
+    assert float(bright.data.max()) == 1.0
+    assert float(dim.data.max()) < 1.0
+    assert bright.linear_rgb is not None
+    assert float(bright.linear_rgb.max()) > 1.0
 
 
 def test_rggb_pipeline(isp_config, raw_frame):
@@ -245,11 +310,12 @@ def test_display_p3_pipeline(isp_config, raw_frame):
 
 
 def test_linear_rgb_is_unclipped_while_display_is_clipped(isp_config, raw_frame):
-    """A bright frame overflows the linear buffer but not the display contract."""
-    bright = _bright_frame(raw_frame)
-    out = camsim.ISP(isp_config).process(bright, trace=True)
+    """A pinned gain overflows the linear buffer but not the display contract."""
+    config = isp_config.model_copy(deep=True)
+    config.awb.gains = (1.0, 1.0, 3.0)
+    out = camsim.ISP(config).process(_bright_frame(raw_frame), trace=True)
     assert out.linear_rgb is not None
-    assert float(out.linear_rgb.min()) > 1.0
+    assert float(out.linear_rgb.max()) > 1.0
     assert float(out.data.min()) >= 0.0
     assert float(out.data.max()) == 1.0
 
@@ -258,13 +324,14 @@ def test_tone_disabled_clips_display_and_keeps_linear_unclipped(isp_config, raw_
     """Disabled tone is a diagnostic mode: clipped display, untouched linear data."""
     config = isp_config.model_copy(deep=True)
     config.tone.enabled = False
+    config.awb.gains = (1.0, 1.0, 3.0)
     bright = _bright_frame(raw_frame)
     out = camsim.ISP(config).process(bright, trace=True)
     assert "tone" not in out.stages
     assert out.linear_rgb is not None
-    assert float(out.linear_rgb.min()) > 1.0
+    assert float(out.linear_rgb.max()) > 1.0
     np.testing.assert_array_equal(out.linear_rgb, _linear_before_tone(bright, config))
-    np.testing.assert_array_equal(out.data, np.ones_like(out.data))
+    np.testing.assert_array_equal(out.data, np.clip(out.linear_rgb, 0.0, 1.0))
 
 
 def test_no_nan_output(isp_config, raw_frame):
@@ -382,6 +449,16 @@ def test_config_hash_is_stable_and_canonical():
     assert camsim.ISP(as_array).config_hash == camsim.ISP(as_list).config_hash
 
 
+def test_config_hash_is_recomputed_at_process_time(isp_config, raw_frame):
+    """A config mutated after construction cannot carry a stale provenance hash."""
+    isp = camsim.ISP(isp_config)
+    before = isp.process(raw_frame).metadata["isp_config_hash"]
+    isp.config.tone.exposure_compensation_ev = 0.5
+    after = isp.process(raw_frame).metadata["isp_config_hash"]
+    assert after == isp.config_hash
+    assert after != before
+
+
 def test_stage_metadata_records_parameters(isp_config, raw_frame):
     """Every executed stage records the parameters that determined its output."""
     config = isp_config.model_copy(deep=True)
@@ -411,8 +488,10 @@ def test_stage_metadata_records_parameters(isp_config, raw_frame):
         "output",
     ]
     assert out.stages["dpc"].metadata["method"] == config.dpc.method
+    white_span_dn = float(2**raw_frame.bit_depth - 1) - float(raw_frame.black_level_dn)
     assert out.stages["blc"].metadata == {
         "black_level_dn": float(raw_frame.black_level_dn),
+        "white_span_dn": white_span_dn,
         "bit_depth": raw_frame.bit_depth,
     }
     assert out.stages["lsc"].metadata["mode"] == "radial"

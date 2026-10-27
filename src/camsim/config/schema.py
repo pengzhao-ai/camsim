@@ -695,13 +695,16 @@ class DemosaicConfig(ConfigModel):
 
 
 class CCMConfig(ConfigModel):
-    """Colour-correction matrix and its least-squares fit settings.
+    """Colour-correction matrix and its offline least-squares fit settings.
 
-    ``matrix`` is applied in linear RGB when supplied; it must be row-normalised
-    so neutrals stay neutral. Otherwise the pipeline fits a matrix with ridge
-    (L2) regularisation and, when ``row_sum`` is true, a row-sum constraint.
-    Ridge suppresses noise amplification at low light; 1e-4 is a typical
-    starting value.
+    ``matrix`` is required by the ISP pipeline for a colour frame and is applied
+    in linear RGB; it must be row-normalised so neutrals stay neutral. Fitting
+    is a separate calibration step performed offline with
+    :func:`camsim.isp.ccm.fit_ccm` against reference patches; ``ridge`` (L2)
+    regularisation and the ``row_sum`` constraint configure that fit. Ridge
+    suppresses noise amplification at low light; 1e-4 is a typical starting
+    value. The pipeline never fits a matrix at runtime because it has no
+    reference target to fit against.
     """
 
     enabled: bool = True
@@ -771,14 +774,18 @@ class ISPConfig(ConfigModel):
     """A complete image-signal-processor preset.
 
     Stages run in the fixed order ``dpc, blc, lsc, awb, demosaic, ccm,
-    denoise, sharpen, tone, output``. Each stage config carries an ``enabled``
-    toggle. The defaults form a conventional baseline, not a guarantee of
-    identity: auto white balance estimates and applies per-channel gains, and
-    colour correction either applies a supplied matrix or is fitted by the
-    pipeline when ``matrix`` is ``None``. Callers that need a bit-exact
-    pass-through must disable those stages explicitly. Optional enhancement
-    stages whose numeric strengths default to zero (``denoise``, ``sharpen``)
-    are identity operations until parameters are supplied.
+    denoise, sharpen, tone, output``. BLC subtracts the ADC pedestal and
+    normalises the result by the white span, so every later stage works in
+    ``[0, 1]`` linear units. Each stage config carries an ``enabled`` toggle.
+    The defaults form a conventional baseline, not a guarantee of identity:
+    auto white balance estimates and applies per-channel gains, and colour
+    correction applies a matrix supplied in ``ccm.matrix``; a colour frame that
+    reaches the stage without one raises. Matrices are fitted offline with
+    :func:`camsim.isp.ccm.fit_ccm`, never by the pipeline at runtime. Callers
+    that need a bit-exact pass-through must disable those stages explicitly.
+    Optional enhancement stages whose numeric strengths default to zero
+    (``denoise``, ``sharpen``) are identity operations until parameters are
+    supplied.
     """
 
     schema_version: SchemaVersion
