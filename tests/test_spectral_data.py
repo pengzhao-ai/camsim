@@ -229,9 +229,18 @@ def test_reference_lab_is_spectral_ground_truth() -> None:
 
 def test_reference_lab_uses_each_illuminant_white_point() -> None:
     warm = reference_lab("3000K")
+    neutral = reference_lab("4000K")
 
     assert warm.illuminant_name == "3000K"
     assert warm.white_point_xy == pytest.approx((0.4369, 0.4041), abs=5e-3)
+    assert neutral.illuminant_name == "4000K"
+    assert neutral.white_point_xy == pytest.approx((0.3804, 0.3767), abs=5e-3)
+    assert neutral.white_point_xy != pytest.approx(warm.white_point_xy)
+
+
+def test_reference_lab_rejects_unsupported_illuminant() -> None:
+    with pytest.raises(ValueError, match="illuminant"):
+        reference_lab("D50")
 
 
 def test_reference_lab_changes_with_illuminant() -> None:
@@ -254,14 +263,21 @@ def test_d65_reference_matches_colour_science() -> None:
     from colour.characterisation.datasets.colour_checkers import SDS_COLOURCHECKERS
     from colour.colorimetry import MSDS_CMFS, SDS_ILLUMINANTS
     from colour.difference import delta_E_CIE2000
+    from colour.utilities import ColourRuntimeWarning
 
     cmfs = MSDS_CMFS["CIE 1931 2 Degree Standard Observer"]
     d65 = SDS_ILLUMINANTS["D65"]
     # colour-science warns while aligning its native 10 nm reflectance and
     # 5 nm illuminant tables to the 1 nm observer grid; those warnings are
     # expected and do not indicate a problem with camsim's own resampling.
+    # Restrict the suppression to those alignment messages so unrelated
+    # deprecations or runtime warnings still surface.
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+        warnings.filterwarnings(
+            "ignore",
+            category=ColourRuntimeWarning,
+            message=r".*(Aligning|Trimming|shape could not be honoured).*",
+        )
         white = sd_to_XYZ(d65, cmfs)
         white_xy = XYZ_to_xy(white / white[1])
         expected = np.array(
