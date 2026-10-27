@@ -706,7 +706,7 @@ Expected: FAIL because the example is missing.
 
 - [ ] **Step 3: Implement the plotting helpers and example/notebook**
 
-Set a colorblind-friendly Matplotlib style. Plot illuminant SPDs, QE/CFA curves, PSF profiles, and MTF curves. The example renders a scene through optics and saves a contact sheet; the Jupytext notebook narrates the same steps with markdown cells. All examples and notebooks honor `CAMSIM_FIG_DIR` (default `results/figures`). Keep it under 2 minutes.
+Set a colorblind-friendly Matplotlib style. Plot illuminant SPDs, ColorChecker reflectance, lens geometry, PSF profiles, and MTF curves. QE/CFA/IR-cut curves are deferred to Task 17, where the real sensor preset data exists; do not fake a sensor in Task 10. The example renders a scene through optics and saves a contact sheet; the Jupytext notebook narrates the same steps with markdown cells. All examples and notebooks honor `CAMSIM_FIG_DIR` (default `results/figures`). Keep it under 2 minutes.
 
 - [ ] **Step 4: Run the test and notebook headless**
 
@@ -1163,7 +1163,7 @@ Expected: FAIL until the preset/report are complete.
 
 - [ ] **Step 3: Finalize the preset, datasheet guide, and examples**
 
-Fill the flagship preset with value-justified QE/CFA/IR-cut curves and provenance; document how each datasheet field maps to JSON and which values are assumptions. Add the EMVA example and sensor notebook sections. Generate G2 plots: PTC, SNR vs irradiance, dark current vs temperature, LCG/HCG comparison, DSNU/PRNU histograms.
+Fill the flagship preset with value-justified QE/CFA/IR-cut curves and provenance; document how each datasheet field maps to JSON and which values are assumptions. Add the EMVA example and sensor notebook sections. Generate G2 plots: QE/CFA/IR-cut curves, PTC, SNR vs irradiance, dark current vs temperature, LCG/HCG comparison, DSNU/PRNU histograms.
 
 - [ ] **Step 4: Run the G2 gate**
 
