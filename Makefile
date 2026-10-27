@@ -35,19 +35,32 @@ docs:  ## Build the documentation with warnings as errors
 build:  ## Build the wheel and source distribution
 	$(UV) build
 
+# Jupytext matches a kernel by interpreter path. uv's venv kernel ships a bare
+# "python" argv, so register a venv-local kernel with the absolute path first.
 notebooks:  ## Execute every Jupytext notebook headlessly into results/cache
 	@set -e; found=0; mkdir -p results/cache/notebooks; \
+	prefix="$$($(UV) run python -c 'import sys; print(sys.prefix)')"; \
+	$(UV) run python -m ipykernel install --prefix "$$prefix" --name python3 \
+		--display-name "Python 3 (camsim)" >/dev/null; \
 	for nb in notebooks/*.py; do \
 		[ -e "$$nb" ] || continue; \
 		found=1; \
 		out="results/cache/notebooks/$$(basename "$$nb" .py).ipynb"; \
 		echo "Executing $$nb"; \
-		$(UV) run jupytext --to ipynb --execute "$$nb" --output "$$out"; \
+		MPLBACKEND=Agg $(UV) run jupytext --to ipynb --set-kernel python3 --execute \
+			"$$nb" --output "$$out"; \
 	done; \
 	if [ "$$found" -eq 0 ]; then echo "No notebooks yet."; fi
 
-figures:  ## Report the figure-gallery status
-	@echo "No committed figure gallery yet; figures are produced by notebooks and examples."
+figures:  ## Regenerate the gallery figures from the example scripts
+	@set -e; found=0; \
+	for example in examples/*.py; do \
+		[ -e "$$example" ] || continue; \
+		found=1; \
+		echo "Running $$example"; \
+		MPLBACKEND=Agg $(UV) run python "$$example"; \
+	done; \
+	if [ "$$found" -eq 0 ]; then echo "No examples yet."; fi
 
 gate: sync lint typecheck test coverage docs build  ## Run the full G0 quality gate
 
