@@ -32,7 +32,7 @@ comparisons use tolerances because floating-point reduction order may differ.
 | Gate | Phase | Scope | Report | Status |
 |---|---|---|---|---|
 | G0 | 0 | install, lint, typecheck, tests, docs build | this page | Green locally; CI runs the same commands |
-| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | Planned |
+| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | Green locally; report PASS and the G1 tests pass |
 | G2 | 2 | sensor model and characterization | `results/reports/g2_sensor.md` | Planned |
 | G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` | Planned |
 | G4 | 4 | metrics harness | `results/reports/g4_metrics.md` | Planned |
@@ -59,7 +59,60 @@ errors, and the version prints `0.1.0.dev0`. The executable form of this gate
 is `tests/test_ci_config.py` plus the CI workflows, and `make gate` runs the
 same commands locally.
 
-## G1–G4 — Phase validation reports
+## G1 — Scene and optics
+
+**Status: green locally.** The full report is
+`results/reports/g1_scene_optics.md`; its four figures are
+`results/figures/g1_lux_normalization.png`, `g1_psf_mtf.png`,
+`g1_energy_conservation.png`, and `g1_edge_angle.png`. The report is generated
+deterministically by `benchmarks/g1_scene_optics.py`, and
+`tests/test_validation_g1.py` is the executable form of the gate.
+
+Reproduce from the repository root:
+
+```bash
+uv run python benchmarks/g1_scene_optics.py
+uv run pytest tests/test_validation_g1.py -v
+uv run pytest tests/test_validation_g1.py tests/test_units.py \
+  tests/test_spectral.py tests/test_lens.py tests/test_psf.py \
+  tests/test_targets.py tests/test_propagation.py tests/test_glyphs.py -v
+uv run pytest -q
+uv run ruff check . && uv run mypy src
+```
+
+Measured results against the G1 tolerances:
+
+| Check | Measured | Tolerance | Result |
+|---|---|---|---|
+| Photometric normalization (`683 * integral E(lambda) V(lambda) dlambda`, dlambda in nm) | max relative error 3.64e-16 over D65/3000 K/4000 K and 1-100,000 lux | < 1e-3 | PASS |
+| Gaussian PSF MTF50, sigma = 1 px | 0.187391 cycles/pixel | within 0.01 of 0.1874 | PASS |
+| Airy first zero, reference f/1.8 lens | 1.07810 px | within 1e-3 of 1.078 px; kernel matches `x = pi r / (lambda N / pitch)` within 1e-12 | PASS |
+| Energy through PSF + 4x box mean | max relative error 8.88e-16 | < 1e-2 | PASS |
+| Slanted-edge angle recovery | max absolute error 0.0426 deg | < 0.5 deg | PASS |
+| Spectral cube/unit contract and resampling | 7/7 checks behaved as required | reject mismatches; conserve energy | PASS |
+| Reference lens geometry | 83.677 deg diagonal FOV; 99.733 px/deg at 1.12 um | 84 +/- 1 deg; 99.73 +/- 0.1 % | PASS |
+
+The report records these assumptions and known limitations:
+
+- the optics layer is a **supporting model, not a calibrated lens**: ideal
+  Gaussian, Airy, and box kernels with no aberrations, wavelength-dependent
+  PSF, polychromatic diffraction, or field-dependent blur;
+- **ISO 12233-style e-SFR is deferred to G4**; G1 validates only the
+  target/estimator edge-angle convention;
+- **D65 endpoint extrapolation**: `colour-science` tabulates D65 to 780 nm and
+  camsim holds that value constant to 830 nm; V(lambda) is about 1.5e-5 at
+  780 nm, so the photometric effect is far below the 1e-3 tolerance;
+- the **photometric integral covers 360-830 nm**, with V(lambda) zero outside
+  the CIE table by contract;
+- the **reference lens** uses scalar transmittance 0.9, no vignetting, and a
+  83.68 deg field that rounds to the documented approximately 84 deg;
+- **energy conservation** is a round-off-level statement for symmetric kernels
+  with reflected borders; asymmetric kernels carry the documented 1 % budget;
+- **determinism** is promised within one environment; PNG bytes can differ
+  across Matplotlib/font builds, so cross-platform checks compare the reported
+  numbers with tolerances.
+
+## G2–G4 — Phase validation reports
 
 Each report will contain:
 
