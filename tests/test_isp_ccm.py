@@ -110,12 +110,11 @@ def test_ccm_without_row_sum_recovers_unconstrained_matrix() -> None:
     rng = np.random.default_rng(3)
     target = rng.random((32, 3))
     # Rows sum to 1.3, 1.05, and 1.1, so an unconstrained fit must not force them
-    # to one. A tiny positive ridge is used because ridge=0 without the row-sum
-    # constraint is rejected as unregularised.
+    # to one.
     true = np.array([[0.8, 0.2, 0.3], [0.1, 1.1, -0.15], [0.05, 0.15, 0.9]])
     camera = target @ np.linalg.inv(true).T
-    fitted = fit_ccm(camera, target, ridge=1e-12, row_sum=False)
-    np.testing.assert_allclose(fitted, true, rtol=0.0, atol=1e-8)
+    fitted = fit_ccm(camera, target, ridge=0.0, row_sum=False)
+    np.testing.assert_allclose(fitted, true, rtol=0.0, atol=1e-9)
     assert not np.allclose(fitted.sum(axis=1), 1.0)
 
 
@@ -235,12 +234,26 @@ def test_fit_ccm_rejects_non_bool_row_sum() -> None:
             fit_ccm(good, good, row_sum=bad_row_sum)
 
 
-def test_fit_ccm_rejects_ridge_zero_without_row_sum() -> None:
-    # With neither ridge nor the row-sum constraint the fit has no regularising
-    # mechanism at all; this is rejected rather than attempted.
-    good = _target_patches(16)
-    with pytest.raises(ValueError, match="row_sum"):
-        fit_ccm(good, good @ np.eye(3).T, ridge=0.0, row_sum=False)
+def test_fit_ccm_zero_ridge_without_row_sum_is_ordinary_least_squares() -> None:
+    # No ridge and no constraint is plain OLS: it is well-posed whenever the
+    # camera samples span three directions, and it recovers an exact known
+    # matrix without any regularisation bias.
+    rng = np.random.default_rng(16)
+    target = rng.random((24, 3))
+    true = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
+    camera = target @ np.linalg.inv(true).T
+    fitted = fit_ccm(camera, target, ridge=0.0, row_sum=False)
+    np.testing.assert_allclose(fitted, true, rtol=0.0, atol=1e-9)
+
+
+def test_fit_ccm_rejects_singular_unconstrained_system() -> None:
+    # Every camera sample is the same colour, so the unconstrained normal
+    # equations have rank one; the caller is told to use a ridge instead of
+    # receiving NaNs or silently regularised coefficients.
+    camera = np.ones((24, 3))
+    target = _target_patches(16)
+    with pytest.raises(ValueError, match="singular"):
+        fit_ccm(camera, target, ridge=0.0, row_sum=False)
 
 
 def test_fit_ccm_rejects_singular_system_without_ridge() -> None:

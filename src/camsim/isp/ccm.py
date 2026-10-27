@@ -41,12 +41,14 @@ equality constraint. The KKT system
     [[C^T C + ridge I, 1], [1^T, 0]] [m_i; nu] = [C^T t_i + ridge e_i; 1]
 
 is solved directly, so row sums are one to machine precision rather than to the
-accuracy of a penalty approximation. With ``ridge=0`` the constrained system is
-still nonsingular for rank-3 camera data, because the constraint supplies the
-information missing from a weak direction. Without the constraint there is no
-regularising mechanism at all, so ``ridge=0`` is rejected in that combination,
-and any singular normal-equation system -- for example every patch recorded as
-the same colour -- raises instead of returning huge or non-finite coefficients.
+accuracy of a penalty approximation. For rank-3 camera data ``C^T C`` is already
+positive definite, so an unconstrained fit needs no ridge to be nonsingular; the
+row-sum constraint additionally makes some rank-2 problems uniquely solvable by
+determining the missing direction, but it cannot rescue a normal matrix whose
+null space contains a direction orthogonal to the constraint vector (the
+all-ones vector). A singular normal-equation system -- for example every patch
+recorded as the same colour -- raises instead of returning huge or non-finite
+coefficients, whether or not the constraint is enabled.
 
 Application is a matrix product in linear light followed by a clamp at zero::
 
@@ -165,13 +167,13 @@ def fit_ccm(
         identity, so larger values pull the matrix toward "no correction" and
         suppress noise amplification in weakly excited colour directions.
         ``1e-4`` is the reference default; use a few 1e-2 for noisy low-light
-        calibrations. ``ridge=0`` is allowed only with ``row_sum=True``, where
-        the exact row-sum constraint keeps the KKT system nonsingular for
-        rank-3 data.
+        calibrations. ``ridge=0`` gives ordinary least squares and is accepted
+        whenever the resulting system is nonsingular; rank-deficient
+        ``camera_rgb`` then raises and asks for a positive ridge.
     row_sum:
         When true (the default), impose ``sum_j M[i, j] = 1`` exactly via the
         KKT system, preserving neutrality. When false, fit the unconstrained
-        ridged least squares; a positive ``ridge`` is then required.
+        ridged least squares (ordinary least squares when ``ridge=0``).
 
     Returns
     -------
@@ -185,10 +187,9 @@ def fit_ccm(
         If the samples are not 2-D ``(N, 3)`` real numeric finite arrays with
         the same shape and ``N >= 3``, if ``ridge`` is not a finite real
         number at least zero (booleans are rejected), if ``row_sum`` is not a
-        bool, if ``ridge=0`` is requested with ``row_sum=False``, or if the
-        normal-equation system is singular. A singular fit would otherwise
-        return huge coefficients or NaNs, which silently destroy every colour
-        downstream.
+        bool, or if the normal-equation system is singular. A singular fit
+        would otherwise return huge coefficients or NaNs, which silently
+        destroy every colour downstream.
 
     Notes
     -----
@@ -204,11 +205,6 @@ def fit_ccm(
     _require_matching_samples(camera, target)
     ridge_value = _validate_ridge(ridge)
     constrained = _validate_row_sum(row_sum)
-    if ridge_value == 0.0 and not constrained:
-        raise ValueError(
-            "ridge=0 with row_sum=False leaves the CCM fit unregularised and is "
-            "rejected; pass a positive ridge (for example ridge=1e-4) or set row_sum=True"
-        )
 
     with np.errstate(over="ignore", invalid="ignore"):
         gram = camera.T @ camera
@@ -250,7 +246,8 @@ def apply_ccm(rgb: ArrayLike, matrix: ArrayLike) -> NDArray[np.float32]:
     A new C-contiguous float32 array with the same shape as ``rgb``, equal to
     ``max(rgb @ matrix.T, 0)``. Clipping negatives is the stage's only
     non-linearity; positive values are preserved without a gamma curve or tone
-    map. The accumulation is float64 so the result is rounded once to float32.
+    map. The input is taken to float32 first and then accumulated in float64,
+    so the result is rounded to float32 once at the end.
 
     Raises
     ------
