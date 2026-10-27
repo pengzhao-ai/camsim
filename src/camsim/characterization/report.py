@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Self
 
-__all__ = ["EMVAReport", "SNRPoint", "render_g3_report"]
+__all__ = ["EMVAReport", "SNRPoint", "render_g3_report", "render_g4_report"]
 
 _SCHEMA_VERSION = "1.0"
 _REPORT_KIND = "EMVA1288StyleReport"
@@ -932,6 +932,512 @@ def render_g3_report(payload: Mapping[str, Any]) -> str:
                 f"The failing checks are: {failing_names}.",
                 "The JSON and this report are generated from the same payload; do",
                 "not mark G3 green until the failing measurement is resolved.",
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _g4_number(value: object, *, missing: str = "not reached") -> str:
+    """Format a JSON number for a G4 table, or return a missing-value label."""
+    if not isinstance(value, (int, float)):
+        return missing
+    number = float(value)
+    if not math.isfinite(number):
+        return missing
+    if number == 0.0:
+        return "0"
+    magnitude = abs(number)
+    if magnitude < 1e-3 or magnitude >= 1e5:
+        return f"{number:.4g}"
+    return f"{number:.6g}"
+
+
+def _g4_result(value: object) -> str:
+    """Return PASS or FAIL for a serialized boolean verdict."""
+    return "PASS" if bool(value) else "FAIL"
+
+
+def render_g4_report(payload: Mapping[str, Any]) -> str:
+    """Render the deterministic G4 Markdown report from a measurement payload.
+
+    Parameters
+    ----------
+    payload:
+        The dictionary returned by :func:`camsim.characterization.measure_g4`.
+        It must contain ``status``, ``checks``, and the raw ``mtf``, ``snr``,
+        ``color``, ``measure_all``, and ``acutance_sweep`` sections written by
+        that function.
+
+    Returns
+    -------
+    The complete Markdown report as a string. The summary is **status-aware**:
+    a PASS payload states that all measured checks pass, while a FAIL payload
+    states that the gate failed and names every failing check. It never claims
+    success from a hard-coded sentence.
+
+    Raises
+    ------
+    ValueError
+        If the payload is not a camsim G4 payload, lacks a required section, or
+        has a status other than ``"PASS"`` or ``"FAIL"``. Rendering a malformed
+        payload would otherwise produce a plausible-looking but false report.
+    """
+    if payload.get("kind") != "camsim G4 metrics validation":
+        raise ValueError(
+            "render_g4_report requires a 'camsim G4 metrics validation' payload; "
+            f"got {payload.get('kind')!r}"
+        )
+    status = str(payload.get("status", ""))
+    if status not in {"PASS", "FAIL"}:
+        raise ValueError(f"G4 payload status must be 'PASS' or 'FAIL'; got {status!r}")
+
+    checks = list(payload["checks"])
+    failing = [check for check in checks if not bool(check.get("pass"))]
+    failing_names = ", ".join(f"`{check['name']}`" for check in failing) or "unspecified"
+    environment = payload["environment"]
+    seeds = payload["seeds"]
+    config = payload["config"]
+    mtf = payload["mtf"]
+    snr = payload["snr"]
+    color = payload["color"]
+    harness = payload["measure_all"]
+    acutance = payload["acutance_sweep"]
+
+    cases = mtf["cases"]
+    max_mtf_error = max(
+        max(
+            abs(float(case["relative_error_mtf50"])),
+            abs(float(case["relative_error_mtf20"])),
+        )
+        for case in cases
+    )
+    max_angle_spread = max(float(row["spread_fraction"]) for row in mtf["angle_robustness"])
+    max_snr_error = max(
+        [abs(float(row["error_db"])) for row in snr["spatial"]["measurements"]]
+        + [
+            abs(float(snr["temporal"]["error_db"])),
+            abs(float(snr["mono"]["error_db"])),
+        ]
+    )
+    chart = harness["chart"]
+
+    if status == "PASS" and not failing:
+        summary_lines = [
+            "**All measured G4 checks pass.** The analytic MTF cases agree with",
+            f"`psf_mtf` within {100.0 * max_mtf_error:.3f} % (gate 2 %); the",
+            f"MTF50 angle spread is at most {100.0 * max_angle_spread:.3f} %",
+            "(gate 5 %); spatial, temporal, and mono SNR recover the known noise",
+            f"within {max_snr_error:.3f} dB (gate 0.5 dB); delta-E76 and",
+            "delta-E2000 agree with `colour-science` to floating-point precision;",
+            f"and `measure_all` returns {chart['patch_count']} valid colour",
+            "patches with per-patch SNR, an edge MTF/acutance report, and strict",
+            "JSON with not-reached crossings as `null`. The metrics layer imports",
+            "none of the sensor, ISP, scene, or optics packages.",
+        ]
+    else:
+        summary_lines = [
+            f"**The G4 gate is FAIL ({len(failing)} of {len(checks)} checks).**",
+            f"Failing checks: {failing_names}.",
+            "The verdict table below records every measured value and tolerance;",
+            "this summary and the JSON are rendered from the same payload, so a",
+            "failure cannot be hidden behind success prose. The measured values",
+            "are synthetic and simulated, not a certified ISO 12233 measurement.",
+        ]
+
+    lines: list[str] = [
+        "# G4 - metrics validation",
+        "",
+        f"**Status: {status}**",
+        "",
+        "G4 closes Phase 4 by validating the independent image-quality harness",
+        "against analytic references. MTF comes from a slanted edge blurred by a",
+        "known Gaussian, box, or Airy PSF and is compared with the exact discrete",
+        "transfer function `psf_mtf`; SNR comes from synthetic patches with known",
+        "noise; delta-E76 and delta-E2000 are compared with `colour-science` on",
+        "published Sharma pairs and constructed neutral, lightness, and",
+        "hue-rotation pairs; and `measure_all` is exercised on a synthetic",
+        "ColorChecker-like chart, an edge layout, and a mono image. The",
+        "measurements are produced by `camsim.characterization.measure_g4`; this",
+        "report and `results/reports/g4_metrics_results.json` are generated by",
+        "the same full example run, so a stale report is detectable.",
+        "",
+        *summary_lines,
+        "",
+        "## Environment and reproduction",
+        "",
+        "| Item | Value |",
+        "|---|---|",
+        f"| Python | `{environment['python']}` |",
+        f"| camsim | `{environment['camsim']}` |",
+        f"| NumPy | `{environment['numpy']}` |",
+        f"| SciPy | `{environment['scipy']}` |",
+        f"| colour-science | `{environment['colour_science']}` |",
+        f"| Platform | `{environment['platform']}` |",
+        "| Artifact generator | `uv run python examples/03_measure_iq.py` |",
+        "| Machine-readable results | `results/reports/g4_metrics_results.json` |",
+        "| Gate tests | `uv run pytest tests/test_example_03.py -v` |",
+        "| Quick smoke | `CAMSIM_FIG_DIR=/tmp/g4_quick_figures uv run python "
+        "examples/03_measure_iq.py --quick --report-dir /tmp/g4_quick_reports` "
+        "(not gate evidence; suffixed figures) |",
+        "",
+        f"Full mode uses a {config['mtf_shape'][1]} x {config['mtf_shape'][0]}"
+        f" slanted edge at {config['mtf_primary_angle_deg']:.0f} degrees with"
+        f" {config['mtf_oversampling']}x analysis oversampling,"
+        f" {config['snr_spatial_patch']} x {config['snr_spatial_patch']} spatial"
+        f" SNR patches, a {config['snr_temporal_frames']}-frame temporal stack,"
+        f" and a {config['chart_shape'][1]} x {config['chart_shape'][0]}"
+        " synthetic ColorChecker-like chart.",
+        "",
+        "Seeds: MTF noise "
+        f"{seeds['mtf_noise']}, spatial SNR {seeds['snr_spatial']}, temporal SNR"
+        f" {seeds['snr_temporal']}, chart noise {seeds['chart_noise']}."
+        f" {seeds['note']}",
+        "",
+        "## Measurement methodology",
+        "",
+        "**Analytic MTF.** A binary slanted edge is convolved with each PSF,",
+        "measured with `slanted_edge_mtf` at **8x oversampling**, and compared",
+        "with `psf_mtf` sampled exactly on the same discrete kernel. Eight",
+        "samples per pixel remove the roughly 2 % near-diffraction-limited",
+        "MTF50 bias that the conventional four carries. The gate cases are a",
+        "Gaussian (sigma = 1 px), a box pixel aperture (width = 4 px), and",
+        "diffraction at f/4 and f/8 (550 nm, 1.12 um pitch). MTF50 and MTF20",
+        "must agree within 2 %; MTF50 must vary by less than 5 % across 5, 10,",
+        "15, and 20 degree edges and by less than 5 % with additive Gaussian",
+        "noise (sigma = 0.01). The curve must be normalized to one at DC, stay",
+        "in [0, 1], and be monotone for the passive Gaussian and for the box",
+        "main lobe. The width-4 box transfer function is `|sinc(4 f)|`: it",
+        "reaches zero at 0.25 cycles/pixel and then carries a sidelobe, so its",
+        "oscillation is documented exactly as the Airy oscillation is.",
+        "",
+        "**Airy f/2.8 diagnostic.** Airy f/2.8 appears only as a diagnostic,",
+        "not as a gate case: its first zero is closest to Nyquist, the ESF",
+        "estimator and Hamming window carry more bias there, and its transfer",
+        "function never reaches 0.20 inside the measured band, so it has no",
+        "finite MTF20. It is reported with that documented bias rather than",
+        "silently omitted.",
+        "",
+        "**Known-noise SNR.** A synthetic flat patch carries known per-channel",
+        "means and Gaussian noise. `snr_patch` must recover",
+        "`20 log10(mean / std)` from the same sample standard deviation per",
+        "channel and in Rec. 709 linear luma. A second stack adds a static",
+        "per-pixel fixed pattern (sigma = 0.05) on top of independent temporal",
+        "noise (sigma = 0.01); `snr_temporal` must recover the known temporal",
+        "noise SNR, and the single-frame spatial SNR must be at least 5 dB",
+        "worse because it counts the fixed pattern as noise. A mono path must",
+        "report one `mono` channel with the same statistics.",
+        "",
+        "**Delta-E.** `camsim.metrics.color._delta_e76` and",
+        f"`_delta_e2000` are evaluated on {color['pair_count']} pairs: the published Sharma et",
+        "al. (2005) CIEDE2000 pairs plus neutral, lightness, hue-rotation, and",
+        "identity pairs. Every value is compared with",
+        "`colour.delta_E(method='CIE 1976')` and `'CIE 2000'` at a `1e-9`",
+        "absolute tolerance; the published Sharma values (four decimals) are",
+        "checked at `1e-4` as an independent source.",
+        "",
+        "**Unified harness.** The synthetic chart is built from the spectrally",
+        "computed reference Lab by adapting to D65 and encoding to display sRGB,",
+        "with a deterministic per-patch Lab perturbation for a meaningful",
+        "delta-E heatmap and a small display noise field so every SNR patch is",
+        "valid. `measure_all` must return complete colour and SNR groups; a",
+        "separate edge layout must return MTF and acutance, and a perfectly",
+        "sharp synthetic edge must serialize its not-reached crossings as",
+        "`null`. A mono image must return SNR and no colour group. A fresh",
+        "interpreter proves that `import camsim.metrics` loads none of the",
+        "simulator packages.",
+        "",
+        "## Verdict summary",
+        "",
+        "| Check | Measured | Tolerance | Result |",
+        "|---|---|---|---|",
+    ]
+    for check in checks:
+        lines.append(
+            f"| {check['name']} | {check['measured_text']} | "
+            f"{check['tolerance_text']} | {_g4_result(check['pass'])} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 1. Analytic MTF",
+            "",
+            "| Case | MTF50 measured | MTF50 analytic | MTF50 rel. error | "
+            "MTF20 measured | MTF20 analytic | MTF20 rel. error |",
+            "|---|---:|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for case in cases:
+        lines.append(
+            f"| {case['name']} | {_g4_number(case['measured_mtf50_cp'])} | "
+            f"{_g4_number(case['reference_mtf50_cp'])} | "
+            f"{_g4_number(case['relative_error_mtf50'])} | "
+            f"{_g4_number(case['measured_mtf20_cp'])} | "
+            f"{_g4_number(case['reference_mtf20_cp'])} | "
+            f"{_g4_number(case['relative_error_mtf20'], missing='n/a')} |"
+        )
+    lines.extend(
+        [
+            "",
+            "The reference is the exact discrete transfer function of the same",
+            "kernel, not a fit to the measured curve. The measured curve is",
+            "clipped to the physical [0, 1] range and normalized to one at DC.",
+            "",
+            "| Case | 5 deg | 10 deg | 15 deg | 20 deg | Spread % |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for row in mtf["angle_robustness"]:
+        values = " | ".join(_g4_number(value) for value in row["mtf50_cp"])
+        lines.append(f"| {row['case']} | {values} | {100.0 * float(row['spread_fraction']):.4g} |")
+    lines.extend(
+        [
+            "",
+            "| Case | DC | Min | Max | Monotonic band | Max rise |",
+            "|---|---:|---:|---:|---|---:|",
+        ]
+    )
+    for row in mtf["normalization"]["cases"]:
+        lines.append(
+            f"| {row['case']} | {_g4_number(row['dc'])} | "
+            f"{_g4_number(row['min'])} | {_g4_number(row['max'])} | "
+            f"{row['monotonic_band']} | {_g4_number(row['max_rise'])} |"
+        )
+    noise = mtf["noise"]
+    lines.extend(
+        [
+            "",
+            "| Noise robustness quantity | Value |",
+            "|---|---:|",
+            f"| Clean MTF50 (cycles/pixel) | {_g4_number(noise['clean_mtf50_cp'])} |",
+            f"| Noisy MTF50, sigma={float(noise['sigma']):g} (cycles/pixel) | "
+            f"{_g4_number(noise['noisy_mtf50_cp'])} |",
+            f"| Relative change | {_g4_number(noise['relative_change'])} |",
+            "",
+            "| Diagnostic | MTF50 measured | MTF50 analytic | MTF20 | Note |",
+            "|---|---:|---:|---|---|",
+        ]
+    )
+    for diagnostic in mtf["diagnostics"]:
+        lines.append(
+            f"| {diagnostic['name']} | {_g4_number(diagnostic['mtf50_cp'])} | "
+            f"{_g4_number(diagnostic['reference_mtf50_cp'])} | "
+            f"{_g4_number(diagnostic['mtf20_cp'])} | {diagnostic['note']} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 2. Known-noise SNR",
+            "",
+            "| Measurement | Mean | Std | SNR (dB) | Expected (dB) | Error (dB) |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for row in snr["spatial"]["measurements"]:
+        lines.append(
+            f"| spatial {row['channel']} | {_g4_number(row['mean'])} | "
+            f"{_g4_number(row['std'])} | {_g4_number(row['snr_db'])} | "
+            f"{_g4_number(row['expected_snr_db'])} | {_g4_number(row['error_db'])} |"
+        )
+    temporal = snr["temporal"]
+    lines.append(
+        f"| temporal | {_g4_number(temporal['mean'])} | {_g4_number(temporal['std'])} | "
+        f"{_g4_number(temporal['snr_db'])} | {_g4_number(temporal['expected_snr_db'])} | "
+        f"{_g4_number(temporal['error_db'])} |"
+    )
+    mono = snr["mono"]
+    lines.append(
+        f"| mono | {_g4_number(mono['mean'])} | {_g4_number(mono['std'])} | "
+        f"{_g4_number(mono['snr_db'])} | {_g4_number(mono['expected_snr_db'])} | "
+        f"{_g4_number(mono['error_db'])} |"
+    )
+    lines.extend(
+        [
+            "",
+            f"The temporal stack has {temporal['frames']} frames with a static",
+            f"fixed pattern of sigma {float(temporal['fixed_pattern_sigma']):g} and",
+            f"temporal noise of sigma {float(temporal['temporal_sigma']):g}. Its",
+            "SNR exceeds the single-frame spatial estimate by",
+            f"{_g4_number(temporal['fpn_rejection_db'])} dB, which is the",
+            "fixed-pattern rejection the two estimators are meant to provide.",
+            "",
+            "## 3. Colour difference",
+            "",
+            "| Pair | Source | Our deltaE76 | Reference deltaE76 | "
+            "Our deltaE2000 | Reference deltaE2000 |",
+            "|---|---|---:|---:|---:|---:|",
+        ]
+    )
+    for pair in color["pairs"]:
+        lines.append(
+            f"| {pair['name']} | {pair['source']} | {_g4_number(pair['delta_e76'])} | "
+            f"{_g4_number(pair['reference_delta_e76'])} | "
+            f"{_g4_number(pair['delta_e2000'])} | "
+            f"{_g4_number(pair['reference_delta_e2000'])} |"
+        )
+    lines.extend(
+        [
+            "",
+            f"The maximum absolute error is"
+            f" {_g4_number(color['max_abs_error_delta_e76'])} for delta-E76 and"
+            f" {_g4_number(color['max_abs_error_delta_e2000'])} for delta-E2000"
+            f" over {color['pair_count']} pairs; the identity error is"
+            f" {_g4_number(color['identity_max_abs'])}. The published Sharma"
+            " values agree to"
+            f" {_g4_number(color['sharma_published_max_abs_error_delta_e2000'])}",
+            "at their four-decimal print precision.",
+            "",
+            "## 4. Unified harness and import independence",
+            "",
+            "| Group | Quantity | Value |",
+            "|---|---|---|",
+            f"| ColorChecker-like chart | valid patches | {chart['patch_count']} |",
+            f"| ColorChecker-like chart | mean deltaE76 | {_g4_number(chart['mean_delta_e76'])} |",
+            f"| ColorChecker-like chart | mean deltaE2000 | "
+            f"{_g4_number(chart['mean_delta_e2000'])} |",
+            f"| ColorChecker-like chart | SNR patches x channels | "
+            f"{chart['snr_patch_count']} x {len(chart['snr_channels'])} |",
+            f"| ColorChecker-like chart | mean luma SNR (dB) | "
+            f"{_g4_number(chart['mean_luma_snr_db'])} |",
+            f"| Edge layout | MTF50 (cycles/pixel) | {_g4_number(harness['edge']['mtf50_cp'])} |",
+            f"| Edge layout | MTF20 (cycles/pixel) | {_g4_number(harness['edge']['mtf20_cp'])} |",
+            f"| Edge layout | acutance | {_g4_number(harness['edge']['acutance'])} |",
+            f"| MONO layout | SNR channel | {', '.join(harness['mono']['snr_channels'])} |",
+            f"| MONO layout | colour present | "
+            f"{'yes' if harness['mono']['color_present'] else 'no'} |",
+            f"| Serialization | strict JSON round trip | "
+            f"{_g4_result(harness['serialization']['roundtrip_ok'])} |",
+            f"| Serialization | NaN/Infinity tokens absent | "
+            f"{_g4_result(harness['serialization']['nan_token_absent'])} |",
+            f"| Serialization | not-reached crossing as null | "
+            f"{_g4_result(harness['serialization']['null_crossing'])} |",
+            f"| Import independence | subprocess | "
+            f"{_g4_result(harness['import_independence']['passed'])} |",
+            "",
+            "Per-patch colour difference of the synthetic chart:",
+            "",
+            "| Patch | deltaE76 | deltaE2000 |",
+            "|---|---:|---:|",
+        ]
+    )
+    for index, name in enumerate(chart["patch_names"]):
+        lines.append(
+            f"| {name} | {_g4_number(chart['per_patch_delta_e76'][index])} | "
+            f"{_g4_number(chart['per_patch_delta_e2000'][index])} |"
+        )
+    lines.extend(
+        [
+            "",
+            "The edge layout's MTF crossings are reported as `not reached` because",
+            "an ideal synthetic step never falls to 50 % or 20 % inside Nyquist.",
+            "That is a legitimate answer, and it must serialize as JSON `null`",
+            "rather than a non-standard token. The import-independence check runs",
+            "`import camsim.metrics` in a fresh interpreter and asserts that",
+            "`camsim.sensor`, `camsim.isp`, `camsim.scene`, and `camsim.optics`",
+            "are absent from `sys.modules`.",
+            "",
+            "## 5. Acutance versus Gaussian blur",
+            "",
+            "| Gaussian blur sigma (px) | Acutance |",
+            "|---|---:|",
+        ]
+    )
+    for sigma, value in zip(acutance["sigma_px"], acutance["acutance"], strict=True):
+        lines.append(f"| {_g4_number(sigma)} | {_g4_number(value)} |")
+    lines.extend(
+        [
+            "",
+            "Acutance is the contrast-normalized RMS gradient of a fixed edge ROI;",
+            "it falls monotonically as the Gaussian blur widens. It is a sharpness",
+            "proxy for correlation studies, not a calibrated MTF and not an",
+            "ISO 12233 quantity.",
+            "",
+            "## Figures",
+            "",
+            "| Figure | Path |",
+            "|---|---|",
+            "| MTF curves with analytic references | `results/figures/03_mtf_curves.png` |",
+            "| SNR versus lux | `results/figures/03_snr_vs_lux.png` |",
+            "| Per-patch delta-E heatmap | `results/figures/03_delta_e_heatmap.png` |",
+            "| Acutance versus Gaussian blur | `results/figures/03_acutance_vs_blur.png` |",
+            "| MTF gate figure | `results/figures/g4_mtf_curves.png` |",
+            "| SNR-versus-lux gate figure | `results/figures/g4_snr_vs_lux.png` |",
+            "| Delta-E gate heatmap | `results/figures/g4_delta_e_heatmap.png` |",
+            "| Acutance gate figure | `results/figures/g4_acutance_vs_blur.png` |",
+            "| Check summary | `results/figures/g4_check_summary.png` |",
+            "",
+            "## Assumptions and limitations",
+            "",
+            "- **Simulated data.** Every measurement is synthetic. It is not a",
+            "  certified ISO 12233 e-SFR measurement; the implementation follows",
+            "  the standard's principles but makes no conformance claim.",
+            "- **Analytic PSFs are ideal.** Gaussian, box, and Airy kernels model",
+            "  aberration cores, pixel integration, and diffraction separately.",
+            "  They do not include aberrations, field-dependent blur, or a",
+            "  wavelength-dependent PSF.",
+            "- **8x oversampling for the gate cases.** The Airy and box gate cases",
+            "  use eight analysis samples per pixel; four is conventional but",
+            "  carries about a 2 % MTF50 bias for near-diffraction-limited",
+            "  systems, which the gallery may use with that caveat.",
+            "- **Airy f/2.8 is a diagnostic.** Its MTF does not reach 0.20 inside",
+            "  Nyquist and its MTF50 sits near the band edge, so it is reported",
+            "  with its documented bias and excluded from the gate thresholds.",
+            "- **Box monotonicity.** The width-4 box transfer function is",
+            "  `|sinc(4 f)|`; its sidelobe after the zero at 0.25 cycles/pixel is",
+            "  physical, so monotonicity is enforced over the main lobe only.",
+            "- **Synthetic SNR.** The noise is Gaussian in linear light, not",
+            "  Poisson shot noise from a sensor; this isolates the estimator from",
+            "  the sensor model. The temporal stack's fixed pattern is static by",
+            "  construction.",
+            "- **Synthetic chart.** The ColorChecker-like image is built from the",
+            "  spectrally computed reference Lab plus a deterministic",
+            "  perturbation; it is a measurement vehicle, not a camera render,",
+            "  and its delta-E values are not a camera colour-accuracy claim.",
+            "- **Not-reached crossings.** An ideal synthetic edge has no finite",
+            "  MTF50/MTF20. The report records that as `null` and never invents a",
+            "  crossing.",
+            "- **Quick mode is not gate evidence.** `--quick` uses smaller MTF,",
+            "  SNR, chart, and acutance grids and writes",
+            "  `g4_metrics_results_quick.json`; it never writes or overwrites the",
+            "  committed `g4_metrics_results.json` or `g4_metrics.md`.",
+            "- **Determinism.** Seeds are explicit and outputs are reproducible",
+            "  within one software environment; PNG bytes can differ across",
+            "  Matplotlib/font builds, so cross-platform comparisons use numbers",
+            "  and tolerances.",
+            "",
+            "## Reproduction",
+            "",
+            "```bash",
+            "uv run python examples/03_measure_iq.py",
+            "uv run pytest tests/test_metrics_mtf.py tests/test_metrics_snr.py \\",
+            "  tests/test_metrics_color.py tests/test_metrics_summary.py \\",
+            "  tests/test_metrics_independence.py tests/test_example_03.py -v",
+            "uv run pytest -q",
+            "uv run ruff check . && uv run ruff format --check . && uv run mypy src",
+            "uv run mkdocs build --strict",
+            "uv run jupytext --to ipynb --execute notebooks/03_measuring_iq.py \\",
+            "  --output /tmp/03.ipynb",
+            "```",
+            "",
+            "The full example writes `results/reports/g4_metrics_results.json`",
+            "and `results/reports/g4_metrics.md`; the gate tests parse the",
+            "committed report tables back and compare every numeric cell with the",
+            "JSON, so a stale report fails instead of being accepted. The",
+            "`--quick` flag is a smoke run and is not gate evidence.",
+            "",
+        ]
+    )
+
+    if status != "PASS":
+        lines.extend(
+            [
+                "## Gate failure",
+                "",
+                f"The failing checks are: {failing_names}.",
+                "The JSON and this report are generated from the same payload; do",
+                "not mark G4 green until the failing measurement is resolved.",
                 "",
             ]
         )

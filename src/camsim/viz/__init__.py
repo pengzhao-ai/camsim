@@ -25,15 +25,23 @@ dependent metadata, which would make repeated runs differ byte for byte.
 
 The public surface covers the Phase 1 optics figures (spectrum, PSF profile,
 MTF), the Phase 2 sensor figures (spectral response, photon transfer curve,
-SNR, dark current, dual-gain comparison, DSNU/PRNU histograms), and Phase 3's
-ISP stage gallery (pipeline trace, zoomed stage crops, and the bilinear/MHC
-demosaic comparison), plus a deterministic figure saver. Later phases extend
-the same namespace with metric and experiment plots without changing these
-entry points.
+SNR, dark current, dual-gain comparison, DSNU/PRNU histograms), Phase 3's ISP
+stage gallery (pipeline trace, zoomed stage crops, and the bilinear/MHC
+demosaic comparison), and Phase 4's metric plots (measured MTF with analytic
+references, SNR versus illuminance, a per-patch delta-E heatmap, and acutance
+versus blur), plus a deterministic figure saver. Later phases extend the same
+namespace with experiment plots without changing these entry points.
 """
 
 from __future__ import annotations
 
+from camsim.viz.metrics import (
+    MTFPlotSeries,
+    plot_acutance,
+    plot_delta_e_heatmap,
+    plot_mtf_curve,
+    plot_snr_vs_lux,
+)
 from camsim.viz.pipeline import (
     plot_demosaic_comparison,
     plot_pipeline_trace,
@@ -52,17 +60,22 @@ from camsim.viz.style import PALETTE, set_style
 
 __all__ = [
     "PALETTE",
+    "MTFPlotSeries",
     "figure_dir",
+    "plot_acutance",
     "plot_dark_current_vs_temperature",
+    "plot_delta_e_heatmap",
     "plot_demosaic_comparison",
     "plot_fixed_pattern_histograms",
     "plot_mode_comparison",
     "plot_mtf",
+    "plot_mtf_curve",
     "plot_pipeline_trace",
     "plot_psf",
     "plot_ptc",
     "plot_sensor_spectral_response",
     "plot_snr_vs_irradiance",
+    "plot_snr_vs_lux",
     "plot_spectrum",
     "plot_zoom_crops",
     "save_figure",
