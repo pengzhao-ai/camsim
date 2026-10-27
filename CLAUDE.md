@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo status
 
-Phase 0 is in progress: the repository scaffold is in place — the `camsim` package installs, the CLI skeleton runs, and lint, typecheck, tests, and docs build. Simulation, ISP, metrics, and machine-vision modules are added phase by phase.
+Phase 5 consolidation is complete and the repository is at the **G5 human
+sign-off gate**: G1–G4 pass with committed evidence, the consolidated G5
+candidate report is available, and the `v0.1.0` tag has not been created. CI
+workflows (including examples and notebooks) exist, but CI execution is pending
+a push; the local equivalents pass. Machine-vision code remains gated.
 
 - **Authoritative spec:** `docs/superpowers/specs/2026-10-26-camsim-design.md` — read it before building anything.
 - **Implementation plan:** `docs/superpowers/plans/2026-10-26-camsim-core-pipeline.md` — task-by-task requirements and gates.
@@ -33,13 +37,18 @@ uv run pytest tests/test_package.py::test_import_and_version -v   # single test
 uv run ruff check . && uv run ruff format --check .
 uv run mypy src               # strict, src/ only
 uv run mkdocs build --strict
+uv run pytest --cov=camsim --cov-fail-under=90          # subject-module gate
+uv run pytest --cov=camsim --cov-config=coverage-whole.rc  # whole package incl. viz
+uv run python benchmarks/run_examples.py   # 300 s per example
+uv run python benchmarks/run_notebooks.py  # 120 s per notebook
+uv run python benchmarks/benchmark_pipeline.py [--quick|--large]
 uv run jupytext --to ipynb --execute notebooks/NN_name.py --output /tmp/NN.ipynb
 ```
 
 - Python 3.11–3.13, `uv` with a committed `uv.lock`; the pip/venv fallback is documented in the README.
-- `make notebooks` executes every Jupytext notebook headlessly; notebooks must run in under 2 minutes each on Apple Silicon.
-- The CLI entry point is `camsim = "camsim.cli:main"` with `validate`, `schema`, and `info` subcommands.
-- `make figures` will regenerate the committed figure gallery once the plotting layer lands (Phase 4/5); it currently reports that the gallery is empty.
+- `make notebooks` executes every Jupytext notebook headlessly through `benchmarks/run_notebooks.py` with a 120 s per-notebook timeout; `make figures` runs every example through `benchmarks/run_examples.py` with a 300 s per-example timeout. Both runners fail fast and write per-item timing evidence under `results/reports/`.
+- The CLI entry point is `camsim = "camsim.cli:main"` with `validate`, `schema`, `info`, `render`, `characterize`, `measure`, and `figures` subcommands.
+- `scene.render` and `Sensor.expose` enforce a configurable simulation-memory budget (8 GiB default; `CAMSIM_MAX_SIMULATION_BYTES` or `max_memory_bytes=`). Full 50 MP spectral simulation is not supported at v0.1.0.
 
 ## Package architecture
 
@@ -65,7 +74,8 @@ src/camsim/
 
 ## Non-negotiable conventions
 
-- **Linear-space invariant:** DPC, BLC, LSC, AWB, demosaic, CCM, denoise, and sharpen operate in linear float32. The tone curve and output OETF are the only non-linear steps.
+- **Linear-space invariant:** DPC, BLC, LSC, AWB, demosaic, CCM, denoise, and sharpen operate in linear float32. The CCM non-negativity clamp is the one bounded exception and is inactive on in-gamut data; the G3 linearity check reports its pre-clamp margin. The tone curve and output OETF are the only intentionally non-linear steps.
+- **Luma and primaries:** Rec. 709 luma weights assume linear sRGB. `measure_all` converts a linear Display P3 buffer to linear sRGB before SNR/MTF/acutance and records the conversion; direct 3-D metric calls assume sRGB input.
 - **Spectral boundary:** the sensor consumes irradiance at the sensor plane before IR-cut/CFA/microlens. The sensor never resamples implicitly; spatial and wavelength resampling use explicit, energy-conserving helpers.
 - **Determinism:** explicit `numpy.random.Generator` only, no global RNG; seeds and config hashes recorded in outputs. Bit-identical within one environment; tolerance-based across platforms.
 - **From scratch first:** implement core numerics (MHC demosaic, e-SFR, ridge CCM, …) in NumPy, then validate against `colour-science`, `colour-demosaicing`, and `scikit-image` in tests.
@@ -84,4 +94,4 @@ src/camsim/
 
 ## Phases and gates
 
-Phase 0 scaffold (G0: install, lint, typecheck, tests, docs) · Phase 1 scene/optics (G1) · Phase 2 sensor (G2) · Phase 3 ISP (G3) · Phase 4 metrics (G4) · Phase 5 consolidation and human sign-off (G5) · Phases 6–9 machine vision, mono-vs-Bayer, auto-tuning, metric correlation. Each gate's validation criteria are in the design spec, Section 10.
+Phase 0 scaffold (G0: install, lint, typecheck, tests, docs) · Phase 1 scene/optics (G1) · Phase 2 sensor (G2) · Phase 3 ISP (G3) · Phase 4 metrics (G4) · **Phase 5 consolidation and human sign-off (G5, awaiting sign-off)** · Phases 6–9 machine vision, mono-vs-Bayer, auto-tuning, metric correlation. Each gate's validation criteria are in the design spec, Section 10.

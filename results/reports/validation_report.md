@@ -2,7 +2,7 @@
 
 **Status: awaiting human sign-off.**
 
-This is the consolidated G5 candidate report for the camsim core pipeline. G1-G4 are green, every cross-cutting check below passed on the validated source tree, and the engineering gates are green. The G5 gate itself is **not** closed: the project owner must review this report and the figure gallery, confirm the scope, assumptions, and limitations, and explicitly approve `v0.1.0`. Until that decision is recorded, the status stays **awaiting human sign-off**, no tag exists, and no machine-vision code may be written.
+This is the consolidated G5 candidate report for the camsim core pipeline. G1-G4 are green, every cross-cutting check below passed on the validated source tree, and the local engineering gates are green. CI workflows for lint, types, tests, coverage, docs, build, examples, and notebooks were added in this candidate, but their execution is pending a push; the owner must accept that residual at sign-off. The G5 gate itself is **not** closed: the project owner must review this report and the figure gallery, confirm the scope, assumptions, and limitations, and explicitly approve `v0.1.0`. Until that decision is recorded, the status stays **awaiting human sign-off**, no tag exists, and no machine-vision code may be written.
 
 ## 1. Scope and architecture
 
@@ -16,7 +16,7 @@ scene reflectance x illuminant x lens
         -> image-quality report     camsim.metrics.measure_all
 ```
 
-The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denoise -> sharpen -> tone -> output`. Every stage before tone operates in linear float32 light; the tone curve and output OETF are the only non-linear steps.
+The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denoise -> sharpen -> tone -> output`. Every stage before tone operates in linear float32 light. The CCM's non-negativity clamp is the one bounded exception: it is inactive on in-gamut data and is measured explicitly in G3. The tone curve and output OETF are the only intentionally non-linear steps.
 
 ## 2. Environment and validated source
 
@@ -30,7 +30,7 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | colour-demosaicing | `0.2.7` |
 | Matplotlib | `3.11.2` |
 | Platform | `Darwin (arm64)` |
-| Validated source commit | `fe42fcf15993a100e0b04a00cf67d6b4d3a92af2` |
+| Validated source commit | `9d73b076d7c40c848b248b831d9211241db22ef0 + uncommitted working tree` |
 | Branch | `feat/camsim-core` |
 | Report date | `2026-10-27` |
 | Sensor preset | `src/camsim/config/presets/sensors/flagship_phone_50mp.json` |
@@ -38,20 +38,20 @@ The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> denois
 | Sensor config hash | `dc383811bd9307f5d864d917da8fc7ac918e2983c802dc900ad56463d9b3b591` |
 | ISP config hash | `790c97d8f00b352fe31f2ffd26fd46e89c47caf308622db51d397308ed49a627` |
 
-The phase reports and this candidate were produced from the same source tree and software environment. The G5 candidate commit adds only this report, its tests, the two G5 figures, and documentation and metadata updates; it changes no simulation, sensor, ISP, metrics, camera, or CLI code. All numbers are simulated measurements, not measurements of physical hardware.
+The phase reports and this candidate were produced from the same source tree and software environment. This candidate includes the release-blocking fixes from the whole-branch review: physical dead/stuck/hot defect behaviour and a separate hot mask, Display P3 luma conversion, an AWB+CCM linearity check, a two-sided denoise MTF bound with an edge-ringing check, a simulation-memory guard, and the CI/notebook runners. G3 evidence was regenerated; G1, G2, and G4 remained byte-identical. All numbers are simulated measurements, not measurements of physical hardware.
 
 ## 3. Gate status
 
 | Gate | Phase | Scope | Evidence | Measured / passed | Status |
 |---|---|---|---|---|---|
-| G0 | 0 | install, lint, typecheck, tests, docs | [docs/validation.md](../../docs/validation.md) | 9/9 commands | **PASS** (local) |
+| G0 | 0 | install, lint, typecheck, tests, docs | [docs/validation.md](../../docs/validation.md) | 11/11 commands | **PASS** (local) |
 | G1 | 1 | scene, illuminants, optics | [g1_scene_optics.md](g1_scene_optics.md) | 7/7 checks | **PASS** |
 | G2 | 2 | sensor model and EMVA characterization | [g2_sensor.md](g2_sensor.md) + [g2_sensor_results.json](g2_sensor_results.json) | 16/16 checks | **PASS** |
-| G3 | 3 | ISP stages and pipeline | [g3_isp.md](g3_isp.md) + [g3_isp_results.json](g3_isp_results.json) | 19/19 checks | **PASS** |
+| G3 | 3 | ISP stages and pipeline | [g3_isp.md](g3_isp.md) + [g3_isp_results.json](g3_isp_results.json) | 21/21 checks | **PASS** |
 | G4 | 4 | metrics harness | [g4_metrics.md](g4_metrics.md) + [g4_metrics_results.json](g4_metrics_results.json) | 31/31 checks | **PASS** |
-| G5 | 5 | consolidated cross-cutting evidence | this report | 13/13 checks | **Awaiting human sign-off** |
+| G5 | 5 | consolidated cross-cutting evidence | this report | 16/16 checks | **Awaiting human sign-off** |
 
-A phase gate is evidence only when its report says PASS and every recorded check in its machine-readable results passed. The loader that builds this table refuses quick-mode artifacts and any JSON not marked `gate_evidence: true`. G0 is a local gate run; no CI-matrix result is recorded in this repository artifact.
+A phase gate is evidence only when its report says PASS and every recorded check in its machine-readable results passed. The loader that builds this table refuses quick-mode artifacts and any JSON not marked `gate_evidence: true`. G0 is a local gate run. The CI workflow now defines quality, test, docs, build, examples, and notebooks jobs, but GitHub Actions cannot be executed from this environment: the workflows are added, the local equivalents passed, and CI execution is pending a push. The owner must accept that residual at sign-off. No claim that CI is green is made here.
 
 ### 3.1 Phase artifact bindings
 
@@ -62,12 +62,12 @@ Every phase artifact this report reads is bound by SHA-256. The G5 test suite re
 | `g1_scene_optics.md` | `9d57875d370aef49702234c33ba7d7872b0332fa7e69fc8b21a4b9065fda8140` |
 | `g2_sensor.md` | `324009aa10394db7a8842ceff0b3d92d17443b5c062d264585d2fdc788419692` |
 | `g2_sensor_results.json` | `aacbf03da1659b238b32cdbd4930563c88412d03fde0dd09d0acd8872feae796` |
-| `g3_isp.md` | `884a25af3e5797a7e884eda90faa424af57616f2f649703d8af7de52570cb118` |
-| `g3_isp_results.json` | `e7758e3cba31a5281db030a28135100efd5bdf260aceacc0abfa98a4088d46e8` |
+| `g3_isp.md` | `c8e33bf06550f350298c124f3512e8521eb5b79d5a39460c2790eab9f44cbdef` |
+| `g3_isp_results.json` | `497703fce429fc1cb841a383a31ef64fb521bde512535f413704b267830be03f` |
 | `g4_metrics.md` | `2a7b33233f34f3ebf9365259c532957520dbf07b5f30b7b58bdb354915a40127` |
 | `g4_metrics_results.json` | `24de5b0f85a20790ead3d25a0e01417355f7f95e426910371cbf5305b68601bd` |
 
-**Regeneration record for this candidate.** `benchmarks/g1_scene_optics.py`, examples 01-04 in full mode, and notebooks 01-03 headless were re-run on the validated source tree. G1 remained PASS and its report and four figures were byte-identical; the G2-G4 reports and JSON were byte-identical; the example and notebook gallery figures were byte-identical. G2, G3, and G4 each reported PASS after regeneration. Quick modes were not run against the gate directories.
+**Regeneration record for this candidate.** `benchmarks/g1_scene_optics.py`, examples 01-04 in full mode, and notebooks 01-03 headless were re-run on the validated source tree. G1 remained PASS and its report and four figures were byte-identical; G2 and G4 reports and JSON were byte-identical; the example and notebook gallery figures were byte-identical except the G3 check-summary figure, which reflects the added AWB/CCM linearity checks. G3 was regenerated because its linearity check now runs with AWB enabled and a fitted CCM, and its report wording was corrected. G1-G4 each reported PASS after regeneration. The preset's defect rates (1e-5 dead, 1e-5 hot, 1e-6 stuck) put fewer than one expected defect in the G2 characterization fields, so G2 was byte-identical after the defect behaviour change; the end-to-end defect tests use raised custom rates. Quick modes were not run against the gate directories. The per-item example and notebook runtimes are recorded in section 5.9.
 
 ## 4. G1-G4 measured evidence
 
@@ -134,7 +134,9 @@ Machine-readable results: [`g3_isp_results.json`](g3_isp_results.json)
 | sRGB OETF vs colour.cctf_encoding (max abs) | 2.977e-08 | < 1e-07 | PASS |
 | Stage trace tone reproduction (max abs) | 0 | < 1e-06 | PASS |
 | Stage trace linear_rgb reproduction (Display P3, max abs) | 0 | < 1e-06 | PASS |
-| Linear pre-tone scaling invariance (max relative error) | 0 | < 1e-05 | PASS |
+| AWB gain scale invariance (max relative error) | 0 | < 0.001 | PASS |
+| Linear pre-tone scaling invariance with AWB and CCM (max relative error) | 0 | < 1e-05 | PASS |
+| CCM pre-clamp minimum on linearity data | 0.0248324 | > 0 | PASS |
 | LSC flat-field residual after correction | 0.00618314 | < 0.02 | PASS |
 | Denoise SNR gain (dB) | 13.0556 | > 3 | PASS |
 | Denoise edge-contrast preservation | 4.333e-05 | < 0.1 | PASS |
@@ -142,7 +144,7 @@ Machine-readable results: [`g3_isp_results.json`](g3_isp_results.json)
 | Sharpen overshoot | 0.117446 | > 0 | PASS |
 | RCCC baseline output channels | 3 | = 3 +/- 0 | PASS |
 
-19 of 19 checks pass; reported status **PASS**.
+21 of 21 checks pass; reported status **PASS**.
 
 ### G4 - metrics harness
 
@@ -193,23 +195,28 @@ These criteria span phases or the engineering process, so no single phase report
 
 | Command | Recorded result | Wall time | Verdict |
 |---|---|---:|---|
-| `uv run pytest -q` | 1751 passed | 125.92 s | **PASS** |
-| `uv run pytest --cov=camsim --cov-fail-under=90` | 1751 passed; total coverage 91.82% (required 90%) | 152.16 s | **PASS** |
+| `uv run pytest -q` | 1775 passed | 126.16 s | **PASS** |
+| `uv run pytest --cov=camsim --cov-fail-under=90` | 1775 passed; subject-module coverage 91.73% (required 90%) | 150.48 s | **PASS** |
+| `uv run pytest --cov=camsim --cov-config=coverage-whole.rc` | 1775 passed; whole-package coverage 83.55% including viz | 150.17 s | **PASS** |
 | `uv run ruff check .` | All checks passed! | 0.06 s | **PASS** |
-| `uv run ruff format --check .` | 140 files already formatted | 0.03 s | **PASS** |
-| `uv run mypy src` | Success: no issues found in 68 source files | 0.59 s | **PASS** |
-| `uv run mkdocs build --strict` | Documentation built in 1.73 seconds | 1.90 s | **PASS** |
-| `uv run python benchmarks/benchmark_pipeline.py --quick` | pipeline total 8.26 ms (128 x 128) | 1.31 s | **PASS** |
-| `uv run python benchmarks/benchmark_pipeline.py` | pipeline total 115.29 ms (512 x 512) | 1.87 s | **PASS** |
-| `uv build` | built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl | 0.75 s | **PASS** |
+| `uv run ruff format --check .` | 143 files already formatted | 0.03 s | **PASS** |
+| `uv run mypy src` | Success: no issues found in 69 source files | 0.59 s | **PASS** |
+| `uv run mkdocs build --strict` | Documentation built in 1.78 seconds | 1.97 s | **PASS** |
+| `uv run python benchmarks/benchmark_pipeline.py --quick` | pipeline total 8.34 ms (128 x 128) | 1.31 s | **PASS** |
+| `uv run python benchmarks/benchmark_pipeline.py` | pipeline total 114.58 ms (512 x 512) | 1.87 s | **PASS** |
+| `uv run python benchmarks/benchmark_pipeline.py --large` | pipeline total 453.90 ms (1024 x 1024, 1x oversampling) | 3.12 s | **PASS** |
+| `uv build` | built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl | 0.77 s | **PASS** |
 
-Absolute timings are machine-specific and are evidence, not guarantees. The coverage gate enforces at least 90 % statement and branch coverage with `*/camsim/viz/*` omitted: the presentation layer is exercised by the executed examples and notebooks that generate the committed gallery, while the simulation, metrics, configuration, characterization, and CLI modules remain subject to the coverage gate. The threshold is not lowered for this candidate.
+Absolute timings are machine-specific and are evidence, not guarantees. Coverage is reported with two scopes, not one headline number: **subject-module coverage is 91.73 %** with `*/camsim/viz/*` omitted, and **whole-package coverage including viz is 83.55 %**. The 90 % statement-and-branch gate applies to the subject modules (simulation, metrics, configuration, characterization, IO, camera, and CLI), which contain the numerical contracts the gates depend on. The presentation layer is exercised by the executed examples and notebooks that generate the committed gallery; its inclusion lowers the whole-package number. That gap is an explicit **reviewed exception** recorded in the sign-off checklist, not a silent claim that 91.73 % is total coverage.
 
 ### 5.2 Cross-cutting measurement summary
 
 | Check | Measured | Bound | Verdict |
 |---|---|---|---|
-| Denoise MTF50 preservation | 0.189840 -> 0.217722 cycles/pixel (+14.69%) | loss <= 10% | **PASS** |
+| Examples headless (local) | 01_spectral_scene_to_raw.py: 2.07 s; 02_isp_stage_gallery.py: 2.44 s; 03_measure_iq.py: 2.57 s; 04_emva_characterization.py: 14.62 s | all exit 0; each item <= 300 s | **PASS** |
+| Notebooks headless (local) | 01_optics_and_sensor.py: 14.82 s; 02_isp_color_fundamentals.py: 2.85 s; 03_measuring_iq.py: 2.57 s | all exit 0; each item <= 120 s | **PASS** |
+| Denoise MTF50 change | 0.189840 -> 0.217722 cycles/pixel (+14.69%) | \|change\| <= 20% | **PASS** |
+| Denoise edge ringing (overshoot/undershoot) | overshoot +0.07%, undershoot +0.07% of edge contrast | \|overshoot\| and \|undershoot\| <= 1% | **PASS** |
 | Denoise luma SNR gain | 25.946 -> 36.558 dB (+10.61 dB) | > 0 dB | **PASS** |
 | Sharpen MTF50 gain | 0.187328 -> 0.249291 cycles/pixel (+33.08%) | after > before | **PASS** |
 | Sharpen positive overshoot | max normalized profile 1.002107 (overshoot +0.21% of edge contrast) | > 1 + 0.001 | **PASS** |
@@ -225,20 +232,22 @@ Absolute timings are machine-specific and are evidence, not guarantees. The cove
 
 Every non-timing cross-cutting measurement is deterministic: fixed seeds, explicit `numpy.random.Generator` instances, and no global RNG. The derivation and raw values follow.
 
-### 5.3 Denoise: SNR gain and MTF50 preservation
+### 5.3 Denoise: SNR gain, MTF50 change, and edge ringing
 
-A 256 x 256 slanted edge at 5 degrees is blurred by the known unit-sigma Gaussian and corrupted with additive Gaussian noise (sigma = 0.01). MTF50 is measured on the noisy edge and again after the shipped bilateral stage (`method=bilateral`, luma strength 1.0, radius 1.5); the SNR measurement uses an independent 64 x 64 flat patch with its own generator. The resolution bound is a **loss** bound: a denoiser that suppresses noise by smearing the edge fails, while a slightly higher measured MTF50 passes because no resolution was lost.
+A 256 x 256 slanted edge at 5 degrees is blurred by the known unit-sigma Gaussian and corrupted with additive Gaussian noise (sigma = 0.01). MTF50 is measured on the noisy edge and again after the shipped bilateral stage (`method=bilateral`, luma strength 1.0, radius 1.5); the SNR measurement uses an independent 64 x 64 flat patch with its own generator. The MTF50 criterion is **two-sided**: |relative change| <= 20%. A denoiser that smears the edge or invents contrast both fail. The same denoised profile must also stay within 1% of the edge contrast on both the bright and dark sides, so a ringing halo cannot pass as sharpening.
 
 | Quantity | Measured |
 |---|---:|
 | MTF50 before denoise | 0.189840 cycles/pixel |
 | MTF50 after denoise | 0.217722 cycles/pixel |
-| Relative MTF50 change | +14.69% |
+| Signed relative MTF50 change | +14.69% |
+| Edge overshoot | +0.072% of contrast |
+| Edge undershoot | +0.065% of contrast |
 | SNR before denoise | 25.946 dB |
 | SNR after denoise | 36.558 dB |
 | SNR gain | +10.61 dB |
 
-Interpretation: the bilateral stage raises flat-patch SNR and does not lose MTF50 on this edge. The measured MTF50 rises because the full-strength bilateral filter sharpens the transition as it suppresses the noise floor; the check is deliberately a preservation bound, and the measured change is reported with its sign rather than described as a pure equality.
+Interpretation: the bilateral stage raises flat-patch SNR. The measured MTF50 rises because the full-strength bilateral filter steepens the transition as it suppresses the noise floor; that rise is inside the stated two-sided bound and is reported with its sign. The edge profile shows no meaningful ringing: overshoot and undershoot are well below the 1 % bound.
 
 ### 5.4 Sharpen: MTF50 gain and overshoot
 
@@ -294,6 +303,22 @@ Determinism is promised within one environment (same OS, Python, NumPy, and SciP
 
 Quick modes (`--quick`) use smaller grids and write suffixed `*_quick.json` artifacts; they are smoke tests and never gate evidence. No machine-vision code exists before the G5 sign-off, so this report makes no task-accuracy, CNN, or metric-correlation claim.
 
+### 5.9 Examples and notebooks (local gallery evidence)
+
+CI workflows now include `examples` and `notebooks` jobs. This environment cannot execute GitHub Actions, so the equivalent local sweeps were run through `benchmarks/run_examples.py` and `benchmarks/run_notebooks.py`, which enforce per-item subprocess timeouts and fail fast. **CI execution is pending a push; local equivalents passed.** The owner must accept that residual at sign-off. The two-minute-per-notebook condition is enforced by the 120 s runner timeout and verified by the times below.
+
+| Item | Sweep | Wall time | Budget | Verdict |
+|---|---|---:|---:|---|
+| `01_spectral_scene_to_raw.py` | example | 2.07 s | 300 s | **PASS** |
+| `02_isp_stage_gallery.py` | example | 2.44 s | 300 s | **PASS** |
+| `03_measure_iq.py` | example | 2.57 s | 300 s | **PASS** |
+| `04_emva_characterization.py` | example | 14.62 s | 300 s | **PASS** |
+| `01_optics_and_sensor.py` | notebook | 14.82 s | 120 s | **PASS** |
+| `02_isp_color_fundamentals.py` | notebook | 2.85 s | 120 s | **PASS** |
+| `03_measuring_iq.py` | notebook | 2.57 s | 120 s | **PASS** |
+
+The timing JSON files are committed as local evidence: `results/reports/examples_timings.json` and `results/reports/notebooks_timings.json`. They are machine-specific wall times, not cross-platform promises.
+
 ## 6. Assumptions
 
 1. **Simulated sensor and preset.** The flagship preset is a representative engineering design point (LCG 100 uV/e-, 6000 e- full well, 2 e- rms read noise; HCG 300 uV/e-, 2000 e-, 0.7 e-; 10-bit ADC, 0.8 V full scale, 64 DN black level). It is not a measurement of, or a claim about, a specific commercial part.
@@ -301,6 +326,8 @@ Quick modes (`--quick`) use smaller grids and write suffixed `*_quick.json` arti
 3. **In-sample colour calibration.** The 3x3 CCM is fitted and evaluated on the same 24 ColorChecker patches. This measures whether the ISP can represent the calibration scene, not held-out generalisation, colour constancy, or performance under an unseen illuminant.
 4. **ISO 12233-style, not certified.** The slanted-edge e-SFR follows the standard's principles (5 degree tilt, ESF derivative, Hamming window, native-Nyquist band) but makes no claim of conformance to its chart, windowing, or reporting details. The EMVA 1288-style sensor characterization is likewise simulated and uncertified.
 5. **Determinism within one environment.** Every stochastic path takes an explicit `numpy.random.Generator` and a recorded seed. Bit-identical outputs are promised for one OS/Python/NumPy/SciPy environment; cross-platform comparisons use the stated tolerances.
+6. **Default ISP is an identity CCM baseline.** The shipped preset's `ccm.matrix` is the identity. It preserves a neutral baseline and lets the stage measurements isolate optics and sensor effects, but it is not a colour-accurate profile. A colour-accurate render must fit a matrix with `camsim.isp.ccm.fit_ccm` and supply it in `ccm.matrix`.
+7. **Defect conventions are explicit.** Dead pixels have zero mean photoresponse, stuck pixels are pinned high to the ADC white code, and hot pixels keep a dark-current multiplier with a separate hot mask. Stuck-black is equally physical but not the chosen deterministic convention.
 
 ## 7. Limitations
 
@@ -312,7 +339,13 @@ Quick modes (`--quick`) use smaller grids and write suffixed `*_quick.json` arti
 6. **Auto-exposure digital-gain noise.** At 0.01 lux auto-exposure needs HCG, the exposure ceiling, maximum analog gain, and about 44x digital gain. Metering converges, but digital gain amplifies sensor noise and cannot create signal; extreme-low-light image quality is not claimed.
 7. **No HDR, 3-D, motion blur, or autofocus.** The model has a single linear exposure, a planar scene, static optics, and no focus search, rolling shutter, or multi-frame HDR. These are Phase 6-9 or later scope, not G5 claims.
 8. **RCCC is a baseline only.** The clear channel is a luma placeholder for G and B; Bayer colour and MTF thresholds do not apply, and advanced RCCC demosaicing is deferred.
-9. **No machine-vision evidence.** `camsim.tasks` is an empty gated namespace. This report says nothing about CNN accuracy, task-relevant IQ, mono-versus-Bayer, auto-tuning, or metric correlation.
+9. **Identity default CCM is not colour accurate.** The default preset renders a ColorChecker at roughly 40 mean delta-E2000 at its default 10 ms exposure (measured 37.6 at 300 lux), about 11 when well exposed, and about 16 under 3000 K. The G3 values near 1-4 come from a per-illuminant fitted matrix, not from the shipped preset. `measure_all` records an identity-CCM warning in its metadata when colour is measured through the default.
+10. **Full 50 MP spectral simulation is not supported at v0.1.0.** A 50 MP frame on the 95-wavelength grid would need about 38 GB for one float64 cube before working copies. `scene.render` and `Sensor.expose` estimate peak memory before allocating and reject a request above the default 8 GiB budget with guidance to reduce shape/oversampling or process in chunks. The validated practical large-frame case is 1024 x 1024 at 1x oversampling (about 1.8 GB estimated peak, measured in section 5.1); 512 x 512 at 4x oversampling has a 3.2 GB cube and fits only with sufficient RAM. Chunked spectral simulation and a full 50 MP path are future work.
+11. **CI is added but not executed here.** The workflow includes quality, test-matrix, docs, build, examples, and notebooks jobs. GitHub Actions cannot run in this environment; the local equivalents passed and CI execution is pending a push. The owner must accept that residual, and no claim that CI is green is made.
+12. **Polychromatic PSF and banding are not v0.1.0.** The optics model uses a wavelength-independent PSF, and row noise is modelled without periodic banding. Both are documented future capabilities, not silent omissions.
+13. **Display P3 files carry sidecar metadata only.** A P3 PNG is tagged in its sidecar; the PNG itself has no reliably interoperable P3 colour profile in this release. Consumers must read the sidecar.
+14. **Reduced frame contract.** `RawFrame` omits wall-clock timestamp and package version, and `RenderedImage` omits `linear_xyz`; acquisition provenance lives in the surrounding experiment record. The reduction is documented, not hidden.
+15. **No machine-vision evidence.** `camsim.tasks` is an empty gated namespace. This report says nothing about CNN accuracy, task-relevant IQ, mono-versus-Bayer, auto-tuning, or metric correlation.
 
 ## 8. Reproduction
 
@@ -327,12 +360,9 @@ uv run python examples/04_emva_characterization.py
 uv run python examples/02_isp_stage_gallery.py
 uv run python examples/03_measure_iq.py
 
-# Gallery: examples 01-04 full mode, then notebooks 01-03 headless
-uv run python examples/01_spectral_scene_to_raw.py
-uv run python examples/02_isp_stage_gallery.py
-uv run python examples/03_measure_iq.py
-uv run python examples/04_emva_characterization.py
-make notebooks
+# Gallery: examples 01-04 and notebooks 01-03, with per-item timeouts
+uv run python benchmarks/run_examples.py
+uv run python benchmarks/run_notebooks.py
 
 # Consolidated G5 report and figures
 uv run python benchmarks/g5_validation_report.py
@@ -340,10 +370,13 @@ uv run python benchmarks/g5_validation_report.py
 # G5 quality gates
 uv run pytest -q
 uv run pytest --cov=camsim --cov-fail-under=90
+# Whole-package coverage including viz, for the two-scope report:
+uv run pytest --cov=camsim --cov-config=coverage-whole.rc --cov-report=term
 uv run ruff check . && uv run ruff format --check . && uv run mypy src
 uv run mkdocs build --strict
 uv run python benchmarks/benchmark_pipeline.py --quick
 uv run python benchmarks/benchmark_pipeline.py
+uv run python benchmarks/benchmark_pipeline.py --large
 uv build
 ```
 
@@ -356,7 +389,7 @@ uv build
 | Figure | Shows |
 |---|---|
 | [g5_gate_summary.png](../figures/g5_gate_summary.png) | Gate/check status matrix; G1-G4 PASS, G5 recorded checks pass, human sign-off awaiting |
-| [g5_evidence.png](../figures/g5_evidence.png) | Denoise SNR/MTF, sharpen profile/overshoot, auto-exposure convergence, and benchmark stage shares |
+| [g5_evidence.png](../figures/g5_evidence.png) | Denoise SNR, signed MTF50 change and ringing, sharpen profile/overshoot, auto-exposure convergence, and benchmark stage shares |
 | [g1_lux_normalization.png](../figures/g1_lux_normalization.png) | Photometric normalization across illuminants and 1-100,000 lux |
 | [g1_psf_mtf.png](../figures/g1_psf_mtf.png) | Gaussian, Airy, and box PSFs with their transfer functions |
 | [g2_ptc.png](../figures/g2_ptc.png) | LCG/HCG photon-transfer curves and system gain |
@@ -377,7 +410,11 @@ G5 is a human decision, not an automated verdict. The owner must review the evid
 - [ ] **Figures reviewed.** Inspect the figure gallery, especially `g5_gate_summary.png`, `g5_evidence.png`, the G3 ColorChecker delta-E figure, the RCCC baseline, and the G4 analytic MTF curves.
 - [ ] **Scope confirmed.** Agree that the validated scope is the scene/optics helpers, sensor, ISP, metrics, camera orchestration, IO, and CLI, and that machine vision is out of scope for v0.1.0.
 - [ ] **Assumptions confirmed.** Accept the simulated flagship preset, provisional synthetic spectral data, in-sample CCM, and the uncertified ISO 12233/EMVA-style measurement status.
-- [ ] **Limitations confirmed.** Accept the synthetic CFA re-authoring, in-sample calibration, 8x Airy diagnostic, synthetic stage measurements, quick-mode exclusion, extreme-low-light digital-gain noise, and the absence of HDR/3-D/motion-blur/autofocus.
+- [ ] **Limitations confirmed.** Accept the synthetic CFA re-authoring, in-sample calibration, 8x Airy diagnostic, synthetic stage measurements, quick-mode exclusion, extreme-low-light digital-gain noise, the identity default CCM, the absence of HDR/3-D/motion-blur/autofocus, no polychromatic PSF or banding, P3 sidecar-only tagging, and the reduced RawFrame/RenderedImage contract.
+- [ ] **Full-50-MP limitation accepted.** Confirm that v0.1.0 supports single-process spectral simulation up to the configured memory budget (validated at 1024 x 1024, 1x oversampling) and rejects larger grids with a clear error rather than attempting a 50 MP spectral cube.
+- [ ] **Coverage exception accepted.** Accept that subject-module coverage is 91.73 % and whole-package coverage including `camsim.viz` is lower, with viz exercised by the executed examples and notebooks. The 90 % gate applies to the numerical subject modules, not to the plotting layer.
+- [ ] **CI and notebook evidence accepted.** Confirm that the CI workflows and runners were added, every example and notebook passed locally under the 300 s / 120 s per-item timeouts, and CI execution is pending a push. Accept that residual.
+- [ ] **Two-minute-per-notebook condition confirmed.** Accept the per-notebook local times in section 5.9, all below 120 s, and the runner/CI timeout that enforces the budget.
 - [ ] **Release approved.** Approve tagging `v0.1.0` on the signed-off commit and starting Phase 6 machine-vision work afterwards.
 
 ```text
@@ -399,6 +436,9 @@ Notes:   ______________________________
 | mtf50_before_cp | `0.18984` |
 | mtf50_after_cp | `0.217722` |
 | mtf50_relative_change | `0.146872` |
+| overshoot_fraction | `0.0007194` |
+| undershoot_fraction | `0.0006522` |
+| ringing_fraction | `0.0007194` |
 | snr_before_db | `25.9456` |
 | snr_after_db | `36.5583` |
 | snr_gain_db | `10.6127` |

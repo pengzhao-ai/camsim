@@ -58,12 +58,17 @@ Seeds: probe 100, scene 101, flat 111, LSC 61, denoise 62. Each illuminant reuse
 
 The enforced order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM ->
 denoise -> sharpen -> tone -> output`. DPC, BLC, LSC, AWB, demosaicing,
-the CCM, denoise, and sharpen operate in linear float32 light. BLC
-subtracts the 64 DN pedestal and divides by the 959 DN white span, so
-ADC saturation maps to 1.0. The tone stage applies the exposure trim in
-linear light, converts to Display P3 when requested, clamps to the
-display range, and applies the sRGB OETF; it is the only non-linear
-step. The linear pre-tone scaling check verifies this invariant directly.
+the CCM, denoise, and sharpen operate in linear float32 light. The CCM
+output is clamped at zero so out-of-gamut colours stay physical; that
+non-negativity clamp is the one bounded exception to the linear-space
+invariant, and the G3 linearity data keep every pre-clamp output
+positive so the clamp is inactive. BLC subtracts the 64 DN pedestal
+and divides by the 959 DN white span, so ADC saturation maps to 1.0.
+The tone stage applies the exposure trim in linear light, converts to
+Display P3 when requested, clamps to the display range, and applies the
+sRGB OETF; it is the only intentionally non-linear step. The linear
+pre-tone scaling check runs with AWB enabled and a fitted CCM and
+verifies this invariant directly.
 
 ## Measurement methodology
 
@@ -126,7 +131,9 @@ unclipped `linear_rgb` buffer at +0.5 EV in Display P3.
 | sRGB OETF vs colour.cctf_encoding (max abs) | 2.977e-08 | < 1e-07 | PASS |
 | Stage trace tone reproduction (max abs) | 0 | < 1e-06 | PASS |
 | Stage trace linear_rgb reproduction (Display P3, max abs) | 0 | < 1e-06 | PASS |
-| Linear pre-tone scaling invariance (max relative error) | 0 | < 1e-05 | PASS |
+| AWB gain scale invariance (max relative error) | 0 | < 0.001 | PASS |
+| Linear pre-tone scaling invariance with AWB and CCM (max relative error) | 0 | < 1e-05 | PASS |
+| CCM pre-clamp minimum on linearity data | 0.0248324 | > 0 | PASS |
 | LSC flat-field residual after correction | 0.00618314 | < 0.02 | PASS |
 | Denoise SNR gain (dB) | 13.0556 | > 3 | PASS |
 | Denoise edge-contrast preservation | 4.333e-05 | < 0.1 | PASS |
@@ -225,7 +232,9 @@ channels are within the 5 % tolerance.
 | sRGB OETF max abs vs colour-science | 2.977e-08 |
 | Trace display reproduction max abs | 0.000e+00 |
 | Trace linear_rgb reproduction max abs | 0.000e+00 |
-| Linear pre-tone scaling max relative error | 0.000e+00 |
+| AWB gain scale invariance max relative error | 0.000e+00 |
+| Linear pre-tone scaling max relative error with AWB + CCM | 0.000e+00 |
+| CCM pre-clamp minimum on linearity data | 2.483e-02 |
 
 The trace stage order in the Display P3 validation is `dpc -> blc -> awb -> demosaic -> ccm -> tone -> output`. The tone and linear-buffer
 comparisons are exact to float32 because the trace records the same
@@ -248,13 +257,12 @@ validates the transfer function against the published standard.
 The LSC measurement calibrates a gain map from one noisy flat field
 and applies it to an independent flat field; the residual is the
 max-minus-min range divided by the mean. The exact-reciprocal check
-is the Task 18 unit test
-`tests/test_isp_lsc.py::test_lsc_flat_field_corrects_vignetting`.
+is `tests/test_isp_lsc.py::test_lsc_flat_field_corrects_vignetting`.
 Denoise and sharpen are measured on synthetic step and flat regions
-with explicit seeds. **Formal ISO 12233 MTF50 and MTF20 validation is
-deferred to G4**: the independent metrics harness does not exist yet,
-so G3 claims edge-contrast preservation and positive overshoot, not
-an MTF number.
+with explicit seeds. Formal ISO 12233-style MTF50 and MTF20 are
+measured by the independent G4 metrics harness and restated in the
+G5 cross-cutting evidence; G3 itself claims edge-contrast
+preservation and positive overshoot.
 
 ## 5. RCCC baseline
 
@@ -306,12 +314,19 @@ ties the BLC contract to the rendered output.
 - **Quick mode is not gate evidence.** `--quick` uses a smaller chart
   and star and writes `g3_isp_results_quick.json`; it never writes or
   overwrites the committed `g3_isp_results.json` or `g3_isp.md`.
-- **Formal MTF is deferred to G4.** ISO 12233-style e-SFR, MTF50, and
-  MTF20 require the independent metrics harness; G3 reports
+- **Formal MTF lives in G4/G5.** ISO 12233-style e-SFR, MTF50, and
+  MTF20 are measured by the independent metrics harness; G3 reports
   edge-contrast preservation and overshoot instead.
-- **Camera auto-exposure is deferred to G5.** The `Camera`
-  orchestration and `auto_expose()` convergence check are Phase 5
-  consolidation work; G3 calibrates exposure explicitly from a probe.
+- **Camera auto-exposure is a G5 check.** `Camera.auto_expose()`
+  convergence and its preset limits are measured in the G5
+  cross-cutting evidence; G3 calibrates exposure from an explicit probe.
+- **The shipped ISP default is an identity CCM.** The G3 delta-E
+  results come from a per-illuminant matrix fitted with
+  `camsim.isp.ccm.fit_ccm`; the default preset deliberately stays an
+  identity baseline so measurements isolate optics and sensor. A
+  colour-accurate render must fit a CCM and supply it in
+  `ccm.matrix`; the default ColorChecker rendering is not colour
+  accurate.
 - **Determinism.** Seeds are explicit and outputs are reproducible
   within one software environment; PNG bytes can differ across
   Matplotlib/font builds, so cross-platform comparisons use numbers

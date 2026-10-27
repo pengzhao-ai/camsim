@@ -38,6 +38,13 @@ channel values, matching the opponent-space helper in
 under D65. Applying them to gamma-encoded values computes a different,
 non-standard quantity.
 
+The weights are defined on the **sRGB primaries**. Direct 3-D calls to
+:func:`snr_channels` therefore assume a linear sRGB image. A linear Display P3
+buffer must be converted to linear sRGB first; :func:`camsim.metrics.measure_all`
+performs that conversion and records it in the report metadata. Applying
+Rec. 709 weights directly to P3 values would overstate pure P3 green and
+understate pure P3 blue.
+
 Validity
 --------
 A measurement is valid only when every sample is finite, the mean is strictly

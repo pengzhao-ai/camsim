@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "name": "01_optics_and_sensor.py",
+      "passed": true,
+      "reason": "ok",
+      "seconds": 14.820066792002763
+    },
+    {
+      "name": "02_isp_color_fundamentals.py",
+      "passed": true,
+      "reason": "ok",
+      "seconds": 2.8501872920023743
+    },
+    {
+      "name": "03_measuring_iq.py",
+      "passed": true,
+      "reason": "ok",
+      "seconds": 2.56769691700174
+    }
+  ],
+  "kind": "camsim.notebooks_run",
+  "passed": true,
+  "timeout_s": 120.0
+}

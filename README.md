@@ -69,10 +69,17 @@ package and operates on arrays plus metadata.
   RCCC, and monochrome CFAs.
 - Dual conversion gain (LCG/HCG), Poisson shot noise, read/row noise, DSNU,
   PRNU, dark current with a temperature-doubling model, defects, and PDAF sites.
+- Dead pixels have zero mean photoresponse, stuck pixels are pinned to the ADC
+  white code, and hot pixels receive a temperature-dependent dark-current
+  multiplier. The RAW frame carries the defect union, a separate hot-pixel
+  mask, and the PDAF mask; DPC corrects all three defect classes.
 - Programmable analog/digital gain, 10-bit ADC with black-level pedestal,
   analog or digital binning, and optional crosstalk models.
 - Every frame records its seeds, mode, gains, temperature, masks, and a stable
   configuration hash; fixed-pattern maps are deterministic for a preset.
+- `scene.render` and `Sensor.expose` estimate peak simulation memory before
+  allocating a spectral cube and raise a clear error above the configurable
+  budget (8 GiB default).
 
 **ISP (`camsim.ISP`)**
 
@@ -82,7 +89,14 @@ package and operates on arrays plus metadata.
   balance, ridge-fitted 3×3 colour matrices, lens-shading correction,
   edge-preserving denoise, unsharp masking, and sRGB/Display P3 output.
 - Every linear stage runs in float32; only the tone curve and output OETF are
-  non-linear. Optional stage traces record each intermediate buffer.
+  intentionally non-linear. The colour-correction matrix's non-negativity
+  clamp is the one bounded exception, and it is inactive on in-gamut data.
+  Optional stage traces record each intermediate buffer.
+- **The default preset's CCM is the identity.** It is a neutral baseline, not
+  a colour-accurate profile: a default ColorChecker render is roughly 40 mean
+  ΔE2000 at the preset's default exposure (about 11 when well exposed) versus
+  about 0.9 with the fitted G3 matrix. Fit a matrix with
+  `camsim.isp.ccm.fit_ccm` and supply it in `ccm.matrix` for colour work.
 
 **Metrics (`camsim.metrics`)**
 
@@ -172,8 +186,12 @@ print(f"acutance: {report.acutance:.3f}")
 
 The scene configuration, exposure, and layout must agree on the sensor shape;
 mismatches are rejected rather than silently resampled. For a colour workflow,
-render `"colorchecker"` and measure `colorchecker_layout(illuminant="D65")`,
-which carries the spectrally computed Lab reference. See
+render `"colorchecker"`, build the matching layout with
+`chart_layout_from_scene(scene)`, and pass it to `measure_all`; the helper uses
+the scene's own painted cells and spectrally computed Lab reference, so the
+shape and oversampling cannot drift. The shipped ISP preset has an identity
+CCM, so its delta-E is a baseline, not a colour-accuracy claim: fit a matrix
+with `camsim.isp.ccm.fit_ccm` and place it in `ccm.matrix`. See
 [ISP stages](docs/isp_stages.md) and [Metrics](docs/metrics.md) for the full
 walkthroughs.
 
@@ -208,7 +226,7 @@ phase reports; this README deliberately does not restate them.
 
 | Gate | Scope | Status | Evidence |
 |---|---|---|---|
-| G0 | install, lint, typecheck, tests, docs | Green locally; CI runs the same commands | [Validation](docs/validation.md) |
+| G0 | install, lint, typecheck, tests, docs | Green locally; CI workflows added, execution pending a push | [Validation](docs/validation.md) |
 | G1 | scene, illuminants, optics | **PASS** | [`results/reports/g1_scene_optics.md`](results/reports/g1_scene_optics.md) |
 | G2 | sensor model and EMVA characterization | **PASS** | [`results/reports/g2_sensor.md`](results/reports/g2_sensor.md) |
 | G3 | ISP stages and pipeline | **PASS** | [`results/reports/g3_isp.md`](results/reports/g3_isp.md) |
@@ -254,28 +272,37 @@ make typecheck    # uv run mypy src
 make coverage     # pytest with coverage; fails below 90 %
 make docs         # uv run mkdocs build --strict
 make build        # uv build (wheel + sdist)
-make notebooks    # execute Jupytext notebooks headlessly
-make figures      # regenerate the committed example figures
+make notebooks    # execute Jupytext notebooks with a 120 s per-notebook timeout
+make figures      # run examples with a 300 s per-example timeout
+make coverage-whole  # whole-package coverage including camsim.viz
 make gate         # lint, typecheck, tests, coverage, docs, and build
 ```
 
 A single test can be run with
 `uv run pytest tests/test_package.py::test_import_and_version -v`.
 
-Benchmarks time the reference pipeline at 512 × 512, or 128 × 128 in quick mode:
+Benchmarks time the reference pipeline at 512 × 512, 128 × 128 in quick mode,
+or 1024 × 1024 in the realistic large-frame case (1× oversampling, about 1.8 GB
+estimated peak):
 
 ```bash
 uv run python benchmarks/benchmark_pipeline.py
 uv run python benchmarks/benchmark_pipeline.py --quick
+uv run python benchmarks/benchmark_pipeline.py --large
 ```
 
 Timings are machine-specific and are printed, never committed as claims.
+Full 50 MP spectral simulation is not supported at v0.1.0: the memory guard
+rejects a 38 GB cube with guidance to reduce the grid or process externally.
 
 The coverage gate is statement and branch coverage of the simulation, metrics,
-and support modules. The presentation layer (`camsim.viz`) is validated by the
-executed examples and notebooks that generate the committed gallery, and is
-excluded from the unit-suite gate; see [Validation](docs/validation.md) for the
-policy.
+and support modules: **91.73 % subject-module coverage** in this candidate.
+**Whole-package coverage including `camsim.viz` is 83.55 %**, because the
+plotting layer is exercised by the executed examples and notebooks that
+generate the committed gallery rather than by unit tests. The 90 % threshold
+applies to the numerical subject modules; the lower whole-package number is a
+reviewed exception, not a hidden metric. See
+[Validation](docs/validation.md) for the policy and the sign-off item.
 
 ## Release status
 

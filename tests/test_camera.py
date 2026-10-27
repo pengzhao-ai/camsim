@@ -584,3 +584,33 @@ def test_camera_export_is_not_imported_eagerly():
         ]
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_clipping_uses_analog_gain_for_the_well_and_digital_gain_for_the_code(camera):
+    """A sub-unity digital gain must not hide an ADC/full-well saturation.
+
+    At 6 dB analog gain the HCG full-well voltage is above the ADC full scale,
+    so the converter saturates first. A digital gain of 0.5 maps that saturated
+    code to roughly half scale. Computing the full-well threshold with the
+    post-ADC digital gain folded into the voltage would place the threshold at
+    the top code and miss the saturation; the correct model clips the ADC ratio
+    first and applies digital gain afterwards.
+    """
+    hot_scene = render(
+        "flat_patch",
+        illuminant="D65",
+        lux=500_000.0,
+        shape=(64, 64),
+        oversampling=2,
+    )
+    raw = camera.sensor.expose(
+        hot_scene.irradiance,
+        0.01,
+        mode="HCG",
+        analog_gain_db=6.0,
+        digital_gain=0.5,
+        seed=0,
+    )
+    largest_code = (1 << raw.bit_depth) - 1
+    assert raw.data.max() < largest_code
+    assert _is_clipped(raw, camera.sensor.config) is True

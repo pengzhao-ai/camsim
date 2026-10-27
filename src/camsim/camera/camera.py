@@ -590,28 +590,34 @@ def _is_clipped(raw: RawFrame, config: SensorConfig) -> bool:
     reconstructs both from the frame's recorded readout mode and gains (not
     from the settings the caller believes were used):
 
-    ``well_code = black + full_well_e * conversion_gain_uv_per_e * gain_linear
-    / adc.full_scale_uv * white_span``
+    ``well_code = black + min(1, full_well_e * conversion_gain_uv_per_e
+    * analog_gain_linear / adc.full_scale_uv) * white_span * digital_gain``
 
-    and compares pixels against ``min(2**bits - 1, floor(well_code))``. When
-    the ADC clips first, the threshold is the largest code and only ADC
-    saturation counts. When the well clips first, the threshold sits below the
-    converter ceiling; for the reference preset at unity gain it is 783, not
-    1023. Because the well clip happens before read noise, a marginal
-    saturated pixel scatters around the well code by the read-noise interval;
-    the 1 % fraction tolerates that statistical edge.
+    and compares pixels against ``min(2**bits - 1, floor(well_code))``. The
+    full-well limit is formed with the **analog gain only**: digital gain is a
+    post-ADC multiplier, so it cannot change where the charge well or converter
+    saturates. It does change the code at which that saturation appears, so it
+    is applied after the ADC ratio is clipped. When the ADC clips first, the
+    threshold is the largest code and only ADC saturation counts. When the well
+    clips first, the threshold sits below the converter ceiling; for the
+    reference preset at unity gain it is 783, not 1023. Because the well clip
+    happens before read noise, a marginal saturated pixel scatters around the
+    well code by the read-noise interval; the 1 % fraction tolerates that
+    statistical edge.
     """
     largest_code = (1 << raw.bit_depth) - 1
     mode = _frame_mode(raw.mode)
     mode_config = config.modes[mode]
-    gain_linear = 10.0 ** (float(raw.analog_gain_db) / 20.0) * float(raw.digital_gain)
+    analog_gain_linear = 10.0 ** (float(raw.analog_gain_db) / 20.0)
     full_well_uv = (
-        float(mode_config.full_well_e) * float(mode_config.conversion_gain_uv_per_e) * gain_linear
+        float(mode_config.full_well_e)
+        * float(mode_config.conversion_gain_uv_per_e)
+        * analog_gain_linear
     )
     white_span = float(largest_code) - float(raw.black_level_dn)
-    well_code = (
-        float(raw.black_level_dn) + (full_well_uv / float(config.adc.full_scale_uv)) * white_span
-    )
+    # The converter clips the analog signal before digital gain is applied.
+    adc_fraction = min(1.0, full_well_uv / float(config.adc.full_scale_uv))
+    well_code = float(raw.black_level_dn) + adc_fraction * white_span * float(raw.digital_gain)
     clip_code = min(largest_code, math.floor(well_code))
     clipped = int(np.count_nonzero(raw.data >= clip_code))
     return clipped / raw.data.size > _CLIP_FRACTION

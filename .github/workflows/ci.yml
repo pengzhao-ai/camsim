@@ -51,6 +51,36 @@ jobs:
       - name: Run tests with coverage gate
         run: uv run pytest --cov=camsim --cov-report=term-missing --cov-fail-under=90
 
+  examples:
+    name: Examples headless
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - name: Sync dependencies
+        run: uv sync --all-extras
+      - name: Run examples with the 300 s per-example budget
+        run: uv run python benchmarks/run_examples.py
+
+  notebooks:
+    name: Notebooks headless
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - name: Sync dependencies
+        run: uv sync --all-extras
+      - name: Execute notebooks with the 120 s per-notebook budget
+        run: uv run python benchmarks/run_notebooks.py
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest

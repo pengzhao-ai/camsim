@@ -124,6 +124,23 @@ def test_raw_frame_masks_are_optional_boolean_and_shape_matched() -> None:
         make_raw_frame(pdaf_mask=np.zeros((2, 4), dtype=bool))
 
 
+def test_raw_frame_hot_mask_is_optional_but_must_subset_the_defect_union() -> None:
+    defect = np.zeros((4, 4), dtype=bool)
+    defect[0, 0] = True
+    hot = np.zeros((4, 4), dtype=bool)
+    hot[0, 0] = True
+
+    raw = make_raw_frame(defect_mask=defect, hot_mask=hot)
+    assert raw.hot_mask is hot
+
+    with pytest.raises(ValueError, match="hot_mask requires defect_mask"):
+        make_raw_frame(hot_mask=hot)
+    with pytest.raises(ValueError, match="subset"):
+        make_raw_frame(defect_mask=np.zeros((4, 4), dtype=bool), hot_mask=hot)
+    with pytest.raises(ValueError, match="hot_mask"):
+        make_raw_frame(defect_mask=defect, hot_mask=np.zeros((2, 4), dtype=bool))
+
+
 def test_raw_frame_with_data_preserves_metadata() -> None:
     mask = np.zeros((4, 4), dtype=bool)
     raw = make_raw_frame(defect_mask=mask)
@@ -139,14 +156,19 @@ def test_raw_frame_with_data_preserves_metadata() -> None:
     assert updated.exposure_s == raw.exposure_s
     assert updated.sensor_config_hash == raw.sensor_config_hash
     assert updated.defect_mask is mask
+    assert updated.hot_mask is raw.hot_mask
     with pytest.raises(ValueError, match="data"):
         raw.with_data(np.zeros((4, 4), dtype=np.float32))
 
 
 def test_raw_frame_metadata_json_roundtrip() -> None:
+    defect = np.array([[True, False, False, True]] * 4)
+    hot = np.zeros((4, 4), dtype=bool)
+    hot[0, 0] = True
     raw = make_raw_frame(
         data=np.arange(16, dtype=np.uint16).reshape(4, 4),
-        defect_mask=np.array([[True, False, False, True]] * 4),
+        defect_mask=defect,
+        hot_mask=hot,
         pdaf_mask=None,
     )
 
@@ -154,11 +176,13 @@ def test_raw_frame_metadata_json_roundtrip() -> None:
 
     assert isinstance(payload["data"], list)
     assert isinstance(payload["defect_mask"], list)
+    assert isinstance(payload["hot_mask"], list)
     assert payload["pdaf_mask"] is None
     restored = RawFrame.from_dict(payload)
     np.testing.assert_array_equal(restored.data, raw.data)
     assert restored.data.dtype == np.uint16
     np.testing.assert_array_equal(restored.defect_mask, raw.defect_mask)
+    np.testing.assert_array_equal(restored.hot_mask, raw.hot_mask)
     assert restored.pdaf_mask is None
     for field_name in (
         "cfa",

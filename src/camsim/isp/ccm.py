@@ -62,6 +62,16 @@ clipping is a sign of an over-strong fit. Everything before the tone curve
 remains linear; applying a CCM to gamma-encoded data is a failure mode, because
 the transform then acts on a non-linear function of radiance.
 
+**Bounded exception to the linear-space invariant.** The design says the CCM
+operates in linear float32 light. It does, but its non-negativity clamp means
+the stage is linear only on the in-gamut domain where every matrix output is
+non-negative. That exception is bounded and explicit: on in-gamut data the
+clamp is inactive and scaling the input scales the output exactly; on
+out-of-gamut data the clamp trades hue accuracy for physical non-negative
+radiance. The G3 linearity check uses an in-gamut frame and an explicitly
+measured pre-clamp minimum, and this is the only pre-tone stage allowed such a
+clamp.
+
 Failure artefacts guarded or documented here: over-fitting a noisy or small
 patch set (large coefficients, chroma noise), negative RGB after the transform
 (clamped, at the cost of hue), a neutral shift when rows do not sum to one,

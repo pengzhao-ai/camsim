@@ -77,6 +77,11 @@ from scipy.ndimage import sobel  # type: ignore[import-untyped]
 
 from camsim.config.schema import LensConfig
 from camsim.core.color import ColorReference
+from camsim.core.memory import (
+    ensure_memory_budget,
+    estimate_scene_peak_bytes,
+    resolve_memory_limit,
+)
 from camsim.core.spectral import SpectralIrradiance
 from camsim.optics.lens import transmittance_at
 from camsim.optics.propagation import apply_psf, box_downsample
@@ -691,6 +696,8 @@ def render(
     shape: tuple[int, int] = (256, 256),
     oversampling: int = 4,
     seed: int | None = None,
+    *,
+    max_memory_bytes: int | None = None,
 ) -> SceneResult:
     """Render a synthetic target to sensor-plane spectral irradiance.
 
@@ -739,6 +746,14 @@ def render(
         value does not change the image; it is accepted and recorded now so
         later stochastic targets remain reproducible and no global RNG is
         needed.
+    max_memory_bytes:
+        Optional peak-memory budget for this render, in bytes. ``None`` uses
+        ``CAMSIM_MAX_SIMULATION_BYTES`` when set, otherwise 8 GiB. The guard
+        estimates the oversampled cube, one float64 working copy, and the
+        sensor-grid output before allocating them, and raises a clear
+        ``ValueError`` when the estimate exceeds the budget. v0.1.0 does not
+        chunk spectral processing; reduce ``shape``/``oversampling`` or raise
+        the limit only when the machine has enough RAM.
 
     Returns
     -------
@@ -752,7 +767,9 @@ def render(
     ------
     ValueError
         If the target, shape, oversampling, seed, lens, pitch, illuminant, or
-        PSF is invalid, or if the ColorChecker grid cannot fit in ``shape``.
+        PSF is invalid, if the ColorChecker grid cannot fit in ``shape``, or if
+        the estimated peak memory exceeds the configured budget (the error
+        names the estimate, the limit, and how to reduce the request).
 
     Notes
     -----
@@ -775,6 +792,22 @@ def render(
     sensor_shape = _validate_shape(shape)
     sample_factor = _require_integer(oversampling, "oversampling", 1)
     seed_value: int | None = None if seed is None else _require_integer(seed, "seed", 0)
+    spd = illuminant_spd(illuminant)
+    limit_bytes = resolve_memory_limit(max_memory_bytes)
+    estimate_bytes = estimate_scene_peak_bytes(
+        sensor_shape,
+        int(spd.wavelengths_nm.nm.size),
+        sample_factor,
+    )
+    ensure_memory_budget(
+        estimate_bytes,
+        limit_bytes,
+        context="scene.render",
+        guidance=(
+            "Reduce shape or oversampling, or process the scene in chunks outside "
+            "camsim and pass the resulting SpectralIrradiance to Sensor.expose."
+        ),
+    )
     if lens is None:
         resolved_lens = _reference_lens()
     elif isinstance(lens, LensConfig):
@@ -811,7 +844,6 @@ def render(
         reflectance = siemens_star_target(scene_shape)
         layout = SceneLayout("siemens_star")
 
-    spd = illuminant_spd(illuminant)
     scene_irradiance = lux_to_spectral_irradiance(lux, spd)
     wavelengths_nm = spd.wavelengths_nm.nm
     if reflectance.ndim == 3:

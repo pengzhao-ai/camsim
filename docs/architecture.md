@@ -37,7 +37,7 @@ one sanctioned bridge runs scene → metrics, never the reverse.
 src/camsim/
 ├── __init__.py          # lazy public export map
 ├── _version.py          # single version source
-├── cli.py               # validate / schema / info
+├── cli.py               # validate / schema / info / render / characterize / measure / figures
 ├── core/                # units, spectral cubes, frames, colour references
 ├── config/              # Pydantic schemas, JSON I/O, presets
 ├── data/                # bundled QE/CFA/IR-cut CSVs (package resources)
@@ -65,12 +65,17 @@ gates; `camsim.tasks` does not exist as working code until G5 is signed off.
   optional pixel pitch. The sensor-plane boundary is before the sensor's own
   spectral filters.
 - **`RawFrame`** — `uint16` data plus every piece of metadata the ISP needs
-  (CFA, bit depth, black level, gains, mode, temperature, geometry, masks,
-  simulation provenance). No hidden globals.
+  (CFA, bit depth, black level, gains, mode, temperature, geometry, the defect
+  union, a separate hot-pixel mask, PDAF mask, and configuration hash). No
+  hidden globals. The reduced v0.1.0 contract omits wall-clock timestamp and
+  package version; those belong to the surrounding experiment record.
 - **`RenderedImage`** — display-referred `float32` image in `[0, 1]` with colour
   space, channel layout, optional linear RGB, and stage traces. The
   `linear_rgb` buffer is the unclipped pre-tone data that resolution and noise
-  metrics consume.
+  metrics consume; its primaries follow `color_space` (linear Display P3 for a
+  P3 image), and `measure_all` converts it to linear sRGB before applying
+  Rec. 709 luma. The reduced v0.1.0 contract has no `linear_xyz`, timestamp, or
+  package-version field.
 - **`MetricReport`** — frozen dataclass with optional metric groups, layout id,
   units, and provenance; serializes to dict/JSON with non-finite values as
   `null`.
@@ -108,11 +113,12 @@ limitations.
 file naming, and figure styling. It is exercised by the example scripts and
 notebooks that generate the committed gallery, not by the unit suite. The
 statement-and-branch coverage gate in `pyproject.toml` therefore omits
-`camsim.viz`; the simulation, metrics, configuration, CLI, and characterization
-modules remain under the 90 % threshold. This is a deliberate split between
-correctness logic, which unit tests must cover, and plotting code, which the
-executed gallery demonstrates. See [Validation](validation.md) for the policy
-and evidence.
+`camsim.viz`; the numerical subject modules remain under the 90 % threshold.
+The measured subject-module coverage is **91.73 %**; the whole-package figure
+including viz is **83.55 %** and is a reviewed exception, measured with
+`coverage-whole.rc`. This is a deliberate split between correctness logic,
+which unit tests must cover, and plotting code, which the executed gallery
+demonstrates. See [Validation](validation.md) for the policy and evidence.
 
 ## Repository artifacts
 
@@ -127,8 +133,15 @@ and evidence.
 - `benchmarks/` holds the G1 report generator and the pipeline benchmark; the
   benchmark prints environment and timing tables and does not commit
   machine-specific numbers.
-- `.github/workflows/` holds CI, the Pages deployment, and the tag-triggered
-  release workflow that attaches wheel and sdist assets to a GitHub release.
+- `.github/workflows/` holds CI (including headless examples and notebooks
+  jobs), the Pages deployment, and the tag-triggered release workflow that
+  attaches wheel and sdist assets to a GitHub release. CI execution is pending
+  a push in this candidate; the local runner equivalents are recorded in the
+  G5 evidence.
+- `scene.render` and `Sensor.expose` enforce a configurable simulation-memory
+  budget (8 GiB default via `CAMSIM_MAX_SIMULATION_BYTES` or
+  `max_memory_bytes=`), because v0.1.0 does not chunk spectral cubes. Full
+  50 MP spectral simulation is not supported.
 
 The release contract is in [Release](release.md).
 

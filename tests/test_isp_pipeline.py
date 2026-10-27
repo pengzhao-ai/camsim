@@ -413,6 +413,7 @@ def test_metadata_records_capture_and_configuration(isp_config, raw_frame):
         "pixel_pitch_um",
         "awb_gains",
         "awb_method",
+        "ccm_matrix",
     }
     assert out.metadata["isp_name"] == "default"
     assert out.metadata["isp_config_hash"] == isp.config_hash
@@ -572,3 +573,18 @@ def test_pipeline_is_deterministic_and_leaves_raw_untouched(isp_config, raw_fram
     np.testing.assert_array_equal(first.linear_rgb, second.linear_rgb)
     np.testing.assert_array_equal(first.stages["ccm"].data, second.stages["ccm"].data)
     np.testing.assert_array_equal(raw_frame.data, before)
+
+
+def test_rendered_metadata_records_the_applied_ccm(isp_config, raw_frame):
+    """The default preset records its identity baseline in the image metadata."""
+    identity = np.eye(3).tolist()
+    assert np.asarray(isp_config.ccm.matrix).tolist() == identity
+    out = camsim.ISP(isp_config).process(raw_frame)
+    assert out.metadata["ccm_matrix"] == identity
+
+    fitted = [[1.04, -0.02, -0.02], [-0.03, 1.06, -0.03], [-0.02, -0.04, 1.06]]
+    config = isp_config.model_copy(
+        update={"ccm": isp_config.ccm.model_copy(update={"matrix": fitted})}
+    )
+    fitted_out = camsim.ISP(config).process(raw_frame)
+    assert fitted_out.metadata["ccm_matrix"] == fitted

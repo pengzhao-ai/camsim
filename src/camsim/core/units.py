@@ -8,10 +8,12 @@ Photon counting instead needs a rate per nanometre of bandwidth::
 
 with ``E_photon(lambda) = h * c / lambda`` in joules. Because both quantities
 are densities *per nanometre*, these helpers never integrate across wavelength;
-later stages multiply by wavelength cell widths when turning a spectral cube
-into electrons, using the same trapezoidal weights as the resampler (half-width
-cells at the first and last sample, full width between interior samples).
-Keeping that integral explicit avoids double-counting bandwidth when grids are
+later stages multiply by the wavelength-sample spacing when turning a spectral
+cube into electrons. The sensor uses constant-step integration on its validated
+uniform grid: every sample is weighted equally by ``Δλ`` and there are no
+half-width edge cells. The explicit wavelength-resampling helper is the
+component that uses overlap weights; do not confuse the two conventions.
+Keeping the integral explicit avoids double-counting bandwidth when grids are
 resampled.
 
 Real-world parameter ranges: the visible band spans roughly 360-830 nm. At

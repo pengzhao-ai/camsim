@@ -61,9 +61,9 @@ map from one noisy flat field and applying it to an independent flat field.
 Denoise is measured as the SNR gain on a noisy flat region plus the relative
 change of a step-edge contrast with the bilateral filter. Sharpening is
 measured as the contrast gain and the positive overshoot of a thresholded
-unsharp mask on a step edge. Formal ISO 12233 MTF50 measurement is **not**
-performed here: the independent metrics harness does not exist until Phase 4,
-so the G3 report defers MTF to G4 rather than claiming an MTF check.
+unsharp mask on a step edge. Formal ISO 12233-style MTF50/MTF20 measurement
+lives in the independent G4 metrics harness and the G5 cross-cutting evidence;
+the G3 report points to those checks rather than duplicating them.
 
 **RCCC.** An RCCC mosaic is reconstructed by the documented luma-placeholder
 baseline. It is a shape/linearity/smoke test only; the Bayer ΔE and MTF
@@ -168,6 +168,7 @@ DEMOSAIC_MHC_MAX: Final[float] = 1e-4
 TONE_MAX_ABS: Final[float] = 1e-7
 TRACE_MAX_ABS: Final[float] = 1e-6
 LINEARITY_MAX_REL: Final[float] = 1e-5
+LINEARITY_AWB_MAX_REL: Final[float] = 1e-3
 LSC_RESIDUAL_MAX: Final[float] = 0.02
 DENOISE_SNR_GAIN_MIN: Final[float] = 3.0
 DENOISE_EDGE_MAX: Final[float] = 0.10
@@ -1321,10 +1322,78 @@ def _linearity_frame(code_signal: int, shape: tuple[int, int]) -> RawFrame:
     )
 
 
+def _linearity_ccm() -> NDArray[np.float64]:
+    """Return a positively fitted 3x3 CCM for the linearity frame.
+
+    The matrix is fitted with :func:`camsim.isp.ccm.fit_ccm` from a
+    deterministic, well-conditioned set of in-gamut camera/target samples,
+    using a tiny ridge and the row-sum constraint. It is not the ColorChecker
+    matrix; its purpose is to exercise the CCM stage in the linearity test with
+    a real fit rather than a hand-typed identity. The matrix is chosen so that
+    every output on the synthetic linearity frame is positive, which keeps the
+    stage's documented non-negativity clamp inactive and the linearity check
+    meaningful.
+    """
+    target = np.array(
+        [
+            [0.08, 0.10, 0.12],
+            [0.18, 0.16, 0.14],
+            [0.28, 0.24, 0.20],
+            [0.38, 0.34, 0.30],
+            [0.48, 0.46, 0.42],
+            [0.58, 0.54, 0.50],
+            [0.68, 0.64, 0.60],
+            [0.78, 0.74, 0.70],
+            [0.12, 0.42, 0.22],
+            [0.22, 0.62, 0.32],
+            [0.32, 0.52, 0.72],
+            [0.72, 0.52, 0.32],
+            [0.52, 0.72, 0.42],
+            [0.42, 0.22, 0.62],
+            [0.62, 0.32, 0.12],
+            [0.82, 0.42, 0.22],
+            [0.72, 0.82, 0.52],
+            [0.52, 0.62, 0.82],
+            [0.20, 0.30, 0.80],
+            [0.80, 0.30, 0.20],
+            [0.30, 0.80, 0.30],
+            [0.40, 0.40, 0.40],
+            [0.60, 0.60, 0.60],
+            [0.90, 0.85, 0.80],
+        ],
+        dtype=np.float64,
+    )
+    reference = np.array(
+        [
+            [0.98, 0.03, -0.01],
+            [-0.02, 1.04, -0.02],
+            [0.01, -0.03, 1.02],
+        ],
+        dtype=np.float64,
+    )
+    camera = target @ np.linalg.inv(reference).T
+    fitted = fit_ccm(camera, target, ridge=1e-6, row_sum=True)
+    return np.asarray(fitted, dtype=np.float64)
+
+
 def _measure_linearity(
     shape: int,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Verify that doubling the RAW signal doubles the pre-tone linear output."""
+    """Verify that doubling the RAW signal doubles the pre-tone linear output.
+
+    Three properties are measured. First, gray-world AWB gain *estimation* is
+    scale invariant: doubling the signal must not change the estimated gains.
+    Second, with AWB enabled (pinned to those estimated gains) and a positively
+    fitted CCM, doubling the black-level-corrected RAW signal must double the
+    last linear trace stage exactly; the fitted matrix is checked to produce
+    strictly positive pre-clamp values, so its documented non-negativity clamp
+    is inactive. Third, the result is reported with its pre-clamp minimum so
+    the exception is explicit rather than asserted in prose.
+
+    Denoise and sharpen are disabled because both are optional enhancement
+    stages and the shipped baseline leaves them off. Tone is excluded because
+    it is the one intentionally non-linear stage.
+    """
     isp_config = load_isp(_ISP_PRESET)
     frame = _linearity_frame(code_signal=200, shape=(shape, shape))
     black = frame.black_level_dn
@@ -1334,10 +1403,30 @@ def _measure_linearity(
         2**frame.bit_depth - 1,
     ).astype(np.uint16)
     doubled = frame.with_data(doubled_data)
-    config = _with_stages(
+
+    awb_config = _with_stages(
         isp_config,
         awb_gains=None,
         ccm_matrix=None,
+        denoise=DenoiseConfig(enabled=False),
+        sharpen=SharpenConfig(enabled=False),
+    )
+    awb_first = ISP(awb_config).process(frame, trace=True)
+    awb_second = ISP(awb_config).process(doubled, trace=True)
+    if awb_first.stages is None or awb_second.stages is None:
+        raise RuntimeError("the AWB linearity check did not record stages")
+    gains_first = np.asarray(awb_first.stages["awb"].metadata["gains"], dtype=np.float64)
+    gains_second = np.asarray(awb_second.stages["awb"].metadata["gains"], dtype=np.float64)
+    gain_denominator = float(np.max(np.abs(gains_first)))
+    if gain_denominator <= 0.0:
+        raise ValueError("the AWB linearity check produced an all-zero gain vector")
+    awb_scale_error = float(np.max(np.abs(gains_second - gains_first)) / gain_denominator)
+
+    matrix = _linearity_ccm()
+    config = _with_stages(
+        isp_config,
+        awb_gains=(float(gains_first[0]), float(gains_first[1]), float(gains_first[2])),
+        ccm_matrix=matrix,
         denoise=DenoiseConfig(enabled=False),
         sharpen=SharpenConfig(enabled=False),
     )
@@ -1352,22 +1441,54 @@ def _measure_linearity(
     if denominator <= 0.0:
         raise ValueError("the linearity check produced an all-zero pre-tone image")
     max_relative = float(np.max(np.abs(after - doubled_before)) / denominator)
+    demosaiced = np.asarray(first.stages["demosaic"].data, dtype=np.float64)
+    pre_clamp = demosaiced @ matrix.T
+    pre_clamp_min = float(pre_clamp.min())
+
     section: dict[str, Any] = {
         "scale": 2.0,
         "max_relative_error": max_relative,
         "pixels_compared": int(before.size),
-        "source": "synthetic RGGB gradient frame; signal doubled after BLC",
+        "awb_estimated_gains": [float(value) for value in gains_first],
+        "awb_scale_relative_error": awb_scale_error,
+        "ccm": _matrix_as_list(matrix),
+        "ccm_row_sums": [float(value) for value in matrix.sum(axis=1)],
+        "ccm_pre_clamp_min": pre_clamp_min,
+        "ccm_clamp_active": bool(pre_clamp_min < 0.0),
+        "source": (
+            "synthetic RGGB gradient frame; signal doubled after BLC; AWB enabled "
+            "(estimated gains) and a fitted, in-gamut positive CCM"
+        ),
     }
     checks = [
         _check(
-            "Linear pre-tone scaling invariance (max relative error)",
+            "AWB gain scale invariance (max relative error)",
+            awb_scale_error,
+            maximum=LINEARITY_AWB_MAX_REL,
+            notes=(
+                "Gray-world gain estimation on the frame and on its doubled, "
+                "black-level-corrected signal; normalised gain ratios are scale-free."
+            ),
+        ),
+        _check(
+            "Linear pre-tone scaling invariance with AWB and CCM (max relative error)",
             max_relative,
             maximum=LINEARITY_MAX_REL,
             notes=(
-                "Doubling the black-level-corrected RAW signal must double the "
-                "last linear trace stage exactly; tone is excluded."
+                "Doubling the black-level-corrected RAW signal must double the last "
+                "linear trace stage exactly with AWB enabled and a fitted CCM; the "
+                "CCM clamp is inactive because every pre-clamp output is positive."
             ),
-        )
+        ),
+        _check(
+            "CCM pre-clamp minimum on linearity data",
+            pre_clamp_min,
+            minimum=0.0,
+            notes=(
+                "The CCM non-negativity clamp is the one bounded exception to the "
+                "linear-space invariant; it is inactive on this in-gamut frame."
+            ),
+        ),
     ]
     return section, checks
 
@@ -1417,9 +1538,9 @@ def _measure_lsc(
             maximum=LSC_RESIDUAL_MAX,
             notes=(
                 "A gain map calibrated from one noisy flat field is applied to an "
-                "independent flat field; residual is (max - min) / mean. The "
-                "Task 18 focused test test_lsc_flat_field_corrects_vignetting is "
-                "the exact-reciprocal check."
+                "independent flat field; residual is (max - min) / mean. "
+                "tests/test_isp_lsc.py::test_lsc_flat_field_corrects_vignetting is "
+                "the exact-reciprocal unit check."
             ),
         )
     ]
@@ -1488,7 +1609,8 @@ def _measure_denoise(
             minimum=DENOISE_SNR_GAIN_MIN,
             notes=(
                 "Bilateral luma/chroma denoise on a noisy flat region; SNR is "
-                "20 log10(|mean| / std) of BT.709 luma. Formal MTF is deferred to G4."
+                "20 log10(|mean| / std) of BT.709 luma. Formal slanted-edge MTF "
+                "is measured independently by the G4 metrics harness."
             ),
         ),
         _check(
@@ -1536,7 +1658,8 @@ def _measure_sharpen(
             notes=(
                 "Thresholded unsharp mask on a clean step edge; the full-profile "
                 "contrast must increase. Formal ISO 12233 MTF50 validation is "
-                "deferred to G4 because the metrics harness does not exist yet."
+                "measured independently by the G4 metrics harness; the harness "
+                "exists in this release."
             ),
         ),
         _check(

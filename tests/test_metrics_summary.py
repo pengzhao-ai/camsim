@@ -431,6 +431,10 @@ def test_measure_all_metadata_content() -> None:
         "focal_length_mm": 6.4,
         "reference_illuminant": None,
         "mtf_input": "linear_luma",
+        "luma_space": "linear_sRGB_Rec709",
+        "luma_weights": [0.2126, 0.7152, 0.0722],
+        "luma_buffer_conversion": None,
+        "warnings": [],
         "skipped": ["snr: layout has no patches", "color: layout has no patches"],
     }
 
@@ -682,3 +686,111 @@ def test_metrics_import_does_not_pull_in_simulator_modules() -> None:
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
+
+
+# --------------------------------------------------------------------------- #
+# Display P3 luma and identity-CCM warnings
+# --------------------------------------------------------------------------- #
+
+
+def _explicit_p3_to_srgb(linear_p3: Any) -> np.ndarray:
+    """Convert linear Display P3 to linear sRGB with colour-science."""
+    import colour
+    from colour.models import RGB_COLOURSPACE_DISPLAY_P3, RGB_COLOURSPACE_sRGB
+
+    return np.asarray(
+        colour.RGB_to_RGB(
+            np.asarray(linear_p3, dtype=np.float64),
+            RGB_COLOURSPACE_DISPLAY_P3,
+            RGB_COLOURSPACE_sRGB,
+            chromatic_adaptation_transform=None,
+        ),
+        dtype=np.float64,
+    )
+
+
+def test_measure_all_converts_display_p3_before_luma_metrics() -> None:
+    """P3 SNR, MTF, and acutance equal the same image pre-converted to sRGB."""
+    edge = _edge_plane((96, 96), blur=5)
+    linear_p3 = np.stack(
+        [0.8 * edge, 0.7 * edge, 0.2 + 0.3 * np.roll(edge, 2, axis=1)],
+        axis=2,
+    )
+    # A little deterministic noise keeps every patch's SNR defined.
+    linear_p3 = np.clip(
+        linear_p3 + 0.01 * np.random.default_rng(5).standard_normal(linear_p3.shape),
+        0.0,
+        1.0,
+    )
+    converted = _explicit_p3_to_srgb(linear_p3)
+    p3_image = RenderedImage(
+        data=np.asarray(_srgb_oetf(np.clip(linear_p3, 0.0, 1.0)), dtype=np.float32),
+        color_space="DisplayP3",
+        channels="RGB",
+        linear_rgb=np.asarray(linear_p3, dtype=np.float32),
+    )
+    srgb_image = RenderedImage(
+        data=np.asarray(_srgb_oetf(np.clip(converted, 0.0, 1.0)), dtype=np.float32),
+        color_space="sRGB",
+        channels="RGB",
+        linear_rgb=np.asarray(converted, dtype=np.float32),
+    )
+    layout = _complete_layout()
+
+    p3_report = measure_all(p3_image, layout)
+    srgb_report = measure_all(srgb_image, layout)
+
+    assert p3_report.metadata["luma_space"] == "linear_sRGB_Rec709"
+    assert p3_report.metadata["luma_weights"] == [0.2126, 0.7152, 0.0722]
+    assert p3_report.metadata["luma_buffer_conversion"] == "linear_DisplayP3_to_linear_sRGB"
+    assert srgb_report.metadata["luma_buffer_conversion"] is None
+    assert p3_report.mtf is not None and srgb_report.mtf is not None
+    assert p3_report.mtf.mtf50_cp == pytest.approx(srgb_report.mtf.mtf50_cp, rel=1e-5)
+    assert p3_report.mtf.mtf20_cp == pytest.approx(srgb_report.mtf.mtf20_cp, rel=1e-5)
+    assert p3_report.acutance == pytest.approx(srgb_report.acutance, rel=1e-5)
+    assert p3_report.snr is not None and srgb_report.snr is not None
+    for patch in layout.patches:
+        # The comparison is specifically about luma: per-channel SNR does not
+        # depend on luma weights, and the two conversion paths differ by
+        # float32 round-off in the individual planes.
+        assert p3_report.snr[patch.name]["luma"].snr_db == pytest.approx(
+            srgb_report.snr[patch.name]["luma"].snr_db, abs=1e-3
+        )
+
+
+def test_measure_all_warns_when_colour_uses_an_identity_ccm() -> None:
+    """An identity default preset is disclosed instead of silently judged."""
+    linear = np.full((32, 32, 3), 0.4, dtype=np.float64)
+    layout = ChartLayout(
+        name="colorchecker",
+        patches=(PatchROI("patch", 0, 0, 16, 16),),
+        reference=_reference([[50.0, 0.0, 0.0]]),
+    )
+    identity = RenderedImage(
+        data=np.asarray(_srgb_oetf(linear), dtype=np.float32),
+        color_space="sRGB",
+        channels="RGB",
+        linear_rgb=np.asarray(linear, dtype=np.float32),
+        metadata={"ccm_matrix": np.eye(3).tolist()},
+    )
+    warning_report = measure_all(identity, layout)
+    assert warning_report.color is not None
+    warnings = warning_report.metadata["warnings"]
+    assert isinstance(warnings, list)
+    assert any("identity CCM" in warning for warning in warnings)
+
+    fitted = RenderedImage(
+        data=identity.data,
+        color_space="sRGB",
+        channels="RGB",
+        linear_rgb=identity.linear_rgb,
+        metadata={
+            "ccm_matrix": [
+                [1.04, -0.02, -0.02],
+                [-0.03, 1.06, -0.03],
+                [-0.02, -0.04, 1.06],
+            ]
+        },
+    )
+    fitted_report = measure_all(fitted, layout)
+    assert not any("identity CCM" in warning for warning in fitted_report.metadata["warnings"])

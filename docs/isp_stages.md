@@ -33,12 +33,17 @@ tone error remains visible instead of being hidden per panel.*
 ## The linear-space invariant
 
 DPC, BLC, LSC, AWB, demosaic, CCM, denoise, and sharpen all operate on
-**linear float32** values proportional to radiance. The tone stage is the first
+**linear float32** values proportional to radiance. The CCM output is clamped
+at zero so out-of-gamut colours stay physical; that non-negativity clamp is the
+one bounded exception to the invariant, and it is inactive on in-gamut data.
+The G3 linearity check runs with AWB enabled and a fitted CCM and reports the
+pre-clamp minimum explicitly. The tone stage is the first intentionally
 non-linear step: it applies a linear exposure trim, a change of primaries when
 Display P3 is selected, a display clamp, and the sRGB opto-electronic transfer
 function. `RenderedImage.linear_rgb` keeps the matching unclipped pre-tone
 buffer, while `RenderedImage.data` holds the display-encoded result in
-`[0, 1]`.
+`[0, 1]`. For Display P3, `linear_rgb` is in linear Display P3 primaries; the
+metrics harness converts it to linear sRGB before applying Rec. 709 luma.
 
 That split matters for measurement. Metrics that estimate resolution or noise
 consume `linear_rgb`; only the colour metric decodes `data`. Handing
@@ -62,12 +67,18 @@ tone curve.
 
 ### DPC — defective-pixel correction
 
-A sensor's defect map flags dead, hot, and stuck pixels. DPC replaces those
+A sensor's defect map flags dead, hot, and stuck pixels. These are physical
+signal behaviours, not mask annotations: dead sites have zero mean
+photoresponse, stuck sites are pinned to the ADC white code
+(`2**bits - 1`) after digital gain, and hot sites receive a temperature-
+dependent dark-current multiplier. `RawFrame.defect_mask` is the union of all
+three; `RawFrame.hot_mask` preserves the hot subset. DPC replaces flagged
 samples from same-CFA neighbours (`neighbor`) or a local median (`median`), in
-RAW code units before any black-level subtraction. The stage consumes the
-`RawFrame.defect_mask` produced by the sensor, so a frame without a mask is an
+RAW code units before any black-level subtraction. A frame without a mask is an
 identity operation. Replacing a pixel from the wrong CFA phase would blend
-colours; the correction is therefore phase-aware.
+colours; the correction is therefore phase-aware. Stuck-high is a deliberate,
+deterministic convention: a real stuck site can be pinned black or white, and
+the model chooses one.
 
 ### BLC — black-level correction
 
@@ -141,9 +152,16 @@ with `camsim.isp.ccm.fit_ccm` under an optional ridge penalty (`ridge`, default
 pipeline never fits at runtime because it has no reference target. A Bayer
 frame with CCM enabled but no matrix raises.
 
-The matrix is fitted on a specific illuminant and scene. Applying a D65 matrix
-to a tungsten capture, or evaluating it on held-out patches, measures something
-other than what was calibrated; the G3 report records the in-sample limitation.
+**The shipped default preset's matrix is the identity.** It is a neutral
+baseline for measuring optics, sensor, and stage behaviour, not a
+colour-accurate camera profile. A default ColorChecker render is roughly 40
+mean ΔE2000 at the preset's default exposure (about 11 when well exposed),
+while the G3 fitted matrix reaches 0.9 under D65. Colour work must fit a matrix
+with `fit_ccm` and supply it in `ccm.matrix`; `measure_all` records an
+identity-CCM warning in its metadata when colour is measured through the
+default. The matrix is fitted on a specific illuminant and scene, so applying a
+D65 matrix to a tungsten capture or evaluating it on held-out patches measures
+something other than what was calibrated; G3 records the in-sample limitation.
 
 ### Denoise and sharpen
 
@@ -165,8 +183,10 @@ Tone is the only non-linear reconstruction step. It applies
 output space (`sRGB` or `DisplayP3`), clamps to `[0, 1]`, and applies the sRGB
 OETF — or a plain power curve when `gamma` is set. The output colour space must
 agree with the tone colour space; a disabled tone stage requires sRGB output.
-`output.bit_depth` (8–16) records the intended container depth and does not
-change the in-memory float range.
+`output.bit_depth` (8–16) is metadata: it records the intended container depth
+and does not change the in-memory float range or choose a file format.
+`save_image` selects the actual depth from the requested format (8-bit PNG,
+16-bit mono TIFF).
 
 ## Stage traces
 

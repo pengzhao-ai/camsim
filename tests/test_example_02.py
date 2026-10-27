@@ -173,11 +173,23 @@ def test_g3_quick_status_is_pass(g3: dict[str, Any]) -> None:
 
 
 def test_g3_linearity_check_is_green(g3: dict[str, Any]) -> None:
-    """The linear pre-tone scaling check passes and its measured value is in bounds."""
-    check = _check(g3, "Linear pre-tone scaling invariance (max relative error)")
+    """AWB and CCM remain linear on in-gamut data, and the CCM clamp is inactive."""
+    check = _check(
+        g3,
+        "Linear pre-tone scaling invariance with AWB and CCM (max relative error)",
+    )
     assert check["pass"] is True
     assert check["measured"] <= check["tolerance"]["maximum"]
     assert g3["linearity"]["max_relative_error"] <= check["tolerance"]["maximum"]
+
+    awb = _check(g3, "AWB gain scale invariance (max relative error)")
+    assert awb["pass"] is True
+    assert g3["linearity"]["awb_scale_relative_error"] <= awb["tolerance"]["maximum"]
+
+    clamp = _check(g3, "CCM pre-clamp minimum on linearity data")
+    assert clamp["pass"] is True
+    assert g3["linearity"]["ccm_pre_clamp_min"] > 0.0
+    assert g3["linearity"]["ccm_clamp_active"] is False
 
 
 def test_g3_colorchecker_delta_e_threshold(g3: dict[str, Any]) -> None:
@@ -432,7 +444,7 @@ def test_g3_report_records_limitations() -> None:
     lowered = text.lower()
     for phrase in (
         "in-sample",
-        "deferred to g4",
+        "g4 metrics harness",
         "auto-exposure",
         "not gate evidence",
         "simulated",
@@ -443,4 +455,4 @@ def test_g3_report_records_limitations() -> None:
         assert phrase in lowered, phrase
     # The report must not claim a formal MTF validation that does not exist.
     assert "mtf50" in lowered
-    assert "deferred to g4" in lowered
+    assert "g4 metrics harness" in lowered

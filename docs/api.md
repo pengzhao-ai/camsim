@@ -14,12 +14,13 @@ basis, parameter ranges, and the failure artefacts it guards against.
 ## Top-level package
 
 `camsim` exposes its public types lazily (PEP 562), so importing the package
-loads only version metadata. The five public names below are registered in
+loads only version metadata. The six public names below are registered in
 `_LAZY_EXPORTS`.
 
 ::: camsim
     options:
       members:
+        - Camera
         - ISP
         - Sensor
         - SpectralIrradiance
@@ -105,6 +106,7 @@ Synthetic spectral targets, chart layouts, illuminants, and spectral data.
 ::: camsim.scene.charts
     options:
       members:
+        - chart_layout_from_scene
         - colorchecker_layout
         - flat_patch_layout
         - slanted_edge_layout

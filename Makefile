@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help setup sync test coverage lint format typecheck docs build notebooks figures gate clean
+.PHONY: help setup sync test coverage coverage-whole lint format typecheck docs build notebooks figures gate clean
 
 help:  ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -17,6 +17,9 @@ test:  ## Run the test suite
 
 coverage:  ## Run the test suite with the same coverage gate as CI
 	$(UV) run pytest --cov=camsim --cov-report=term-missing --cov-fail-under=90
+
+coverage-whole:  ## Report whole-package coverage including camsim.viz
+	$(UV) run pytest --cov=camsim --cov-config=coverage-whole.rc --cov-report=term
 
 lint:  ## Check lint and formatting
 	$(UV) run ruff check .
@@ -35,32 +38,11 @@ docs:  ## Build the documentation with warnings as errors
 build:  ## Build the wheel and source distribution
 	$(UV) build
 
-# Jupytext matches a kernel by interpreter path. uv's venv kernel ships a bare
-# "python" argv, so register a venv-local kernel with the absolute path first.
-notebooks:  ## Execute every Jupytext notebook headlessly into results/cache
-	@set -e; found=0; mkdir -p results/cache/notebooks; \
-	prefix="$$($(UV) run python -c 'import sys; print(sys.prefix)')"; \
-	$(UV) run python -m ipykernel install --prefix "$$prefix" --name python3 \
-		--display-name "Python 3 (camsim)" >/dev/null; \
-	for nb in notebooks/*.py; do \
-		[ -e "$$nb" ] || continue; \
-		found=1; \
-		out="results/cache/notebooks/$$(basename "$$nb" .py).ipynb"; \
-		echo "Executing $$nb"; \
-		MPLBACKEND=Agg $(UV) run jupytext --to ipynb --set-kernel python3 --execute \
-			"$$nb" --output "$$out"; \
-	done; \
-	if [ "$$found" -eq 0 ]; then echo "No notebooks yet."; fi
+notebooks:  ## Execute every Jupytext notebook headlessly (120 s each)
+	$(UV) run python benchmarks/run_notebooks.py
 
-figures:  ## Regenerate the gallery figures from the example scripts
-	@set -e; found=0; \
-	for example in examples/*.py; do \
-		[ -e "$$example" ] || continue; \
-		found=1; \
-		echo "Running $$example"; \
-		MPLBACKEND=Agg $(UV) run python "$$example"; \
-	done; \
-	if [ "$$found" -eq 0 ]; then echo "No examples yet."; fi
+figures:  ## Regenerate the gallery figures from the example scripts (300 s each)
+	$(UV) run python benchmarks/run_examples.py
 
 gate: sync lint typecheck test coverage docs build  ## Run the full local quality gate
 

@@ -14,13 +14,16 @@ Applicability rules
 * **MTF and acutance** run only when ``layout.edge_roi`` exists. Both consume
   **linear light**, built once from ``image.linear_rgb`` when present and
   otherwise decoded from ``image.data`` with the exact sRGB/Display P3 EOTF
-  (the two spaces share the transfer curve), then reduced to Rec. 709 luma for
-  RGB or taken as the single plane for MONO. Gamma-encoded MTF input biases the
-  curve, so the harness never measures the display buffer directly. The MTF
-  additionally needs ``layout.pixel_pitch_um``; without it a cycles/pixel
-  frequency cannot be expressed and the harness raises instead of inventing a
-  scale. ``layout.focal_length_mm`` is optional: without it the cycles/pixel
-  crossings are still reported and the cycles/degree fields are NaN.
+  (the two spaces share the transfer curve). A Display P3 buffer is first
+  converted to linear sRGB with the exact P3-to-sRGB matrix, because Rec. 709
+  luma weights are defined on sRGB primaries. The result is then reduced to
+  Rec. 709 luma for RGB or taken as the single plane for MONO. Gamma-encoded
+  MTF input biases the curve, so the harness never measures the display buffer
+  directly. The MTF additionally needs ``layout.pixel_pitch_um``; without it a
+  cycles/pixel frequency cannot be expressed and the harness raises instead of
+  inventing a scale. ``layout.focal_length_mm`` is optional: without it the
+  cycles/pixel crossings are still reported and the cycles/degree fields are
+  NaN.
 * **SNR** runs for every patch when the layout has patches, always on the
   **linear** image. RGB patches report ``R``, ``G``, ``B``, and ``luma``; MONO
   patches report a single ``mono`` plane. Results are stored under the patch
@@ -99,7 +102,7 @@ from camsim.metrics.acutance import edge_acutance
 from camsim.metrics.chart import ChartLayout, PatchROI, extract_patch
 from camsim.metrics.color import ColorResult, _srgb_eotf, delta_e_patches
 from camsim.metrics.mtf import MTFResult, slanted_edge_mtf
-from camsim.metrics.snr import SNRResult, _luma_plane, snr_channels, snr_patch
+from camsim.metrics.snr import _REC709_WEIGHTS, SNRResult, _luma_plane, snr_channels, snr_patch
 
 __all__ = ["MetricReport", "measure_all"]
 
@@ -107,6 +110,50 @@ _RGB_LAYOUT: Final[str] = "RGB"
 _MONO_CHANNEL: Final[str] = "mono"
 _MTF_INPUT: Final[str] = "linear_luma"
 _COLOUR_CHART_MARKER: Final[str] = "colorchecker"
+_LUMA_SPACE: Final[str] = "linear_sRGB_Rec709"
+
+# Display P3 and sRGB share the D65 white point, so the conversion between their
+# linear buffers is a pure 3x3 matrix. Deriving it from the published
+# chromaticities keeps full precision and avoids importing the ISP layer (which
+# the metrics harness must not depend on). Both matrices are identical to
+# ``camsim.isp.colorspace``; the P3 luma row is exactly Rec. 709 after this
+# conversion because both spaces use the same white point.
+_SRGB_PRIMARIES: Final[tuple[tuple[float, float], ...]] = (
+    (0.640, 0.330),
+    (0.300, 0.600),
+    (0.150, 0.060),
+)
+_DISPLAY_P3_PRIMARIES: Final[tuple[tuple[float, float], ...]] = (
+    (0.680, 0.320),
+    (0.265, 0.690),
+    (0.150, 0.060),
+)
+_D65_WHITE: Final[tuple[float, float]] = (0.3127, 0.3290)
+
+
+def _rgb_to_xyz(primaries: tuple[tuple[float, float], ...]) -> NDArray[np.float64]:
+    """Derive an RGB-to-XYZ matrix from primaries and the shared D65 white."""
+    columns = np.array(
+        [[x / y, 1.0, (1.0 - x - y) / y] for x, y in primaries],
+        dtype=np.float64,
+    ).T
+    white = np.array(
+        [
+            _D65_WHITE[0] / _D65_WHITE[1],
+            1.0,
+            (1.0 - _D65_WHITE[0] - _D65_WHITE[1]) / _D65_WHITE[1],
+        ],
+        dtype=np.float64,
+    )
+    scales = np.linalg.solve(columns, white)
+    return np.asarray(columns * scales, dtype=np.float64)
+
+
+_P3_TO_SRGB: Final[NDArray[np.float64]] = np.asarray(
+    np.linalg.inv(_rgb_to_xyz(_SRGB_PRIMARIES)) @ _rgb_to_xyz(_DISPLAY_P3_PRIMARIES),
+    dtype=np.float64,
+)
+_P3_TO_SRGB.setflags(write=False)
 
 
 def _require_non_empty_text(value: object, field: str) -> str:
@@ -252,8 +299,11 @@ class MetricReport:
         when supplied; stored stripped.
     metadata:
         JSON-friendly provenance: colour space, channel layout, pixel pitch,
-        focal length, reference illuminant, MTF input domain, and the
-        ``skipped`` list. ``None`` becomes an empty dict; a mapping is copied.
+        focal length, reference illuminant, MTF input domain, the luma space
+        and coefficients, the Display P3-to-sRGB conversion when one was
+        applied, a ``warnings`` list (for example an identity-CCM colour
+        measurement), and the ``skipped`` list. ``None`` becomes an empty dict;
+        a mapping is copied.
 
     Notes
     -----
@@ -266,6 +316,13 @@ class MetricReport:
     scalars, and non-finite floats (to ``None``). :meth:`to_json` serializes
     that mapping with ``allow_nan=False``, so NaN crossings and undefined SNR
     ratios appear as ``null`` and the text parses with any standard JSON reader.
+
+    Resolution and noise metrics are luma-derived. Their input primaries follow
+    ``RenderedImage.color_space`` before the harness converts them: a linear
+    Display P3 buffer is converted to linear sRGB, then Rec. 709 weights are
+    applied. The metadata records the luma space, the weights, and the
+    conversion that was applied; ``linear_rgb`` is never silently relabelled as
+    sRGB.
     """
 
     mtf: MTFResult | None = None
@@ -330,17 +387,68 @@ class MetricReport:
 
 
 def _linear_image(image: RenderedImage) -> NDArray[np.float64]:
-    """Return the image's linear-light buffer as float64.
+    """Return the image's linear-light buffer as float64 in linear sRGB.
 
     A camera-processed frame carries ``linear_rgb``; a hand-built or externally
     loaded frame may not, in which case the display data are decoded with the
     exact sRGB EOTF. Display P3 shares that transfer curve, so one decoder
     serves both output spaces. Decoding is never applied to an existing linear
     buffer - that would linearize twice.
+
+    The buffer's primaries follow ``image.color_space``. Rec. 709 luma weights
+    are defined on sRGB primaries, so a Display P3 buffer is converted to
+    linear sRGB with the exact P3-to-sRGB matrix before any metric runs. This
+    is the same conversion the ISP applies in reverse when it writes P3, and it
+    leaves the physical luminance unchanged because both spaces are D65.
     """
     if image.linear_rgb is not None:
-        return np.asarray(image.linear_rgb, dtype=np.float64)
-    return _srgb_eotf(image.data)
+        linear = np.asarray(image.linear_rgb, dtype=np.float64)
+    else:
+        linear = _srgb_eotf(image.data)
+    if image.channels == _RGB_LAYOUT and image.color_space == "DisplayP3":
+        linear = np.asarray(linear @ _P3_TO_SRGB.T, dtype=np.float64)
+    return linear
+
+
+def _luma_conversion(image: RenderedImage) -> str | None:
+    """Return the buffer-space conversion applied before Rec. 709 luma, if any."""
+    if image.channels == _RGB_LAYOUT and image.color_space == "DisplayP3":
+        return "linear_DisplayP3_to_linear_sRGB"
+    return None
+
+
+def _colour_warnings(
+    image: RenderedImage,
+    color_measured: bool,
+) -> list[str]:
+    """Return warnings that qualify a measured colour result.
+
+    The shipped ISP preset carries an identity colour-correction matrix as a
+    neutral baseline. That is useful for isolating optics and sensor effects,
+    but it is not a colour-accurate camera profile: the camera's spectral
+    sensitivities are not a colorimetric basis. When colour is measured through
+    an identity matrix, the report says so explicitly instead of letting a
+    large delta-E look like a sensor or metric failure.
+    """
+    warnings: list[str] = []
+    if not color_measured:
+        return warnings
+    matrix = image.metadata.get("ccm_matrix")
+    if matrix is None:
+        return warnings
+    try:
+        resolved = np.asarray(matrix, dtype=np.float64)
+    except (TypeError, ValueError):
+        return warnings
+    if resolved.shape != (3, 3) or not np.all(np.isfinite(resolved)):
+        return warnings
+    if np.allclose(resolved, np.eye(3, dtype=np.float64), rtol=0.0, atol=1e-9):
+        warnings.append(
+            "colour was measured through an identity CCM; the default ISP preset "
+            "is an identity baseline and colour accuracy requires fitting a matrix "
+            "with camsim.isp.ccm.fit_ccm and supplying it in ccm.matrix"
+        )
+    return warnings
 
 
 def _linear_luma(image: RenderedImage, linear: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -386,8 +494,10 @@ def measure_all(
         The MTF result, per-patch SNR, chart-wide colour result, and acutance
         for the groups that apply; ``None`` for the rest; the layout name as
         ``layout_id``; and metadata recording the image and layout settings,
-        the linear-luma input, the reference illuminant, and every skipped
-        group with its reason.
+        the linear-luma input and its coefficients, the Display P3-to-sRGB
+        conversion when the buffer primaries required one, any measurement
+        warnings, the reference illuminant, and every skipped group with its
+        reason.
 
     Raises
     ------
@@ -410,7 +520,9 @@ def measure_all(
     ``extract_patch`` returns views, and every metric copies what it needs.
     MTF is an ISO 12233-style estimate fed **linear luma**; hand it
     display-encoded data and the tone curve biases the curve low at high
-    frequencies. Acutance is a correlation-study sharpness proxy, not a
+    frequencies. For a Display P3 image the linear buffer is converted to
+    linear sRGB before Rec. 709 luma, and the conversion is recorded in the
+    metadata. Acutance is a correlation-study sharpness proxy, not a
     calibrated physical quantity.
     """
     if not isinstance(image, RenderedImage):
@@ -489,6 +601,10 @@ def measure_all(
             None if resolved_reference is None else resolved_reference.illuminant_name
         ),
         "mtf_input": _MTF_INPUT,
+        "luma_space": _LUMA_SPACE,
+        "luma_weights": list(_REC709_WEIGHTS),
+        "luma_buffer_conversion": _luma_conversion(image),
+        "warnings": _colour_warnings(image, color_result is not None),
         "skipped": skipped,
     }
     return MetricReport(

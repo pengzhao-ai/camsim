@@ -48,9 +48,10 @@ thresholds at both illuminants, and the Luther-condition residual falls to
 about 0.13. The fit is still in-sample, which is stated as a limitation.
 
 This is a simulated validation, not a certified ISO 12233 or EMVA measurement.
-The formal ISO 12233 MTF50 check and the ``Camera.auto_expose`` convergence
-check are deferred: the metrics harness does not exist until Phase 4, and the
-``Camera`` orchestration arrives with the Phase 5 consolidation.
+Formal ISO 12233-style MTF50/MTF20 lives in the independent G4 metrics harness
+and the G5 cross-cutting evidence; ``Camera.auto_expose`` convergence is a G5
+check. This example reports the G3 stage evidence and points to those gates
+rather than duplicating them.
 
 Failure artefacts guarded here: a quick run that overwrites gate evidence; a
 contact sheet that auto-normalises each panel and hides a white-balance or

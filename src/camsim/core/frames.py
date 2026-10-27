@@ -178,8 +178,16 @@ class RawFrame:
     pixel_pitch_um:
         Square pixel pitch in micrometres, finite and positive.
     defect_mask:
-        Optional boolean mask, same shape as ``data``, marking defective or
-        hot pixels that a defect-correction stage should replace.
+        Optional boolean mask, same shape as ``data``, marking every defective
+        site a defect-correction stage should replace. It is the union of the
+        dead, hot, and stuck classes.
+    hot_mask:
+        Optional boolean mask, same shape as ``data``, selecting the hot-pixel
+        subset of ``defect_mask``. The sensor has already applied the
+        temperature-dependent dark-current multiplier at those sites; the mask
+        is kept separately because a caller may want to inspect or model the
+        hot-pixel population without re-deriving it from rates and a seed.
+        It is a subset of ``defect_mask`` whenever both are present.
     pdaf_mask:
         Optional boolean mask, same shape as ``data``, marking phase-detection
         autofocus pixels whose signal is not a normal imaging sample.
@@ -191,6 +199,12 @@ class RawFrame:
     -----
     Equality is identity based because frames own large arrays; compare fields
     (or arrays with :func:`numpy.array_equal`) explicitly.
+
+    This is the reduced v0.1.0 contract. It records the acquisition and
+    calibration state the ISP needs, not a full capture-provenance record: it
+    has no wall-clock timestamp or package version. Those fields belong to the
+    surrounding experiment record and are documented as a limitation of the
+    candidate release rather than silently synthesised here.
     """
 
     data: NDArray[np.uint16]
@@ -206,6 +220,7 @@ class RawFrame:
     frame_index: int
     pixel_pitch_um: float
     defect_mask: NDArray[np.bool_] | None = field(default=None, kw_only=True)
+    hot_mask: NDArray[np.bool_] | None = field(default=None, kw_only=True)
     pdaf_mask: NDArray[np.bool_] | None = field(default=None, kw_only=True)
     sensor_config_hash: str
 
@@ -231,6 +246,18 @@ class RawFrame:
             self.pixel_pitch_um, "pixel_pitch_um (pixel pitch)"
         )
         self.defect_mask = _validate_mask(self.defect_mask, "defect_mask", self.data.shape)
+        self.hot_mask = _validate_mask(self.hot_mask, "hot_mask", self.data.shape)
+        if self.hot_mask is not None and self.defect_mask is None:
+            raise ValueError(
+                "hot_mask requires defect_mask; hot pixels are a subset of the "
+                "defective-pixel union"
+            )
+        if (
+            self.hot_mask is not None
+            and self.defect_mask is not None
+            and bool(np.any(self.hot_mask & ~self.defect_mask))
+        ):
+            raise ValueError("hot_mask must be a subset of defect_mask")
         self.pdaf_mask = _validate_mask(self.pdaf_mask, "pdaf_mask", self.data.shape)
         self.sensor_config_hash = _validate_non_empty_text(
             self.sensor_config_hash, "sensor_config_hash"
@@ -242,7 +269,7 @@ class RawFrame:
         The replacement data is validated exactly like constructor data, so a
         caller cannot smuggle floats or out-of-range codes into the pipeline.
         Masks are tied to pixel positions, so changing the data shape requires
-        clearing ``defect_mask`` and ``pdaf_mask`` first.
+        clearing ``defect_mask``, ``hot_mask``, and ``pdaf_mask`` first.
         """
         return replace(self, data=data)
 
@@ -262,6 +289,7 @@ class RawFrame:
             "frame_index": self.frame_index,
             "pixel_pitch_um": self.pixel_pitch_um,
             "defect_mask": None if self.defect_mask is None else self.defect_mask.tolist(),
+            "hot_mask": None if self.hot_mask is None else self.hot_mask.tolist(),
             "pdaf_mask": None if self.pdaf_mask is None else self.pdaf_mask.tolist(),
             "sensor_config_hash": self.sensor_config_hash,
         }
@@ -283,6 +311,7 @@ class RawFrame:
             frame_index=payload["frame_index"],
             pixel_pitch_um=payload["pixel_pitch_um"],
             defect_mask=_payload_mask(payload.get("defect_mask")),
+            hot_mask=_payload_mask(payload.get("hot_mask")),
             pdaf_mask=_payload_mask(payload.get("pdaf_mask")),
             sensor_config_hash=payload["sensor_config_hash"],
         )
@@ -309,18 +338,31 @@ class RenderedImage:
         luminance channel.
     linear_rgb:
         Optional pre-transfer linear RGB buffer with the same shape as
-        ``data``. It may exceed 1.0 (highlights are not clipped) and is the
-        buffer colour metrics linearize from; it is not display data.
+        ``data``. Its R, G, and B primaries follow ``color_space``: for
+        ``"DisplayP3"`` the buffer is linear Display P3, not linear sRGB. It
+        may exceed 1.0 (highlights are not clipped) and is the buffer colour
+        metrics linearize from; it is not display data. A metric that applies
+        sRGB/Rec. 709 weights directly must convert a P3 buffer to linear sRGB
+        first; :func:`camsim.metrics.measure_all` does so exactly.
     stages:
         Optional ISP trace mapping stage names to :class:`StageOutput`
         snapshots. ``None`` when tracing is disabled.
     metadata:
         Free-form capture and processing provenance such as the white point,
-        exposure, or ISP configuration hash. Defaults to an empty dict.
+        exposure, ISP configuration hash, and the applied ``ccm_matrix``.
+        Defaults to an empty dict.
 
     Notes
     -----
     Equality is identity based because images own large arrays.
+
+    This is the reduced v0.1.0 contract. It carries display data, the optional
+    linear RGB buffer, the stage trace, and metadata; it does not carry a
+    ``linear_xyz`` buffer, a wall-clock timestamp, or a package-version field.
+    Colour metrics derive XYZ from ``linear_rgb``/``data`` plus ``color_space``,
+    and acquisition provenance travels in the ``RawFrame`` and the surrounding
+    experiment record. That reduction is documented as a candidate-release
+    limitation rather than papered over with placeholder fields.
     """
 
     data: NDArray[np.float32]

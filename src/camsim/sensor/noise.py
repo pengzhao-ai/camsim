@@ -60,12 +60,11 @@ signal gain; zero-sigma stages that silently advance the RNG and perturb later
 noise; and recomputing fixed-pattern maps per frame, which converts calibratable
 spatial noise into temporal noise.
 
-Task 15 wiring note: :class:`FPNConfig` is deliberately local to this task
-because ``GainModeConfig`` does not yet carry DSNU, PRNU, or row-noise fields.
-Task 15 must add those fields to the sensor schema (or compose this config into
-``SensorConfig``) and pass them to :func:`fixed_pattern_maps` and
-:func:`row_noise`. Until then this module is usable on its own without changing
-the public configuration contract.
+Wiring note: :class:`FPNConfig` is a local value object rather than a
+``GainModeConfig`` field because DSNU, PRNU, and row noise describe the array,
+not a readout mode. :class:`camsim.Sensor` composes it from ``SensorConfig``
+and passes it to :func:`fixed_pattern_maps` and :func:`row_noise`; the module
+remains usable on its own without changing the public configuration contract.
 """
 
 from __future__ import annotations
@@ -118,10 +117,10 @@ class FPNConfig:
 
     Notes
     -----
-    Task 15 must wire these fields into ``SensorConfig`` (or a new sub-model)
-    because the current ``GainModeConfig`` predates the noise layer. Keeping a
-    task-local dataclass now avoids a speculative schema change that later
-    tasks would have to revise.
+    :class:`camsim.Sensor` composes this object from the ``SensorConfig`` noise
+    block. Keeping the noise strengths in one array-level value object avoids
+    attaching DSNU, PRNU, and row noise to a per-readout-mode configuration
+    where they do not belong.
     """
 
     dsnu_e: float = 0.0

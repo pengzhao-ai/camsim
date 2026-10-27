@@ -31,6 +31,10 @@ jobs:
       - name: Run tests
         run: uv run pytest -q
 
+      - name: Verify the release tag matches the package version
+        run: |
+          uv run python -c "import os, camsim; tag = os.environ['GITHUB_REF_NAME']; expected = 'v' + camsim.__version__; assert tag == expected, f'tag {tag!r} does not match package version {expected!r}'; print('tag matches', tag)"
+
       - name: Build wheel and sdist
         run: uv build
 

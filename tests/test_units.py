@@ -75,3 +75,33 @@ def test_conversions_broadcast_over_spatial_axes() -> None:
 def test_wavelength_validation_rejects_invalid_values(bad_wavelength: float) -> None:
     with pytest.raises(ValueError, match="wavelength_nm"):
         units.photon_energy_j(bad_wavelength)
+
+
+# Hypothesis is declared as a development dependency because these invariants
+# hold for every physically valid input, not only the hand-picked examples.
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+
+
+@settings(max_examples=50, deadline=None, derandomize=True)
+@given(
+    irradiance=st.floats(min_value=1e-9, max_value=1e9, allow_nan=False, allow_infinity=False),
+    wavelength_nm=st.floats(
+        min_value=360.0, max_value=830.0, allow_nan=False, allow_infinity=False
+    ),
+)
+def test_irradiance_photon_roundtrip_property(irradiance: float, wavelength_nm: float) -> None:
+    photons = units.irradiance_w_to_photons(irradiance, wavelength_nm)
+    recovered = units.photons_to_irradiance_w(photons, wavelength_nm)
+    assert recovered == pytest.approx(irradiance, rel=1e-12, abs=0.0)
+
+
+@settings(max_examples=50, deadline=None, derandomize=True)
+@given(
+    wavelength_nm=st.floats(min_value=360.0, max_value=830.0, allow_nan=False, allow_infinity=False)
+)
+def test_photon_energy_decreases_with_wavelength(wavelength_nm: float) -> None:
+    longer = min(830.0, wavelength_nm + 1.0)
+    if longer == wavelength_nm:
+        return
+    assert float(units.photon_energy_j(longer)) < float(units.photon_energy_j(wavelength_nm))

@@ -8,7 +8,11 @@ allocation costs do not dominate the result.
 
 The default run uses a 512 x 512 sensor with 1x scene oversampling. ``--quick``
 uses 128 x 128 so the script can run as a smoke test inside the test suite; the
-quick numbers are not comparable with the full run. Every step uses fixed seeds
+quick numbers are not comparable with the full run. ``--large`` uses a
+1024 x 1024 sensor at 1x oversampling, the realistic large-frame case recorded
+in the G5 report; it stays inside the default 8 GiB simulation-memory budget
+(about 1.8 GB estimated peak), while a 50 MP spectral render is rejected.
+Every step uses fixed seeds
 (``SCENE_SEED``, ``SENSOR_SEED``, ``FRAME_SEED``) and no global random state, so
 repeated runs measure the same work.
 
@@ -53,6 +57,7 @@ ISP_PRESET: Final[Path] = PRESETS_DIR / "isp" / "default.json"
 
 QUICK_SHAPE: Final[tuple[int, int]] = (128, 128)
 FULL_SHAPE: Final[tuple[int, int]] = (512, 512)
+LARGE_SHAPE: Final[tuple[int, int]] = (1024, 1024)
 DEFAULT_REPEATS: Final[int] = 3
 
 SCENE_SEED: Final[int] = 11
@@ -126,6 +131,12 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         action="store_true",
         help="use 128 x 128 instead of 512 x 512 (smoke-test mode, not comparable)",
     )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--large",
+        action="store_true",
+        help="use 1024 x 1024 instead of 512 x 512 (realistic large-frame case)",
+    )
     parser.add_argument(
         "--repeats",
         type=_positive_int,
@@ -189,10 +200,18 @@ def _build_pipeline(shape: tuple[int, int]) -> tuple[Callable[[], object], ...]:
     return (render_scene, expose, process, measure)
 
 
-def _print_header(shape: tuple[int, int], *, warmup: int, repeats: int, quick: bool) -> None:
+def _print_header(
+    shape: tuple[int, int],
+    *,
+    warmup: int,
+    repeats: int,
+    quick: bool,
+    large: bool = False,
+) -> None:
     """Print the run configuration and environment."""
+    mode = "quick" if quick else "large" if large else "full"
     print("camsim pipeline benchmark")
-    print(f"mode: {'quick' if quick else 'full'}")
+    print(f"mode: {mode}")
     print(f"shape: {shape[0]} x {shape[1]} sensor pixels")
     print(f"scene oversampling: {OVERSAMPLING}x")
     print(f"warmup: {warmup} call(s) per stage; repeats: {repeats}")
@@ -230,9 +249,20 @@ def _print_table(timings: Sequence[Timing]) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the benchmark and return a process exit code."""
     args = _parse_args(argv)
-    shape = QUICK_SHAPE if args.quick else FULL_SHAPE
+    if args.quick:
+        shape = QUICK_SHAPE
+    elif args.large:
+        shape = LARGE_SHAPE
+    else:
+        shape = FULL_SHAPE
     repeats = args.repeats
-    _print_header(shape, warmup=args.warmup, repeats=repeats, quick=bool(args.quick))
+    _print_header(
+        shape,
+        warmup=args.warmup,
+        repeats=repeats,
+        quick=bool(args.quick),
+        large=bool(args.large),
+    )
 
     operations = _build_pipeline(shape)
     labels = ("scene.render", "sensor.expose", "isp.process", "measure_all")

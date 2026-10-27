@@ -725,3 +725,142 @@ def test_blooming_disabled_is_a_clip() -> None:
     charge = np.full((3, 3), 250.0)
     clipped = apply_blooming(charge, full_well, fraction=0.0, iterations=0)
     np.testing.assert_allclose(clipped, full_well)
+
+
+# ---------------------------------------------------------------------------
+# Physical defect behaviour
+# ---------------------------------------------------------------------------
+
+
+def _defect_config(
+    *,
+    dead_rate: float = 0.0,
+    hot_rate: float = 0.0,
+    stuck_rate: float = 0.0,
+) -> DefectConfig:
+    """Return a defect configuration with high rates for an end-to-end check."""
+    return DefectConfig(dead_rate=dead_rate, hot_rate=hot_rate, stuck_rate=stuck_rate, seed=1234)
+
+
+def _defect_sensor(
+    sensor_config: SensorConfig,
+    defects: DefectConfig,
+) -> Sensor:
+    """Return a sensor with PDAF disabled and the requested defect rates."""
+    pdaf = PDAFConfig(fraction=0.0, qe_factor=0.5, pattern="none")
+    config = sensor_config.model_copy(update={"defects": defects, "pdaf": pdaf})
+    return Sensor(config, seed=1)
+
+
+def test_dead_pixels_read_near_black_not_normal_scene_signal(sensor_config: SensorConfig) -> None:
+    defects = _defect_config(dead_rate=0.05)
+    sensor = _defect_sensor(sensor_config, defects)
+    raw = sensor.expose(make_irr(LOW_LEVEL), 0.01, mode="LCG", seed=7)
+    masks = defect_masks(defects, raw.data.shape, seed=defects.seed)
+    assert masks.dead.any()
+
+    dead_codes = raw.data[masks.dead].astype(np.float64)
+    healthy_codes = raw.data[~masks.dead].astype(np.float64)
+    assert float(np.max(dead_codes)) <= raw.black_level_dn + 2.0
+    assert float(np.median(healthy_codes)) > raw.black_level_dn + 10.0
+    assert float(np.median(healthy_codes)) - float(np.median(dead_codes)) > 10.0
+    assert raw.hot_mask is not None and not raw.hot_mask.any()
+    assert raw.defect_mask is not None
+    np.testing.assert_array_equal(raw.defect_mask, masks.dead)
+
+
+def test_stuck_pixels_are_pinned_to_the_adc_white_code(sensor_config: SensorConfig) -> None:
+    defects = _defect_config(stuck_rate=0.02)
+    sensor = _defect_sensor(sensor_config, defects)
+    raw = sensor.expose(make_irr(LOW_LEVEL), 0.01, mode="LCG", seed=7)
+    masks = defect_masks(defects, raw.data.shape, seed=defects.seed)
+    assert masks.stuck.any()
+
+    maximum = 2**raw.bit_depth - 1
+    np.testing.assert_array_equal(raw.data[masks.stuck], np.full(int(masks.stuck.sum()), maximum))
+    assert raw.defect_mask is not None
+    np.testing.assert_array_equal(raw.defect_mask, masks.stuck)
+    assert raw.hot_mask is not None and not raw.hot_mask.any()
+
+
+def test_hot_pixels_differ_from_healthy_pixels_under_dark_current(
+    sensor_config: SensorConfig,
+) -> None:
+    defects = _defect_config(hot_rate=0.05)
+    sensor = _defect_sensor(sensor_config, defects)
+    raw = sensor.expose(
+        make_irr(0.0),
+        0.1,
+        mode="LCG",
+        temperature_c=70.0,
+        seed=7,
+    )
+    masks = defect_masks(defects, raw.data.shape, seed=defects.seed)
+    assert masks.hot.any()
+
+    hot_codes = raw.data[masks.hot].astype(np.float64)
+    healthy_codes = raw.data[~masks.hot].astype(np.float64)
+    assert float(np.median(hot_codes)) > float(np.median(healthy_codes)) + 20.0
+    assert raw.hot_mask is not None
+    np.testing.assert_array_equal(raw.hot_mask, masks.hot)
+    assert raw.defect_mask is not None
+    np.testing.assert_array_equal(raw.defect_mask, masks.hot)
+
+
+@pytest.mark.parametrize(
+    "defects",
+    [
+        _defect_config(dead_rate=0.05),
+        _defect_config(stuck_rate=0.02),
+        _defect_config(hot_rate=0.05),
+    ],
+    ids=["dead", "stuck", "hot"],
+)
+def test_dpc_corrects_every_flagged_defect_class(
+    sensor_config: SensorConfig,
+    defects: DefectConfig,
+) -> None:
+    from camsim.config.schema import DPCConfig
+    from camsim.isp.dpc import correct_defects
+
+    sensor = _defect_sensor(sensor_config, defects)
+    raw = sensor.expose(
+        make_irr(LOW_LEVEL),
+        0.01,
+        mode="LCG",
+        temperature_c=70.0 if defects.hot_rate else 25.0,
+        seed=7,
+    )
+    assert raw.defect_mask is not None and raw.defect_mask.any()
+    corrected = correct_defects(raw, DPCConfig(enabled=True, method="neighbor"))
+    flagged = raw.defect_mask
+    original = raw.data.astype(np.float32)
+    changed = corrected[flagged] != original[flagged]
+    assert float(np.mean(changed)) > 0.95
+    np.testing.assert_array_equal(corrected[~flagged], original[~flagged])
+
+
+def test_hot_mask_is_reduced_with_binning(sensor_config: SensorConfig) -> None:
+    from camsim.config.schema import BinningConfig
+
+    defects = _defect_config(hot_rate=0.05, dead_rate=0.01)
+    pdaf = PDAFConfig(fraction=0.0, qe_factor=0.5, pattern="none")
+    config = sensor_config.model_copy(
+        update={"defects": defects, "pdaf": pdaf, "binning": BinningConfig(factor=2, mode="analog")}
+    )
+    raw = Sensor(config, seed=1).expose(make_irr(LOW_LEVEL), 0.01, mode="LCG", seed=7)
+    assert raw.data.shape == (16, 16)
+    assert raw.hot_mask is not None and raw.hot_mask.shape == raw.data.shape
+    assert raw.defect_mask is not None and raw.defect_mask.shape == raw.data.shape
+    assert bool(np.all(raw.defect_mask[raw.hot_mask]))
+
+
+def test_sensor_memory_guard_rejects_an_oversized_working_set(
+    sensor_config: SensorConfig,
+) -> None:
+    sensor = Sensor(sensor_config, seed=1)
+    with pytest.raises(ValueError, match="peak memory"):
+        sensor.expose(make_irr(1e-5), 0.01, mode="LCG", seed=1, max_memory_bytes=1)
+    # The rejected call must not lock the native grid or advance the frame stream.
+    raw = sensor.expose(make_irr(1e-5), 0.01, mode="LCG", seed=1)
+    assert raw.data.shape == (32, 32)

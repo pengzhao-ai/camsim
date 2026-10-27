@@ -761,11 +761,15 @@ class ToneConfig(ConfigModel):
 
 
 class OutputConfig(ConfigModel):
-    """Display encoding of the rendered image.
+    """Display encoding metadata for the rendered image.
 
-    ``bit_depth`` is the container depth used when writing images (8 for SDR
-    displays, 10 or 16 for analysis); it does not change the in-memory
-    ``RenderedImage`` float range.
+    ``bit_depth`` is **metadata only**. It records the intended container depth
+    (8 for SDR displays, 10 or 16 for analysis) in ``RenderedImage`` metadata
+    and stage traces; it does not requantize the in-memory float32 data and it
+    does not choose a file format. :func:`camsim.io.images.save_image` chooses
+    the actual bit depth from the requested file format and extension (8-bit
+    PNG, 16-bit mono TIFF), so a metadata claim of 16 bits does not make a PNG
+    a 16-bit file.
     """
 
     color_space: ColorSpace = "sRGB"

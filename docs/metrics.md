@@ -105,7 +105,12 @@ noise.
 **Per-channel SNR** (`snr_channels`) returns `R`, `G`, `B`, and `luma` for a
 colour patch, or `"mono"` for a single plane, in deterministic order. A flat,
 black, negative-mean, or single-pixel patch reports `valid=False` with
-`snr_db=nan` rather than omitting the measurement.
+`snr_db=nan` rather than omitting the measurement. `luma` is Rec. 709 weighted,
+which is defined on **linear sRGB primaries**; a direct 3-D call assumes that
+space. `measure_all` converts a linear Display P3 buffer to linear sRGB first
+and records the coefficients and conversion in the report metadata. Applying
+Rec. 709 weights directly to P3 values overstates pure P3 green and understates
+pure P3 blue.
 
 Values must be linear light with the black-level pedestal already subtracted:
 the pedestal raises the mean without changing the std and therefore inflates
@@ -132,6 +137,16 @@ apparent sensor colour error. `ColorReference` lives in `camsim.core.color`, so
 the scene layer can compute it spectrally and the metrics layer can consume it
 without importing the scene.
 
+!!! warning "The default ISP preset is not colour accurate"
+    The shipped `default.json` carries an identity CCM. It is a neutral
+    baseline, not a calibrated colour profile: a default ColorChecker render is
+    roughly 40 mean ΔE2000 at the preset's default exposure (about 11 when well
+    exposed). Fit a matrix with `camsim.isp.ccm.fit_ccm` and supply it in
+    `ccm.matrix` before treating delta-E as camera colour accuracy.
+    `measure_all` adds an explicit warning to
+    `MetricReport.metadata["warnings"]` when colour is measured through an
+    identity matrix.
+
 `delta_e_patches` returns per-patch rows plus the means over valid patches and
 a validity flag. ΔE76 and ΔE2000 are both always computed, so a report can
 compare the perceptually uniform metric with the simpler Euclidean one.
@@ -148,7 +163,8 @@ colour-accuracy claim.*
 `edge_acutance(image, roi)` is the contrast-normalized RMS gradient of one edge
 ROI: it reduces RGB to Rec. 709 luma, maps the profile to `[0, 1]`, and returns
 `sqrt(mean(gx**2 + gy**2))`. Higher is sharper, and the normalization makes it
-invariant to exposure and chart contrast.
+invariant to exposure and chart contrast. Like luma SNR, the weights assume
+linear sRGB; `measure_all` converts a Display P3 buffer first.
 
 It is a **correlation-study sharpness proxy, not a calibrated physical
 quantity** and not a standard definition. Its magnitude depends on ROI size,
@@ -174,13 +190,17 @@ layout support and returns a frozen `MetricReport`:
 Groups that do not apply are `None`, and `metadata["skipped"]` records the
 reason in a fixed order (MTF, acutance, SNR, colour), so repeated measurement
 is deterministic. Resolution and noise consume `RenderedImage.linear_rgb` when
-present; colour decodes `RenderedImage.data`. Neither the image nor the layout
-is modified.
+present; colour decodes `RenderedImage.data`. The metadata also records the
+luma space and coefficients, the Display P3-to-sRGB conversion when one was
+applied, and a `warnings` list (including identity-CCM colour measurement).
+Neither the image nor the layout is modified.
 
 The expected companion layout for a rendered slanted edge is
-`slanted_edge_layout(shape=...)`; for a rendered ColorChecker use
-`colorchecker_layout(illuminant=..., shape=..., oversampling=...)` at the same
-shape and oversampling as the render.
+`slanted_edge_layout(shape=...)`; for a rendered scene, prefer
+`chart_layout_from_scene(scene)`, which derives the patch/edge geometry and
+reference from the `SceneResult` so the shape and oversampling cannot drift.
+`colorchecker_layout(illuminant=..., shape=..., oversampling=...)` remains
+available when the layout must be built independently.
 
 ### JSON reports
 

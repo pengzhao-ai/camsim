@@ -12,7 +12,10 @@ short, reproducible chain:
 2. **Luma.** A 2-D image is already the plane to measure. An ``(H, W, 3)`` RGB
    image is reduced with the Rec. 709 weights
    ``Y = 0.2126 R + 0.7152 G + 0.0722 B``, applied to the values as supplied.
-   The weights sum to one, so a neutral patch keeps its level.
+   The weights sum to one, so a neutral patch keeps its level. They are
+   defined on sRGB primaries: a linear Display P3 image must be converted to
+   linear sRGB first. :func:`camsim.metrics.measure_all` performs that
+   conversion and records it; direct 3-D calls assume linear sRGB.
 3. **Contrast normalization.** The profile is mapped to
    ``(profile - min) / (max - min)``. The edge's own swing therefore cancels:
    doubling the exposure or halving the chart contrast leaves the number
@@ -115,9 +118,11 @@ def edge_acutance(image: ArrayLike, roi: PatchROI) -> float:
     image:
         Real, finite ``(H, W)`` mono or ``(H, W, 3)`` RGB array-like. RGB input
         is reduced to Rec. 709 luma with the customary ``0.2126``, ``0.7152``,
-        and ``0.0722`` weights. Boolean, complex, non-numeric, and non-finite
-        input is rejected by :func:`~camsim.metrics.chart.extract_patch`, as is
-        any image that is not 2-D or 3-D. A 3-D image that is not exactly three
+        and ``0.0722`` weights, which assume **linear sRGB primaries**; convert
+        a linear Display P3 buffer to linear sRGB before calling this function
+        directly. Boolean, complex, non-numeric, and non-finite input is
+        rejected by :func:`~camsim.metrics.chart.extract_patch`, as is any
+        image that is not 2-D or 3-D. A 3-D image that is not exactly three
         channels wide is rejected here: there is no standard weighting for an
         arbitrary channel count.
 

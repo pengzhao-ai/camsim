@@ -603,3 +603,42 @@ def test_scene_layout_rejects_duplicate_patch_names() -> None:
 
     with pytest.raises(ValueError, match="unique"):
         SceneLayout("chart", patches)
+
+
+# --------------------------------------------------------------------------- #
+# Simulation memory budget and scene-derived metrics layout
+# --------------------------------------------------------------------------- #
+
+
+def test_render_memory_guard_rejects_before_allocating() -> None:
+    """A huge spectral request fails before any cube is allocated."""
+    with pytest.raises(ValueError, match="peak memory"):
+        render(
+            "flat_patch",
+            illuminant="D65",
+            lux=100.0,
+            shape=(100_000, 100_000),
+            oversampling=1,
+            max_memory_bytes=8 * 1024**3,
+        )
+
+
+def test_chart_layout_from_scene_matches_the_render() -> None:
+    """The layout helper derives geometry from the scene, not caller guesses."""
+    from camsim.scene.charts import chart_layout_from_scene
+
+    scene = render(
+        "colorchecker",
+        illuminant="3000K",
+        lux=100.0,
+        shape=(64, 64),
+        oversampling=2,
+    )
+    layout = chart_layout_from_scene(scene, lens=_lens())
+    assert layout.name == "colorchecker"
+    assert len(layout.patches) == 24
+    assert layout.patches[0].name == scene.layout.patches[0].name
+    assert layout.pixel_pitch_um == scene.irradiance.pixel_pitch_um
+    assert layout.reference is not None
+    assert layout.reference.illuminant_name == "3000K"
+    assert layout.focal_length_mm == pytest.approx(6.4)

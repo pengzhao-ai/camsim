@@ -101,10 +101,12 @@ the project owner approves `results/reports/validation_report.md`.
 
 ### Validation
 
-- G0: 9/9 quality-gate commands pass locally; CI runs the same commands.
-- G1: 7/7 checks; G2: 16/16; G3: 19/19; G4: 31/31; G5 cross-cutting: 13/13.
-- Test suite: all tests pass; coverage 91.82% against a 90% gate with the
-  documented `*/camsim/viz/*` presentation-layer omission.
+- G0: quality-gate commands pass locally; CI workflows (including examples
+  and notebooks) were added but execution is pending a push.
+- G1: 7/7 checks; G2: 16/16; G3: 21/21; G4: 31/31; G5 cross-cutting: 16/16.
+- Test suite: all tests pass; subject-module coverage is 91.73% against the
+  90% gate with the documented `*/camsim/viz/*` omission, and whole-package
+  coverage including viz is 83.55% (reviewed exception).
 - The validation is simulated: it is not a certified ISO 12233 or EMVA 1288
   measurement, and the flagship preset is a representative engineering design
   point, not a measurement of a specific commercial part.

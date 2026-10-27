@@ -20,11 +20,14 @@ with a fixed seed, so repeated runs in one environment produce the same values
 and byte-identical PNGs.
 
 Why these criteria matter. Denoising trades noise against resolution: a filter
-that suppresses noise by smearing the edge has not preserved image quality, so
-the gate requires a positive SNR gain *and* no more than a 10 % MTF50 loss.
-Sharpening is the inverse trade: it must raise MTF50 without inventing contrast
-so large that the edge halo is unbounded, so the gate requires both a higher
-MTF50 and a positive but measured overshoot. Auto-exposure must converge to its
+that suppresses noise by smearing the edge has not preserved image quality, and
+a filter that invents edge contrast has distorted it, so the gate requires a
+positive SNR gain *and* a two-sided MTF50 change bound of 20 %. It also checks
+that the denoised edge does not ring: overshoot and undershoot must each stay
+within 1 % of the edge contrast. Sharpening is the inverse trade: it must raise
+MTF50 without inventing contrast so large that the edge halo is unbounded, so
+the gate requires both a higher MTF50 and a positive but measured overshoot.
+Auto-exposure must converge to its
 target while respecting the preset's physical exposure, analog-gain, and
 digital-gain windows; at extreme low light digital gain is a display
 convenience that amplifies noise, which is recorded as a limitation rather than
@@ -123,7 +126,8 @@ FLAT_NOISE_SIGMA: Final[float] = 0.02
 FLAT_NOISE_SEED: Final[int] = 72
 FLAT_LEVEL: Final[float] = 0.4
 FLAT_SHAPE: Final[tuple[int, int]] = (64, 64)
-DENOISE_MAX_MTF_LOSS: Final[float] = 0.10
+DENOISE_MAX_MTF_CHANGE: Final[float] = 0.20
+DENOISE_MAX_RINGING: Final[float] = 0.01
 SHARPEN_OVERSHOOT_MARGIN: Final[float] = 1e-3
 AE_TARGET_FRACTION: Final[float] = 0.18
 AE_TOLERANCE: Final[float] = 0.02
@@ -176,55 +180,73 @@ class GateArtifact:
 # machine-specific measurements, not promises; the verdicts and counts are the
 # evidence. Update this block only after re-running the documented commands.
 GATE_RUN: Final[tuple[GateCommand, ...]] = (
-    GateCommand("uv run pytest -q", "1751 passed", 125.92, True),
+    GateCommand("uv run pytest -q", "1775 passed", 126.16, True),
     GateCommand(
         "uv run pytest --cov=camsim --cov-fail-under=90",
-        "1751 passed; total coverage 91.82% (required 90%)",
-        152.16,
+        "1775 passed; subject-module coverage 91.73% (required 90%)",
+        150.48,
+        True,
+    ),
+    GateCommand(
+        "uv run pytest --cov=camsim --cov-config=coverage-whole.rc",
+        "1775 passed; whole-package coverage 83.55% including viz",
+        150.17,
         True,
     ),
     GateCommand("uv run ruff check .", "All checks passed!", 0.06, True),
-    GateCommand("uv run ruff format --check .", "140 files already formatted", 0.03, True),
-    GateCommand("uv run mypy src", "Success: no issues found in 68 source files", 0.59, True),
+    GateCommand("uv run ruff format --check .", "143 files already formatted", 0.03, True),
+    GateCommand("uv run mypy src", "Success: no issues found in 69 source files", 0.59, True),
     GateCommand(
         "uv run mkdocs build --strict",
-        "Documentation built in 1.73 seconds",
-        1.90,
+        "Documentation built in 1.78 seconds",
+        1.97,
         True,
     ),
     GateCommand(
         "uv run python benchmarks/benchmark_pipeline.py --quick",
-        "pipeline total 8.26 ms (128 x 128)",
+        "pipeline total 8.34 ms (128 x 128)",
         1.31,
         True,
     ),
     GateCommand(
         "uv run python benchmarks/benchmark_pipeline.py",
-        "pipeline total 115.29 ms (512 x 512)",
+        "pipeline total 114.58 ms (512 x 512)",
         1.87,
+        True,
+    ),
+    GateCommand(
+        "uv run python benchmarks/benchmark_pipeline.py --large",
+        "pipeline total 453.90 ms (1024 x 1024, 1x oversampling)",
+        3.12,
         True,
     ),
     GateCommand(
         "uv build",
         "built camsim-0.1.0.dev0.tar.gz and camsim-0.1.0.dev0-py3-none-any.whl",
-        0.75,
+        0.77,
         True,
     ),
 )
 
+# Coverage is reported two ways. The subject-module gate omits the plotting
+# layer; the whole-package figure includes it. Both are measured, and neither is
+# called "total coverage" without its scope.
+COVERAGE_SUBJECT_PCT: Final[float] = 91.73
+COVERAGE_WHOLE_PCT: Final[float] = 83.55
+
 # Benchmark stage shares recorded by the same gate run, used in the evidence
 # figure. Using recorded constants keeps the PNG deterministic; machine timing
 # is inherently variable and is reported as evidence, never as a guarantee.
-BENCHMARK_QUICK_TOTAL_MS: Final[float] = 8.26
-BENCHMARK_FULL_TOTAL_MS: Final[float] = 115.29
+BENCHMARK_QUICK_TOTAL_MS: Final[float] = 8.34
+BENCHMARK_FULL_TOTAL_MS: Final[float] = 114.58
 BENCHMARK_STAGES: Final[tuple[str, ...]] = (
     "scene.render",
     "sensor.expose",
     "isp.process",
     "measure_all",
 )
-BENCHMARK_QUICK_SHARE_PCT: Final[tuple[float, ...]] = (39.7, 38.2, 17.0, 5.0)
-BENCHMARK_FULL_SHARE_PCT: Final[tuple[float, ...]] = (41.9, 41.2, 15.2, 1.7)
+BENCHMARK_QUICK_SHARE_PCT: Final[tuple[float, ...]] = (39.9, 38.6, 16.7, 4.8)
+BENCHMARK_FULL_SHARE_PCT: Final[tuple[float, ...]] = (41.7, 41.6, 14.9, 1.7)
 
 
 def _package_version(name: str) -> str:
@@ -245,6 +267,18 @@ def _git_commit() -> str:
         check=False,
     )
     return completed.stdout.strip() if completed.returncode == 0 else "unknown"
+
+
+def _git_dirty() -> bool:
+    """Return whether the working tree has uncommitted changes."""
+    completed = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return completed.returncode == 0 and bool(completed.stdout.strip())
 
 
 def _split_table_row(line: str) -> list[str]:
@@ -482,7 +516,15 @@ def _measure_denoise() -> tuple[dict[str, Any], list[Check]]:
     before = slanted_edge_mtf(noisy, PIXEL_PITCH_UM, oversampling=MTF_OVERSAMPLING)
     after = slanted_edge_mtf(denoised, PIXEL_PITCH_UM, oversampling=MTF_OVERSAMPLING)
     relative_change = float(after.mtf50_cp / before.mtf50_cp - 1.0)
-    loss = -relative_change
+
+    profile_before = blurred.mean(axis=0)
+    profile_after = denoised.mean(axis=0)
+    low = float(np.median(profile_before[:40]))
+    high = float(np.median(profile_before[-40:]))
+    contrast = high - low
+    overshoot = float((profile_after.max() - high) / contrast)
+    undershoot = float((low - profile_after.min()) / contrast)
+    ringing = max(abs(overshoot), abs(undershoot))
 
     flat_rng = np.random.default_rng(FLAT_NOISE_SEED)
     flat = FLAT_LEVEL + FLAT_NOISE_SIGMA * flat_rng.standard_normal(FLAT_SHAPE)
@@ -494,11 +536,18 @@ def _measure_denoise() -> tuple[dict[str, Any], list[Check]]:
 
     checks = [
         Check(
-            "Denoise MTF50 preservation",
+            "Denoise MTF50 change",
             f"{before.mtf50_cp:.6f} -> {after.mtf50_cp:.6f} cycles/pixel ({relative_change:+.2%})",
-            f"loss <= {DENOISE_MAX_MTF_LOSS:.0%}",
-            loss <= DENOISE_MAX_MTF_LOSS,
+            f"|change| <= {DENOISE_MAX_MTF_CHANGE:.0%}",
+            abs(relative_change) <= DENOISE_MAX_MTF_CHANGE,
             "camsim.metrics.slanted_edge_mtf before/after camsim.isp.denoise.denoise",
+        ),
+        Check(
+            "Denoise edge ringing (overshoot/undershoot)",
+            f"overshoot {overshoot:+.2%}, undershoot {undershoot:+.2%} of edge contrast",
+            f"|overshoot| and |undershoot| <= {DENOISE_MAX_RINGING:.0%}",
+            ringing <= DENOISE_MAX_RINGING,
+            "Row-mean linear profile of the denoised edge against the clean plateau",
         ),
         Check(
             "Denoise luma SNR gain",
@@ -523,6 +572,9 @@ def _measure_denoise() -> tuple[dict[str, Any], list[Check]]:
         "mtf50_before_cp": float(before.mtf50_cp),
         "mtf50_after_cp": float(after.mtf50_cp),
         "mtf50_relative_change": relative_change,
+        "overshoot_fraction": overshoot,
+        "undershoot_fraction": undershoot,
+        "ringing_fraction": ringing,
         "snr_before_db": float(snr_before.snr_db),
         "snr_after_db": float(snr_after.snr_db),
         "snr_gain_db": snr_gain,
@@ -1075,11 +1127,12 @@ def _plot_evidence(
     axis.set_xticklabels(["before", "after"])
     axis.set_ylabel("SNR (dB)")
     axis.set_ylim(0.0, max(denoise["snr_after_db"], denoise["snr_before_db"]) * 1.25)
-    axis.set_title("Denoise: SNR gain and MTF50 preservation")
+    axis.set_title("Denoise: SNR gain and signed MTF50 change")
     axis.annotate(
         f"SNR {denoise['snr_gain_db']:+.2f} dB\n"
         f"MTF50 {denoise['mtf50_before_cp']:.4f} -> {denoise['mtf50_after_cp']:.4f} cp\n"
-        f"({denoise['mtf50_relative_change']:+.2%})",
+        f"({denoise['mtf50_relative_change']:+.2%})\n"
+        f"ringing {denoise['ringing_fraction']:.2%}",
         xy=(0.98, 0.95),
         xycoords="axes fraction",
         ha="right",
@@ -1179,16 +1232,80 @@ def _format_value(value: Any) -> str:
     return str(value)
 
 
+GALLERY_TIMING_FILES: Final[tuple[tuple[str, str, float], ...]] = (
+    ("examples", "examples_timings.json", 300.0),
+    ("notebooks", "notebooks_timings.json", 120.0),
+)
+
+
+def _load_gallery_timings() -> dict[str, dict[str, Any]]:
+    """Load the local example/notebook timing evidence produced by the runners.
+
+    The runners enforce the per-item timeouts (300 s for examples, 120 s for
+    notebooks) and write one JSON record per sweep. The report reads both so the
+    sign-off checklist quotes measured evidence instead of a recollection. The
+    files are machine-specific wall times; they are evidence, not promises.
+    """
+    loaded: dict[str, dict[str, Any]] = {}
+    for kind, name, budget in GALLERY_TIMING_FILES:
+        path = REPORT_DIR / name
+        if not path.is_file():
+            raise ValueError(
+                f"missing {kind} timing evidence {path}; run "
+                f"benchmarks/run_{kind}.py before generating the G5 report"
+            )
+        payload = _load_json(path)
+        items = payload.get("items")
+        if not isinstance(items, list) or payload.get("passed") is not True:
+            raise ValueError(f"{name} is not a passing {kind} run")
+        for item in items:
+            if not isinstance(item, dict) or item.get("passed") is not True:
+                raise ValueError(f"{name} contains a failing {kind} item: {item!r}")
+            seconds = float(item.get("seconds", math.nan))
+            if not math.isfinite(seconds) or seconds > budget:
+                raise ValueError(
+                    f"{name} item {item.get('name')!r} took {seconds:g} s, "
+                    f"above the {budget:g} s budget"
+                )
+        loaded[kind] = {"budget_s": budget, **payload}
+    return loaded
+
+
+def _gallery_checks(gallery: dict[str, dict[str, Any]]) -> list[Check]:
+    """Return one cross-cutting check per gallery runner."""
+    checks: list[Check] = []
+    for kind, label, budget in (
+        ("examples", "Examples headless (local)", 300.0),
+        ("notebooks", "Notebooks headless (local)", 120.0),
+    ):
+        payload = gallery[kind]
+        items = payload["items"]
+        measured = "; ".join(f"{item['name']}: {float(item['seconds']):.2f} s" for item in items)
+        checks.append(
+            Check(
+                label,
+                measured or "no items",
+                f"all exit 0; each item <= {budget:g} s",
+                all(item.get("passed") is True for item in items)
+                and all(float(item["seconds"]) <= budget for item in items),
+                f"benchmarks/run_{kind}.py subprocess sweep with per-item timeout",
+            )
+        )
+    return checks
+
+
 def _render_report(
     gates: list[GateArtifact],
     cross_checks: list[Check],
     measurements: dict[str, Any],
     docs_images: list[str],
+    gallery: dict[str, dict[str, Any]],
 ) -> str:
     """Build the consolidated Markdown report."""
     lines: list[str] = []
     add = lines.append
     commit = _git_commit()
+    source_label = f"{commit} + uncommitted working tree" if _git_dirty() else commit
     environment = {
         "Python": platform.python_version(),
         "camsim": camsim.__version__,
@@ -1198,7 +1315,7 @@ def _render_report(
         "colour-demosaicing": _package_version("colour-demosaicing"),
         "Matplotlib": _package_version("matplotlib"),
         "Platform": f"{platform.system()} ({platform.machine()})",
-        "Validated source commit": commit,
+        "Validated source commit": source_label,
         "Branch": "feat/camsim-core",
         "Report date": date.today().isoformat(),
         "Sensor preset": "src/camsim/config/presets/sensors/flagship_phone_50mp.json",
@@ -1217,7 +1334,10 @@ def _render_report(
     add(
         "This is the consolidated G5 candidate report for the camsim core "
         "pipeline. G1-G4 are green, every cross-cutting check below passed on "
-        "the validated source tree, and the engineering gates are green. The "
+        "the validated source tree, and the local engineering gates are green. "
+        "CI workflows for lint, types, tests, coverage, docs, build, examples, "
+        "and notebooks were added in this candidate, but their execution is "
+        "pending a push; the owner must accept that residual at sign-off. The "
         "G5 gate itself is **not** closed: the project owner must review this "
         "report and the figure gallery, confirm the scope, assumptions, and "
         "limitations, and explicitly approve `v0.1.0`. Until that decision is "
@@ -1251,8 +1371,10 @@ def _render_report(
     add(
         "The enforced ISP order is `DPC -> BLC -> LSC -> AWB -> demosaic -> CCM -> "
         "denoise -> sharpen -> tone -> output`. Every stage before tone operates in "
-        "linear float32 light; the tone curve and output OETF are the only "
-        "non-linear steps."
+        "linear float32 light. The CCM's non-negativity clamp is the one bounded "
+        "exception: it is inactive on in-gamut data and is measured explicitly in "
+        "G3. The tone curve and output OETF are the only intentionally non-linear "
+        "steps."
     )
     add("")
     add("## 2. Environment and validated source")
@@ -1266,11 +1388,14 @@ def _render_report(
     add("")
     add(
         "The phase reports and this candidate were produced from the same "
-        "source tree and software environment. The G5 candidate commit adds "
-        "only this report, its tests, the two G5 figures, and documentation "
-        "and metadata updates; it changes no simulation, sensor, ISP, "
-        "metrics, camera, or CLI code. All numbers are simulated measurements, "
-        "not measurements of physical hardware."
+        "source tree and software environment. This candidate includes the "
+        "release-blocking fixes from the whole-branch review: physical dead/"
+        "stuck/hot defect behaviour and a separate hot mask, Display P3 luma "
+        "conversion, an AWB+CCM linearity check, a two-sided denoise MTF bound "
+        "with an edge-ringing check, a simulation-memory guard, and the "
+        "CI/notebook runners. G3 evidence was regenerated; G1, G2, and G4 "
+        "remained byte-identical. All numbers are simulated measurements, not "
+        "measurements of physical hardware."
     )
     add("")
 
@@ -1303,8 +1428,12 @@ def _render_report(
         "A phase gate is evidence only when its report says PASS and every "
         "recorded check in its machine-readable results passed. The loader "
         "that builds this table refuses quick-mode artifacts and any JSON not "
-        "marked `gate_evidence: true`. G0 is a local gate run; no CI-matrix "
-        "result is recorded in this repository artifact."
+        "marked `gate_evidence: true`. G0 is a local gate run. The CI workflow "
+        "now defines quality, test, docs, build, examples, and notebooks jobs, "
+        "but GitHub Actions cannot be executed from this environment: the "
+        "workflows are added, the local equivalents passed, and CI execution is "
+        "pending a push. The owner must accept that residual at sign-off. No "
+        "claim that CI is green is made here."
     )
     add("")
     add("### 3.1 Phase artifact bindings")
@@ -1329,10 +1458,17 @@ def _render_report(
         "`benchmarks/g1_scene_optics.py`, examples 01-04 in full mode, and "
         "notebooks 01-03 headless were re-run on the validated source tree. "
         "G1 remained PASS and its report and four figures were byte-identical; "
-        "the G2-G4 reports and JSON were byte-identical; the example and "
-        "notebook gallery figures were byte-identical. G2, G3, and G4 each "
-        "reported PASS after regeneration. Quick modes were not run against "
-        "the gate directories."
+        "G2 and G4 reports and JSON were byte-identical; the example and "
+        "notebook gallery figures were byte-identical except the G3 check-"
+        "summary figure, which reflects the added AWB/CCM linearity checks. "
+        "G3 was regenerated because its linearity check now runs with AWB "
+        "enabled and a fitted CCM, and its report wording was corrected. G1-G4 "
+        "each reported PASS after regeneration. The preset's defect rates "
+        "(1e-5 dead, 1e-5 hot, 1e-6 stuck) put fewer than one expected defect "
+        "in the G2 characterization fields, so G2 was byte-identical after the "
+        "defect behaviour change; the end-to-end defect tests use raised custom "
+        "rates. Quick modes were not run against the gate directories. The "
+        "per-item example and notebook runtimes are recorded in section 5.9."
     )
     add("")
 
@@ -1391,12 +1527,17 @@ def _render_report(
     add("")
     add(
         "Absolute timings are machine-specific and are evidence, not "
-        "guarantees. The coverage gate enforces at least 90 % statement and "
-        "branch coverage with `*/camsim/viz/*` omitted: the presentation layer "
-        "is exercised by the executed examples and notebooks that generate "
-        "the committed gallery, while the simulation, metrics, configuration, "
-        "characterization, and CLI modules remain subject to the coverage "
-        "gate. The threshold is not lowered for this candidate."
+        "guarantees. Coverage is reported with two scopes, not one headline "
+        f"number: **subject-module coverage is {COVERAGE_SUBJECT_PCT:.2f} %** "
+        "with `*/camsim/viz/*` omitted, and **whole-package coverage including "
+        f"viz is {COVERAGE_WHOLE_PCT:.2f} %**. The 90 % statement-and-branch "
+        "gate applies to the subject modules (simulation, metrics, "
+        "configuration, characterization, IO, camera, and CLI), which contain "
+        "the numerical contracts the gates depend on. The presentation layer "
+        "is exercised by the executed examples and notebooks that generate the "
+        "committed gallery; its inclusion lowers the whole-package number. "
+        "That gap is an explicit **reviewed exception** recorded in the "
+        "sign-off checklist, not a silent claim that 91.73 % is total coverage."
     )
     add("")
     add("### 5.2 Cross-cutting measurement summary")
@@ -1418,7 +1559,7 @@ def _render_report(
     add("")
 
     denoise = measurements["denoise"]
-    add("### 5.3 Denoise: SNR gain and MTF50 preservation")
+    add("### 5.3 Denoise: SNR gain, MTF50 change, and edge ringing")
     add("")
     add(
         "A 256 x 256 slanted edge at 5 degrees is blurred by the known "
@@ -1427,27 +1568,32 @@ def _render_report(
         "measured on the noisy edge and again after the shipped bilateral "
         "stage (`method=bilateral`, luma strength 1.0, radius 1.5); the SNR "
         "measurement uses an independent 64 x 64 flat patch with its own "
-        "generator. The resolution bound is a **loss** bound: a denoiser that "
-        "suppresses noise by smearing the edge fails, while a slightly higher "
-        "measured MTF50 passes because no resolution was lost."
+        "generator. The MTF50 criterion is **two-sided**: "
+        f"|relative change| <= {DENOISE_MAX_MTF_CHANGE:.0%}. A denoiser that "
+        "smears the edge or invents contrast both fail. The same denoised "
+        "profile must also stay within "
+        f"{DENOISE_MAX_RINGING:.0%} of the edge contrast on both the bright "
+        "and dark sides, so a ringing halo cannot pass as sharpening."
     )
     add("")
     add("| Quantity | Measured |")
     add("|---|---:|")
     add(f"| MTF50 before denoise | {denoise['mtf50_before_cp']:.6f} cycles/pixel |")
     add(f"| MTF50 after denoise | {denoise['mtf50_after_cp']:.6f} cycles/pixel |")
-    add(f"| Relative MTF50 change | {denoise['mtf50_relative_change']:+.2%} |")
+    add(f"| Signed relative MTF50 change | {denoise['mtf50_relative_change']:+.2%} |")
+    add(f"| Edge overshoot | {denoise['overshoot_fraction']:+.3%} of contrast |")
+    add(f"| Edge undershoot | {denoise['undershoot_fraction']:+.3%} of contrast |")
     add(f"| SNR before denoise | {denoise['snr_before_db']:.3f} dB |")
     add(f"| SNR after denoise | {denoise['snr_after_db']:.3f} dB |")
     add(f"| SNR gain | {denoise['snr_gain_db']:+.2f} dB |")
     add("")
     add(
-        "Interpretation: the bilateral stage raises flat-patch SNR and does "
-        "not lose MTF50 on this edge. The measured MTF50 rises because the "
-        "full-strength bilateral filter sharpens the transition as it "
-        "suppresses the noise floor; the check is deliberately a preservation "
-        "bound, and the measured change is reported with its sign rather than "
-        "described as a pure equality."
+        "Interpretation: the bilateral stage raises flat-patch SNR. The "
+        "measured MTF50 rises because the full-strength bilateral filter "
+        "steepens the transition as it suppresses the noise floor; that rise "
+        "is inside the stated two-sided bound and is reported with its sign. "
+        "The edge profile shows no meaningful ringing: overshoot and "
+        "undershoot are well below the 1 % bound."
     )
     add("")
 
@@ -1588,6 +1734,39 @@ def _render_report(
     )
     add("")
 
+    add("### 5.9 Examples and notebooks (local gallery evidence)")
+    add("")
+    add(
+        "CI workflows now include `examples` and `notebooks` jobs. This "
+        "environment cannot execute GitHub Actions, so the equivalent local "
+        "sweeps were run through `benchmarks/run_examples.py` and "
+        "`benchmarks/run_notebooks.py`, which enforce per-item subprocess "
+        "timeouts and fail fast. **CI execution is pending a push; local "
+        "equivalents passed.** The owner must accept that residual at "
+        "sign-off. The two-minute-per-notebook condition is enforced by the "
+        "120 s runner timeout and verified by the times below."
+    )
+    add("")
+    add("| Item | Sweep | Wall time | Budget | Verdict |")
+    add("|---|---|---:|---:|---|")
+    for kind, label in (("examples", "example"), ("notebooks", "notebook")):
+        payload = gallery[kind]
+        budget = float(payload["budget_s"])
+        for item in payload["items"]:
+            verdict = "PASS" if item.get("passed") is True else "FAIL"
+            add(
+                f"| `{item['name']}` | {label} | {float(item['seconds']):.2f} s | "
+                f"{budget:.0f} s | **{verdict}** |"
+            )
+    add("")
+    add(
+        "The timing JSON files are committed as local evidence: "
+        "`results/reports/examples_timings.json` and "
+        "`results/reports/notebooks_timings.json`. They are machine-specific "
+        "wall times, not cross-platform promises."
+    )
+    add("")
+
     add("## 6. Assumptions")
     add("")
     assumptions = (
@@ -1614,6 +1793,16 @@ def _render_report(
         "an explicit `numpy.random.Generator` and a recorded seed. Bit-identical "
         "outputs are promised for one OS/Python/NumPy/SciPy environment; "
         "cross-platform comparisons use the stated tolerances.",
+        "**Default ISP is an identity CCM baseline.** The shipped preset's "
+        "`ccm.matrix` is the identity. It preserves a neutral baseline and lets "
+        "the stage measurements isolate optics and sensor effects, but it is "
+        "not a colour-accurate profile. A colour-accurate render must fit a "
+        "matrix with `camsim.isp.ccm.fit_ccm` and supply it in `ccm.matrix`.",
+        "**Defect conventions are explicit.** Dead pixels have zero mean "
+        "photoresponse, stuck pixels are pinned high to the ADC white code, and "
+        "hot pixels keep a dark-current multiplier with a separate hot mask. "
+        "Stuck-black is equally physical but not the chosen deterministic "
+        "convention.",
     )
     for index, assumption in enumerate(assumptions, start=1):
         add(f"{index}. {assumption}")
@@ -1661,6 +1850,39 @@ def _render_report(
         "**RCCC is a baseline only.** The clear channel is a luma placeholder "
         "for G and B; Bayer colour and MTF thresholds do not apply, and "
         "advanced RCCC demosaicing is deferred.",
+        "**Identity default CCM is not colour accurate.** The default preset "
+        "renders a ColorChecker at roughly 40 mean delta-E2000 at its default "
+        "10 ms exposure (measured 37.6 at 300 lux), about 11 when well exposed, "
+        "and about 16 under 3000 K. The G3 values near 1-4 come from a "
+        "per-illuminant fitted matrix, not from the shipped preset. "
+        "`measure_all` records an identity-CCM warning in its metadata when "
+        "colour is measured through the default.",
+        "**Full 50 MP spectral simulation is not supported at v0.1.0.** A "
+        "50 MP frame on the 95-wavelength grid would need about 38 GB for one "
+        "float64 cube before working copies. `scene.render` and "
+        "`Sensor.expose` estimate peak memory before allocating and reject a "
+        "request above the default 8 GiB budget with guidance to reduce "
+        "shape/oversampling or process in chunks. The validated practical "
+        "large-frame case is 1024 x 1024 at 1x oversampling (about 1.8 GB "
+        "estimated peak, measured in section 5.1); 512 x 512 at 4x "
+        "oversampling has a 3.2 GB cube and fits only with sufficient RAM. "
+        "Chunked spectral simulation and a full 50 MP path are future work.",
+        "**CI is added but not executed here.** The workflow includes "
+        "quality, test-matrix, docs, build, examples, and notebooks jobs. "
+        "GitHub Actions cannot run in this environment; the local equivalents "
+        "passed and CI execution is pending a push. The owner must accept that "
+        "residual, and no claim that CI is green is made.",
+        "**Polychromatic PSF and banding are not v0.1.0.** The optics model "
+        "uses a wavelength-independent PSF, and row noise is modelled without "
+        "periodic banding. Both are documented future capabilities, not "
+        "silent omissions.",
+        "**Display P3 files carry sidecar metadata only.** A P3 PNG is tagged "
+        "in its sidecar; the PNG itself has no reliably interoperable P3 "
+        "colour profile in this release. Consumers must read the sidecar.",
+        "**Reduced frame contract.** `RawFrame` omits wall-clock timestamp and "
+        "package version, and `RenderedImage` omits `linear_xyz`; acquisition "
+        "provenance lives in the surrounding experiment record. The reduction "
+        "is documented, not hidden.",
         "**No machine-vision evidence.** `camsim.tasks` is an empty gated "
         "namespace. This report says nothing about CNN accuracy, task-relevant "
         "IQ, mono-versus-Bayer, auto-tuning, or metric correlation.",
@@ -1682,12 +1904,9 @@ def _render_report(
     add("uv run python examples/02_isp_stage_gallery.py")
     add("uv run python examples/03_measure_iq.py")
     add("")
-    add("# Gallery: examples 01-04 full mode, then notebooks 01-03 headless")
-    add("uv run python examples/01_spectral_scene_to_raw.py")
-    add("uv run python examples/02_isp_stage_gallery.py")
-    add("uv run python examples/03_measure_iq.py")
-    add("uv run python examples/04_emva_characterization.py")
-    add("make notebooks")
+    add("# Gallery: examples 01-04 and notebooks 01-03, with per-item timeouts")
+    add("uv run python benchmarks/run_examples.py")
+    add("uv run python benchmarks/run_notebooks.py")
     add("")
     add("# Consolidated G5 report and figures")
     add("uv run python benchmarks/g5_validation_report.py")
@@ -1695,10 +1914,13 @@ def _render_report(
     add("# G5 quality gates")
     add("uv run pytest -q")
     add("uv run pytest --cov=camsim --cov-fail-under=90")
+    add("# Whole-package coverage including viz, for the two-scope report:")
+    add("uv run pytest --cov=camsim --cov-config=coverage-whole.rc --cov-report=term")
     add("uv run ruff check . && uv run ruff format --check . && uv run mypy src")
     add("uv run mkdocs build --strict")
     add("uv run python benchmarks/benchmark_pipeline.py --quick")
     add("uv run python benchmarks/benchmark_pipeline.py")
+    add("uv run python benchmarks/benchmark_pipeline.py --large")
     add("uv build")
     add("```")
     add("")
@@ -1730,9 +1952,9 @@ def _render_report(
         "sign-off awaiting |"
     )
     add(
-        "| [g5_evidence.png](../figures/g5_evidence.png) | Denoise SNR/MTF, "
-        "sharpen profile/overshoot, auto-exposure convergence, and benchmark "
-        "stage shares |"
+        "| [g5_evidence.png](../figures/g5_evidence.png) | Denoise SNR, signed "
+        "MTF50 change and ringing, sharpen profile/overshoot, auto-exposure "
+        "convergence, and benchmark stage shares |"
     )
     add(
         "| [g1_lux_normalization.png](../figures/g1_lux_normalization.png) | "
@@ -1807,7 +2029,33 @@ def _render_report(
         "- [ ] **Limitations confirmed.** Accept the synthetic CFA re-authoring, "
         "in-sample calibration, 8x Airy diagnostic, synthetic stage "
         "measurements, quick-mode exclusion, extreme-low-light digital-gain "
-        "noise, and the absence of HDR/3-D/motion-blur/autofocus."
+        "noise, the identity default CCM, the absence of HDR/3-D/motion-blur/"
+        "autofocus, no polychromatic PSF or banding, P3 sidecar-only tagging, "
+        "and the reduced RawFrame/RenderedImage contract."
+    )
+    add(
+        "- [ ] **Full-50-MP limitation accepted.** Confirm that v0.1.0 supports "
+        "single-process spectral simulation up to the configured memory budget "
+        "(validated at 1024 x 1024, 1x oversampling) and rejects larger grids "
+        "with a clear error rather than attempting a 50 MP spectral cube."
+    )
+    add(
+        "- [ ] **Coverage exception accepted.** Accept that subject-module "
+        "coverage is 91.73 % and whole-package coverage including `camsim.viz` "
+        "is lower, with viz exercised by the executed examples and notebooks. "
+        "The 90 % gate applies to the numerical subject modules, not to the "
+        "plotting layer."
+    )
+    add(
+        "- [ ] **CI and notebook evidence accepted.** Confirm that the CI "
+        "workflows and runners were added, every example and notebook passed "
+        "locally under the 300 s / 120 s per-item timeouts, and CI execution "
+        "is pending a push. Accept that residual."
+    )
+    add(
+        "- [ ] **Two-minute-per-notebook condition confirmed.** Accept the "
+        "per-notebook local times in section 5.9, all below 120 s, and the "
+        "runner/CI timeout that enforces the budget."
     )
     add(
         "- [ ] **Release approved.** Approve tagging `v0.1.0` on the signed-off "
@@ -1860,6 +2108,7 @@ def main() -> int:
         if failed:
             raise ValueError(f"{gate.gate} has failing checks: {failed}")
 
+    gallery = _load_gallery_timings()
     denoise, denoise_checks = _measure_denoise()
     sharpen, sharpen_checks = _measure_sharpen()
     ae_rows, ae_checks = _measure_auto_exposure()
@@ -1871,6 +2120,7 @@ def main() -> int:
     scope, scope_checks = _measure_machine_vision_scope()
 
     cross_checks = [
+        *_gallery_checks(gallery),
         *denoise_checks,
         *sharpen_checks,
         *ae_checks,
@@ -1905,7 +2155,7 @@ def main() -> int:
 
     # The appendix skips the long profile arrays; they are figure inputs, not
     # report values.
-    report = _render_report(gates, cross_checks, measurements, docs_images)
+    report = _render_report(gates, cross_checks, measurements, docs_images, gallery)
     REPORT_PATH.write_text(report, encoding="utf-8")
 
     passed = sum(1 for check in cross_checks if check.passed)

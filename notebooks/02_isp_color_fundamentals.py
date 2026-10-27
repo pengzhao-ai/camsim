@@ -352,10 +352,10 @@ print(f"Pre-tone linearity max relative error: {payload['linearity']['max_relati
 #   linearity smoke tests, but it is not colour accurate and no Bayer ΔE or MTF
 #   threshold applies.
 #
-# The notebook does **not** measure formal ISO 12233 MTF50: the independent
-# metrics harness does not exist until Phase 4, so MTF validation is deferred
-# to G4. It also does not run `Camera.auto_expose()`; the Camera orchestration
-# is Phase 5 consolidation work. Quick mode is not gate evidence.
+# The notebook does **not** duplicate the formal ISO 12233-style MTF50/MTF20
+# measurement: that lives in the independent G4 metrics harness and the G5
+# cross-cutting evidence. It also does not run `Camera.auto_expose()`; the
+# camera convergence check is part of G5. Quick mode is not gate evidence.
 
 # %%
 print(

@@ -228,8 +228,19 @@
     {
       "measured": 0.0,
       "measured_text": "0",
-      "name": "Linear pre-tone scaling invariance (max relative error)",
-      "notes": "Doubling the black-level-corrected RAW signal must double the last linear trace stage exactly; tone is excluded.",
+      "name": "AWB gain scale invariance (max relative error)",
+      "notes": "Gray-world gain estimation on the frame and on its doubled, black-level-corrected signal; normalised gain ratios are scale-free.",
+      "pass": true,
+      "tolerance": {
+        "maximum": 0.001
+      },
+      "tolerance_text": "< 0.001"
+    },
+    {
+      "measured": 0.0,
+      "measured_text": "0",
+      "name": "Linear pre-tone scaling invariance with AWB and CCM (max relative error)",
+      "notes": "Doubling the black-level-corrected RAW signal must double the last linear trace stage exactly with AWB enabled and a fitted CCM; the CCM clamp is inactive because every pre-clamp output is positive.",
       "pass": true,
       "tolerance": {
         "maximum": 1e-05
@@ -237,10 +248,21 @@
       "tolerance_text": "< 1e-05"
     },
     {
+      "measured": 0.024832383544757825,
+      "measured_text": "0.0248324",
+      "name": "CCM pre-clamp minimum on linearity data",
+      "notes": "The CCM non-negativity clamp is the one bounded exception to the linear-space invariant; it is inactive on this in-gamut frame.",
+      "pass": true,
+      "tolerance": {
+        "minimum": 0.0
+      },
+      "tolerance_text": "> 0"
+    },
+    {
       "measured": 0.006183140445500612,
       "measured_text": "0.00618314",
       "name": "LSC flat-field residual after correction",
-      "notes": "A gain map calibrated from one noisy flat field is applied to an independent flat field; residual is (max - min) / mean. The Task 18 focused test test_lsc_flat_field_corrects_vignetting is the exact-reciprocal check.",
+      "notes": "A gain map calibrated from one noisy flat field is applied to an independent flat field; residual is (max - min) / mean. tests/test_isp_lsc.py::test_lsc_flat_field_corrects_vignetting is the exact-reciprocal unit check.",
       "pass": true,
       "tolerance": {
         "maximum": 0.02
@@ -251,7 +273,7 @@
       "measured": 13.055647776433482,
       "measured_text": "13.0556",
       "name": "Denoise SNR gain (dB)",
-      "notes": "Bilateral luma/chroma denoise on a noisy flat region; SNR is 20 log10(|mean| / std) of BT.709 luma. Formal MTF is deferred to G4.",
+      "notes": "Bilateral luma/chroma denoise on a noisy flat region; SNR is 20 log10(|mean| / std) of BT.709 luma. Formal slanted-edge MTF is measured independently by the G4 metrics harness.",
       "pass": true,
       "tolerance": {
         "minimum": 3.0
@@ -273,7 +295,7 @@
       "measured": 0.5872285432323827,
       "measured_text": "0.587229",
       "name": "Sharpen edge-contrast gain",
-      "notes": "Thresholded unsharp mask on a clean step edge; the full-profile contrast must increase. Formal ISO 12233 MTF50 validation is deferred to G4 because the metrics harness does not exist yet.",
+      "notes": "Thresholded unsharp mask on a clean step edge; the full-profile contrast must increase. Formal ISO 12233 MTF50 validation is measured independently by the G4 metrics harness; the harness exists in this release.",
       "pass": true,
       "tolerance": {
         "minimum": 0.0
@@ -1034,10 +1056,40 @@
   "gate_evidence": true,
   "kind": "camsim G3 ISP validation",
   "linearity": {
+    "awb_estimated_gains": [
+      1.0264160908146929,
+      1.0,
+      1.057626427804303
+    ],
+    "awb_scale_relative_error": 0.0,
+    "ccm": [
+      [
+        0.980000036891084,
+        0.029999932960421465,
+        -0.009999969851505485
+      ],
+      [
+        -0.019999957553969484,
+        1.0399999100521415,
+        -0.019999952498172033
+      ],
+      [
+        0.009999973222038579,
+        -0.02999993211778872,
+        1.01999995889575
+      ]
+    ],
+    "ccm_clamp_active": false,
+    "ccm_pre_clamp_min": 0.024832383544757825,
+    "ccm_row_sums": [
+      0.9999999999999999,
+      1.0,
+      0.9999999999999999
+    ],
     "max_relative_error": 0.0,
     "pixels_compared": 27648,
     "scale": 2.0,
-    "source": "synthetic RGGB gradient frame; signal doubled after BLC"
+    "source": "synthetic RGGB gradient frame; signal doubled after BLC; AWB enabled (estimated gains) and a fitted, in-gamut positive CCM"
   },
   "lsc": {
     "map_max": 1.4305216073989868,

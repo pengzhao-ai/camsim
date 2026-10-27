@@ -25,6 +25,10 @@ sensor-pixel coordinates:
   region inset from the frame border avoids boundary pixels biasing the
   edge-angle fit, and the metric may crop further inside it.
 
+``chart_layout_from_scene`` avoids the shape/oversampling mismatch entirely by
+deriving the layout from a :class:`~camsim.scene.targets.SceneResult`; prefer
+it when the render is already in hand.
+
 Colour ground truth is bound, not assumed. ``colorchecker_layout`` attaches the
 :class:`~camsim.core.color.ColorReference` computed spectrally by
 :func:`camsim.scene.illuminants.reference_lab` for the requested illuminant, so
@@ -58,6 +62,7 @@ from camsim.scene.illuminants import reference_lab
 from camsim.scene.spectral_data import load_colorchecker
 from camsim.scene.targets import (
     PatchROI,
+    SceneResult,
     _centered_roi,
     _colorchecker_cells,
     _layout_from_painted_cells,
@@ -65,7 +70,12 @@ from camsim.scene.targets import (
     _validate_shape,
 )
 
-__all__ = ["colorchecker_layout", "flat_patch_layout", "slanted_edge_layout"]
+__all__ = [
+    "chart_layout_from_scene",
+    "colorchecker_layout",
+    "flat_patch_layout",
+    "slanted_edge_layout",
+]
 
 # Matches the renderer's default sensor pitch so a default layout fits a
 # default render without a units mismatch.
@@ -89,6 +99,58 @@ def _resolve_focal_length(lens: LensConfig | None) -> float | None:
     if not isinstance(lens, LensConfig):
         raise ValueError(f"lens must be a LensConfig or None; got {type(lens).__name__}")
     return float(lens.focal_length_mm)
+
+
+def chart_layout_from_scene(
+    scene: SceneResult,
+    lens: LensConfig | None = None,
+) -> ChartLayout:
+    """Return the metrics layout that exactly matches a rendered scene.
+
+    Building a layout separately from the render is error-prone: the shape,
+    oversampling factor, patch geometry, and illuminant reference must all
+    match the scene, and a mismatch silently shifts every ROI. This helper
+    derives the layout from the scene's own painted cells and reference, so a
+    ColorChecker render and its measurement cannot disagree about
+    ``oversampling`` or patch placement.
+
+    Parameters
+    ----------
+    scene:
+        The :class:`~camsim.scene.targets.SceneResult` returned by
+        :func:`camsim.scene.targets.render`.
+    lens:
+        Optional lens used for the render. Supplying it records the focal
+        length for cycles/degree conversion; ``None`` leaves the focal length
+        unknown even though the renderer used a default lens, because the
+        layout describes the camera actually used.
+
+    Returns
+    -------
+    ChartLayout
+        The scene's patch and edge regions in sensor-pixel coordinates, the
+        scene's spectrally computed :class:`ColorReference`, and the sensor
+        pixel pitch from the irradiance metadata.
+
+    Raises
+    ------
+    ValueError
+        If ``scene`` is not a :class:`~camsim.scene.targets.SceneResult`, or
+        ``lens`` is neither ``None`` nor a
+        :class:`~camsim.config.schema.LensConfig`.
+    """
+    if not isinstance(scene, SceneResult):
+        raise ValueError(f"scene must be a SceneResult; got {type(scene).__name__}")
+    patches = tuple(_convert_roi(patch) for patch in scene.layout.patches)
+    edge_roi = None if scene.layout.edge_roi is None else _convert_roi(scene.layout.edge_roi)
+    return ChartLayout(
+        name=scene.layout.name,
+        patches=patches,
+        edge_roi=edge_roi,
+        reference=scene.reference,
+        pixel_pitch_um=scene.irradiance.pixel_pitch_um,
+        focal_length_mm=_resolve_focal_length(lens),
+    )
 
 
 def colorchecker_layout(

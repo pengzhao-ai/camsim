@@ -11,9 +11,12 @@ every fact the ISP needs. This module writes the array and a sidecar together:
 * ``<name>.json`` — the schema version, every scalar/string :class:`RawFrame`
   field, the data file name/shape/dtype, and (when present) the name of the
   mask archive. The sidecar is the authority on how to interpret the array.
-* ``<name>_masks.npz`` — compressed ``defect_mask`` and ``pdaf_mask`` boolean
-  arrays. Masks share the frame's megapixel geometry, so embedding them as
-  JSON booleans would inflate the sidecar by orders of magnitude.
+* ``<name>_masks.npz`` — compressed ``defect_mask``, ``hot_mask``, and
+  ``pdaf_mask`` boolean arrays. Masks share the frame's megapixel geometry, so
+  embedding them as JSON booleans would inflate the sidecar by orders of
+  magnitude. ``hot_mask`` is stored separately because the sensor applies its
+  dark-current multiplier before DPC and a caller may want the hot subset even
+  though ``defect_mask`` contains the union.
 
 Typical RAW data span 10-16 bits per pixel; a 50 MP 10-bit frame is 100 MB of
 ``uint16``. Storing it losslessly is deliberate — a JPEG-compressed frame would
@@ -71,7 +74,7 @@ _SCALAR_FIELDS: Final[tuple[str, ...]] = (
 )
 """Every :class:`RawFrame` field except the data array and the two masks."""
 
-_MASK_FIELDS: Final[tuple[str, ...]] = ("defect_mask", "pdaf_mask")
+_MASK_FIELDS: Final[tuple[str, ...]] = ("defect_mask", "hot_mask", "pdaf_mask")
 """Optional boolean arrays stored in the compressed mask archive."""
 
 _SUPPORTED_SUFFIXES: Final[frozenset[str]] = frozenset({".npy", ".json"})
@@ -405,6 +408,7 @@ def _load_raw_frame(path: Path, expected_data_name: str | None = None) -> RawFra
             frame_index=fields["frame_index"],
             pixel_pitch_um=fields["pixel_pitch_um"],
             defect_mask=masks.get("defect_mask"),
+            hot_mask=masks.get("hot_mask"),
             pdaf_mask=masks.get("pdaf_mask"),
             sensor_config_hash=fields["sensor_config_hash"],
         )

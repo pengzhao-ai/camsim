@@ -1,0 +1,10 @@
+# Whole-package coverage configuration for the two-scope G5 report.
+#
+# The default gate in pyproject.toml omits the plotting layer (`*/camsim/viz/*`)
+# and enforces 90 % statement-and-branch coverage on the subject modules. This
+# file keeps branch measurement on but omits nothing, so the same test suite
+# also yields the whole-package number that includes viz. Run it with:
+#
+#   uv run pytest --cov=camsim --cov-config=coverage-whole.rc --cov-report=term
+[run]
+branch = true

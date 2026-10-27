@@ -277,3 +277,33 @@ def test_spectral_names_resolve_through_lazy_exports() -> None:
         ]
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+# Hypothesis property: area-conserving box resampling preserves the mean for
+# every positive integer reduction factor that divides the input shape.
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+
+
+@settings(max_examples=30, deadline=None, derandomize=True)
+@given(
+    target_height=st.integers(min_value=1, max_value=8),
+    target_width=st.integers(min_value=1, max_value=8),
+    factor_y=st.integers(min_value=1, max_value=4),
+    factor_x=st.integers(min_value=1, max_value=4),
+)
+def test_resample_spatial_conserves_the_mean_property(
+    target_height: int,
+    target_width: int,
+    factor_y: int,
+    factor_x: int,
+) -> None:
+    height = target_height * factor_y
+    width = target_width * factor_x
+    wavelengths = np.array([450.0, 550.0, 650.0])
+    rng = np.random.default_rng(0)
+    cube = rng.random((height, width, wavelengths.size))
+    source = SpectralIrradiance.from_array(cube, wavelengths, unit="W/m^2/nm")
+    reduced = source.resample_spatial((target_height, target_width))
+    assert reduced.data.shape == (target_height, target_width, wavelengths.size)
+    np.testing.assert_allclose(reduced.data.mean(), source.data.mean(), rtol=1e-12, atol=0.0)

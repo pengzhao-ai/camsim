@@ -6,22 +6,27 @@ modelled here as independent per-pixel failure modes:
 * **Dead** pixels have no photoresponse. They read near the black level
   regardless of illumination and appear as dark points. Dead rates for
   well-controlled consumer parts are roughly one in 10,000 to one in 1,000,000
-  pixels.
+  pixels. The sensor zeroes their expected charge before Poisson sampling, so
+  enabling the rate changes the image, not only a mask.
 * **Hot** pixels have anomalously high dark current. Their brightness grows
   with exposure time and roughly doubles every 5-10 K, so a pixel that is
   invisible in a short daylight frame can saturate a multi-second night frame.
-  Hot rates span roughly 1e-5 to 1e-3. The mask only *flags* these sites; the
-  sensor applies a dark-current multiplier (Task 15), because replacing them
-  outright would discard the temperature-dependent signal the model is meant to
-  demonstrate.
+  Hot rates span roughly 1e-5 to 1e-3. The sensor applies a dark-current
+  multiplier and returns the site map separately as ``RawFrame.hot_mask``; the
+  union ``RawFrame.defect_mask`` also contains hot sites so DPC replaces them.
 * **Stuck** pixels are pinned to a fixed code (black or white) by a shorted or
   open readout node. Rates are similar to dead pixels, around 1e-6 to 1e-5.
+  The simulator pins stuck sites to the ADC white code ``2**bits - 1`` after
+  the ADC and digital gain. A real stuck site can be pinned black or white;
+  the model chooses one deterministic convention so the output is
+  reproducible.
 
 The three masks are drawn independently, so a rare pixel can be in more than
 one class. That is physically plausible and harmless: a defect-correction stage
-takes the union, while the hot-pixel dark-current multiplier is applied before
-correction. Recomputing any of these maps per frame would turn a fixed,
-calibratable pattern into temporal noise.
+takes the union, while the hot-pixel dark-current multiplier and the dead /
+stuck signal behaviours are applied before correction. Recomputing any of
+these maps per frame would turn a fixed, calibratable pattern into temporal
+noise.
 
 Phase-detection autofocus (PDAF) pixels are not defects. They use a partially
 masked or split photodiode to sample the exit pupil and therefore collect only
@@ -92,14 +97,16 @@ class DefectMasks:
     Parameters
     ----------
     dead:
-        ``(H, W)`` mask of pixels with no photoresponse. A defect-correction
-        stage replaces these from same-CFA neighbours.
+        ``(H, W)`` mask of pixels with no photoresponse. The sensor zeroes
+        their expected charge before sampling, and a defect-correction stage
+        replaces the resulting near-black samples from same-CFA neighbours.
     hot:
         ``(H, W)`` mask of pixels with excess dark current. The sensor applies
-        a dark-current multiplier; the mask is not itself a correction.
+        a dark-current multiplier and records this subset separately in
+        ``RawFrame.hot_mask``; ``RawFrame.defect_mask`` contains the union.
     stuck:
-        ``(H, W)`` mask of pixels pinned to a fixed output code. Corrected like
-        dead pixels.
+        ``(H, W)`` mask of pixels pinned to a fixed output code. The simulator
+        pins them to the ADC white code; corrected like dead pixels.
 
     The classes are drawn independently and may overlap. Equality is identity
     based because the bundle owns large arrays.
@@ -148,8 +155,11 @@ def defect_masks(
     Each rate is an independent Bernoulli probability per pixel, so the
     realized count fluctuates around ``rate * height * width`` with binomial
     standard deviation. Defect maps are fixed for the life of the sensor; do
-    not regenerate them per frame. Hot pixels are deliberately left for the
-    sensor's dark-current multiplier instead of being folded into DPC.
+    not regenerate them per frame. Hot pixels receive the sensor's
+    dark-current multiplier and remain identifiable through
+    ``RawFrame.hot_mask``; dead and stuck pixels change the sampled or
+    quantized signal, and all three classes join ``defect_mask`` so DPC
+    replaces them.
     """
     if not isinstance(config, DefectConfig):
         raise ValueError(f"config must be a DefectConfig; got {type(config).__name__}")

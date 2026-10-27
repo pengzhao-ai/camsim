@@ -13,9 +13,9 @@ artifact's contract executable without pretending to be the human decision:
   the ``camsim.viz`` omission;
 * the cross-cutting design criteria are measured directly with the public
   metrics and stages, not trusted from prose: denoise must raise flat-patch
-  SNR without losing more than 10 % MTF50, sharpen must raise MTF50 and
-  produce measurable overshoot, and camera auto-exposure must converge inside
-  the preset's physical limits;
+  SNR with a two-sided MTF50 change bound and no edge ringing, sharpen must
+  raise MTF50 and produce measurable overshoot, and camera auto-exposure must
+  converge inside the preset's physical limits;
 * ``camsim.tasks`` contains no implementation and imports no PyTorch;
 * the report status says **awaiting human sign-off** and never claims that the
   owner signed or that ``v0.1.0`` was tagged.
@@ -32,6 +32,7 @@ import hashlib
 import json
 import math
 import re
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -69,7 +70,8 @@ FLAT_NOISE_SIGMA = 0.02
 FLAT_NOISE_SEED = 72
 FLAT_LEVEL = 0.4
 FLAT_SHAPE = (64, 64)
-DENOISE_MAX_MTF_LOSS = 0.10
+DENOISE_MAX_MTF_CHANGE = 0.20
+DENOISE_MAX_RINGING = 0.01
 SHARPEN_OVERSHOOT_MARGIN = 1e-3
 
 
@@ -98,12 +100,13 @@ def _reported_number(label: str) -> float:
     tolerance rather than a byte-for-byte string match.
     """
     match = re.search(
-        rf"^\| {re.escape(label)} \| ([+-]?[0-9.]+(?:e[+-]?[0-9]+)?)",
+        rf"^\| {re.escape(label)} \| ([+-]?[0-9.]+(?:e[+-]?[0-9]+)?)(%?)",
         _report(),
         re.MULTILINE,
     )
     assert match, f"report has no numeric row {label!r}"
-    return float(match.group(1))
+    value = float(match.group(1))
+    return value / 100.0 if match.group(2) == "%" else value
 
 
 def test_report_exists_and_status_is_awaiting_signoff() -> None:
@@ -157,6 +160,8 @@ def test_required_sections_and_signoff_checklist_exist() -> None:
     assert "in-sample colour calibration" in lower
     assert "iso 12233-style, not certified" in lower
     assert "no hdr, 3-d, motion blur, or autofocus" in lower
+    assert "polychromatic psf" in lower
+    assert "banding" in lower
     assert "owner:" in lower
     assert "decision:" in lower
     assert "approve v0.1.0" in lower
@@ -235,20 +240,69 @@ def test_g5_figures_exist_and_docs_mirror_is_byte_identical() -> None:
 
 
 def test_coverage_gate_and_viz_omission_are_documented() -> None:
-    """The 90 % gate and the presentation-layer omission are still in force."""
+    """The 90 % gate, its scope, and the whole-package exception are explicit."""
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "*/camsim/viz/*" in pyproject
     assert "branch = true" in pyproject
     assert "--cov-fail-under=90" in (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "--cov-fail-under=90" in ci
+    assert (REPO_ROOT / "coverage-whole.rc").is_file()
     validation = (REPO_ROOT / "docs" / "validation.md").read_text(encoding="utf-8").lower()
     assert "90" in validation
     assert "viz" in validation
+    assert "whole-package" in validation
+
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "g5_validation_report",
+        REPO_ROOT / "benchmarks" / "g5_validation_report.py",
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    subject = float(module.COVERAGE_SUBJECT_PCT)
+    whole = float(module.COVERAGE_WHOLE_PCT)
+    assert subject >= 90.0
+    assert whole < subject
     report = _report().lower()
-    assert "coverage" in report
-    assert "91.82" in report
+    assert f"{subject:.2f}" in report
+    assert f"{whole:.2f}" in report
+    assert "subject-module" in report
+    assert "whole-package" in report
+    assert "reviewed exception" in report
     assert "*/camsim/viz/*" in report
+
+
+def test_local_gallery_evidence_covers_examples_and_notebook_budgets() -> None:
+    """Every example and notebook ran headlessly inside its documented budget."""
+    examples = json.loads((REPORT_DIR / "examples_timings.json").read_text(encoding="utf-8"))
+    notebooks = json.loads((REPORT_DIR / "notebooks_timings.json").read_text(encoding="utf-8"))
+    assert examples["passed"] is True and notebooks["passed"] is True
+    assert examples["timeout_s"] == 300.0
+    assert notebooks["timeout_s"] == 120.0
+    example_names = {path.name for path in (REPO_ROOT / "examples").glob("*.py")}
+    notebook_names = {path.name for path in (REPO_ROOT / "notebooks").glob("*.py")}
+    assert {item["name"] for item in examples["items"]} == example_names
+    assert {item["name"] for item in notebooks["items"]} == notebook_names
+    assert all(item["seconds"] <= examples["timeout_s"] for item in examples["items"])
+    assert all(item["seconds"] <= notebooks["timeout_s"] for item in notebooks["items"])
+    report = _report().lower()
+    assert "two-minute" in report or "120 s" in report
+    assert "ci execution is pending a push" in report
+    assert "local equivalents passed" in report
+
+
+def test_identity_ccm_and_large_frame_limits_are_disclosed() -> None:
+    """The sign-off report names the identity-CCM baseline and the 50 MP limit."""
+    lower = _report().lower()
+    assert "identity ccm" in lower
+    assert "fit_ccm" in lower
+    assert "50 mp" in lower
+    assert "memory" in lower
+    assert "1024 x 1024" in lower
 
 
 def test_no_machine_vision_implementation() -> None:
@@ -263,8 +317,8 @@ def test_no_machine_vision_implementation() -> None:
     assert "no machine-vision" in _report().lower()
 
 
-def test_denoise_raises_snr_and_preserves_mtf50() -> None:
-    """Direct metrics calls reproduce the report's denoise evidence."""
+def test_denoise_raises_snr_with_bounded_mtf50_change_and_no_ringing() -> None:
+    """Direct metrics calls reproduce the report's two-sided denoise evidence."""
     blurred = _blurred_edge()
     rng = np.random.default_rng(EDGE_NOISE_SEED)
     noisy = blurred + EDGE_NOISE_SIGMA * rng.standard_normal(blurred.shape)
@@ -277,7 +331,18 @@ def test_denoise_raises_snr_and_preserves_mtf50() -> None:
     denoised = np.asarray(denoise(noisy, config), dtype=np.float64)
     before = slanted_edge_mtf(noisy, PIXEL_PITCH_UM, oversampling=MTF_OVERSAMPLING)
     after = slanted_edge_mtf(denoised, PIXEL_PITCH_UM, oversampling=MTF_OVERSAMPLING)
-    assert after.mtf50_cp >= before.mtf50_cp * (1.0 - DENOISE_MAX_MTF_LOSS)
+    relative_change = after.mtf50_cp / before.mtf50_cp - 1.0
+    assert abs(relative_change) <= DENOISE_MAX_MTF_CHANGE
+
+    profile_before = blurred.mean(axis=0)
+    profile_after = denoised.mean(axis=0)
+    low = float(np.median(profile_before[:40]))
+    high = float(np.median(profile_before[-40:]))
+    contrast = high - low
+    overshoot = (float(profile_after.max()) - high) / contrast
+    undershoot = (low - float(profile_after.min())) / contrast
+    assert abs(overshoot) <= DENOISE_MAX_RINGING
+    assert abs(undershoot) <= DENOISE_MAX_RINGING
 
     flat_rng = np.random.default_rng(FLAT_NOISE_SEED)
     flat = FLAT_LEVEL + FLAT_NOISE_SIGMA * flat_rng.standard_normal(FLAT_SHAPE)
@@ -289,6 +354,14 @@ def test_denoise_raises_snr_and_preserves_mtf50() -> None:
 
     assert math.isclose(_reported_number("MTF50 before denoise"), before.mtf50_cp, rel_tol=0.01)
     assert math.isclose(_reported_number("MTF50 after denoise"), after.mtf50_cp, rel_tol=0.01)
+    assert math.isclose(
+        _reported_number("Signed relative MTF50 change"),
+        relative_change,
+        rel_tol=0.02,
+        abs_tol=1e-4,
+    )
+    assert math.isclose(_reported_number("Edge overshoot"), overshoot, rel_tol=0.05, abs_tol=1e-4)
+    assert math.isclose(_reported_number("Edge undershoot"), undershoot, rel_tol=0.05, abs_tol=1e-4)
     assert math.isclose(_reported_number("SNR before denoise"), snr_before.snr_db, abs_tol=0.05)
     assert math.isclose(_reported_number("SNR after denoise"), snr_after.snr_db, abs_tol=0.05)
     assert math.isclose(

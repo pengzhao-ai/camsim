@@ -103,7 +103,7 @@ def test_raw_sidecar_records_every_scalar_field(tmp_path: Path, raw_frame) -> No
     masks = payload["masks"]
     assert isinstance(masks, dict)
     assert masks["file"] == f"{data_path.stem}_masks.npz"
-    assert set(masks["arrays"]) == {"defect_mask", "pdaf_mask"}
+    assert set(masks["arrays"]) == {"defect_mask", "hot_mask", "pdaf_mask"}
 
 
 def test_load_raw_preserves_masks(tmp_path: Path, raw_frame) -> None:
@@ -111,18 +111,23 @@ def test_load_raw_preserves_masks(tmp_path: Path, raw_frame) -> None:
     defect = np.zeros(raw_frame.data.shape, dtype=bool)
     defect[0, 0] = True
     defect[-1, -1] = True
+    hot = np.zeros(raw_frame.data.shape, dtype=bool)
+    hot[0, 0] = True
     pdaf = np.ones(raw_frame.data.shape, dtype=bool)
     pdaf[1, 1] = False
-    framed = replace(raw_frame, defect_mask=defect, pdaf_mask=pdaf)
+    framed = replace(raw_frame, defect_mask=defect, hot_mask=hot, pdaf_mask=pdaf)
 
     data_path = save_raw(framed, tmp_path)
     loaded = load_raw(data_path)
 
     assert loaded.defect_mask is not None
+    assert loaded.hot_mask is not None
     assert loaded.pdaf_mask is not None
     np.testing.assert_array_equal(loaded.defect_mask, defect)
+    np.testing.assert_array_equal(loaded.hot_mask, hot)
     np.testing.assert_array_equal(loaded.pdaf_mask, pdaf)
     assert loaded.defect_mask[0, 0]
+    assert loaded.hot_mask[0, 0]
     assert not loaded.pdaf_mask[1, 1]
 
 
@@ -144,13 +149,14 @@ def test_save_raw_is_deterministic(tmp_path: Path, raw_frame) -> None:
 
 
 def test_save_raw_omits_the_mask_archive_without_masks(tmp_path: Path, raw_frame) -> None:
-    bare = replace(raw_frame, defect_mask=None, pdaf_mask=None)
+    bare = replace(raw_frame, defect_mask=None, hot_mask=None, pdaf_mask=None)
     data_path = save_raw(bare, tmp_path)
     payload = _read_sidecar(data_path)
     assert payload["masks"] is None
     assert not data_path.with_name(f"{data_path.stem}_masks.npz").exists()
     loaded = load_raw(data_path)
     assert loaded.defect_mask is None
+    assert loaded.hot_mask is None
     assert loaded.pdaf_mask is None
 
 

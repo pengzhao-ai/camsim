@@ -38,14 +38,14 @@ FIGURES = REPO_ROOT / "results" / "figures"
 
 
 def test_readme_links_and_gallery_exist():
-    readme = Path("README.md").read_text()
+    readme = README.read_text(encoding="utf-8")
     assert "results/figures/" in readme
-    assert Path("docs/index.md").exists()
-    assert Path("docs/validation.md").exists()
+    assert (DOCS / "index.md").is_file()
+    assert (DOCS / "validation.md").is_file()
 
 
 def test_mkdocs_nav_covers_core_docs():
-    text = Path("mkdocs.yml").read_text()
+    text = MKDOCS.read_text(encoding="utf-8")
     for page in (
         "concepts.md",
         "architecture.md",

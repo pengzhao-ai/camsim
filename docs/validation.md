@@ -34,12 +34,12 @@ comparisons use tolerances because floating-point reduction order may differ.
 
 | Gate | Phase | Scope | Evidence | Measured / passed | Status |
 |---|---|---|---|---|---|
-| G0 | 0 | install, lint, typecheck, tests, docs build | this page; `.github/workflows/ci.yml` | 9/9 commands | **PASS** (local gate run) |
+| G0 | 0 | install, lint, typecheck, tests, docs build | this page; `.github/workflows/ci.yml` | 11/11 commands | **PASS** (local gate run) |
 | G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | 7/7 checks | **PASS** |
 | G2 | 2 | sensor model and EMVA characterization | `results/reports/g2_sensor.md` + `g2_sensor_results.json` | 16/16 checks | **PASS** |
 | G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 19/19 checks | **PASS** |
 | G4 | 4 | metrics harness | `results/reports/g4_metrics.md` + `g4_metrics_results.json` | 31/31 checks | **PASS** |
-| G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 13/13 cross-cutting checks; sign-off pending | **Awaiting human sign-off** |
+| G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 16/16 cross-cutting checks; sign-off pending | **Awaiting human sign-off** |
 
 ## Coverage policy
 
@@ -53,10 +53,23 @@ uv run pytest --cov=camsim --cov-fail-under=90
 `*/camsim/viz/*`. The presentation layer is plotting code: it is exercised by
 the example scripts and notebooks that generate the committed gallery, not by
 the unit suite. Its correctness is judged by executed examples, while the
-simulation, metrics, configuration, characterization, and CLI modules — the
-code whose numbers the gates depend on — must meet the 90 % threshold. The
-same command is the Makefile `coverage` target and the CI test command; a
-release must not lower the threshold or delete tests to pass it.
+simulation, metrics, configuration, characterization, IO, camera, and CLI
+modules — the code whose numbers the gates depend on — must meet the 90 %
+threshold. The same command is the Makefile `coverage` target and the CI test
+command; a release must not lower the threshold or delete tests to pass it.
+
+Coverage is reported with two explicit scopes, never one headline number:
+
+| Scope | Measured | Gate |
+|---|---:|---|
+| Subject modules (viz omitted, branch) | **91.73 %** | ≥ 90 % |
+| Whole package including `camsim.viz` (branch) | **83.55 %** | reviewed exception |
+
+The whole-package figure is measured with `coverage-whole.rc` (or
+`make coverage-whole`), which does not omit viz. It is lower because the
+plotting layer is exercised by the executed examples and notebooks, not by the
+unit suite. The owner accepts this exception at sign-off; 91.73 % is not called
+"total coverage".
 
 `tests/test_docs_smoke.py` additionally checks that the README gallery paths,
 documentation nav, `docs/images` mirror, API/release pages, and workflows exist;
@@ -302,12 +315,11 @@ The report records these assumptions and known limitations:
 - the ColorChecker CCM run uses **manual analytic perfect-diffuser AWB gains**
   so the row-sum CCM is neutral-preserving; the default gray-world estimator is
   validated separately on neutral flat fields and under an injected cast;
-- **formal ISO 12233-style e-SFR and MTF50/MTF20 are deferred to G4**, because
-  the independent metrics harness does not exist in Phase 3; G3 reports
-  edge-contrast preservation and positive overshoot instead;
-- **`Camera.auto_expose()` convergence is deferred to G5**, because the
-  `Camera` orchestration is Phase 5 consolidation work; G3 calibrates exposure
-  explicitly from a probe;
+- **formal ISO 12233-style e-SFR and MTF50/MTF20 live in G4/G5**; the
+  independent metrics harness measures them, while G3 reports edge-contrast
+  preservation and positive overshoot;
+- **`Camera.auto_expose()` convergence is G5 evidence**; G3 calibrates
+  exposure explicitly from a probe;
 - **quick mode is not gate evidence**; `--quick` writes
   `g3_isp_results_quick.json` and never overwrites the committed JSON or
   Markdown;
@@ -476,7 +488,8 @@ and metrics. The full derivation and raw values are in the report.
 | Check | Measured | Bound | Result |
 |---|---|---|---|
 | Denoise luma SNR gain | +10.61 dB (25.946 → 36.558 dB) | > 0 dB | PASS |
-| Denoise MTF50 preservation | 0.189840 → 0.217722 cycles/pixel (+14.69%) | loss ≤ 10% | PASS |
+| Denoise MTF50 change | 0.189840 → 0.217722 cycles/pixel (signed +14.69%) | \|change\| ≤ 20% | PASS |
+| Denoise edge ringing | overshoot +0.07%, undershoot 0.07% of contrast | each ≤ 1% | PASS |
 | Sharpen MTF50 gain | 0.187328 → 0.249291 cycles/pixel (+33.08%) | after > before | PASS |
 | Sharpen positive overshoot | max normalized profile 1.002107 (+0.21% of contrast) | > 1.001 | PASS |
 | Camera AE convergence | 2000/20/0.01 lux: 1/4/5 probes, metered 0.1930/0.1634/0.1786 | converged, \|metered − 0.18\| ≤ 0.02 | PASS |
@@ -486,13 +499,17 @@ and metrics. The full derivation and raw values are in the report.
 | Metrics import independence | sensor/ISP/scene/optics absent from `sys.modules` | no forbidden imports | PASS |
 | CLI render → measure | both commands exit 0; MTF50 0.433778 cycles/pixel; acutance 0.0768 | finite report | PASS |
 | Quick-mode isolation | no `*_quick*` artifacts in `results/reports` | full-run JSON only | PASS |
+| Examples headless (local) | 4/4 pass, 1.96–14.64 s each | 300 s per example | PASS |
+| Notebooks headless (local) | 3/3 pass, 2.53–14.79 s each | 120 s per notebook | PASS |
 | Machine-vision scope | `camsim.tasks` is its docstring only; no torch import | gated until sign-off | PASS |
 
 The denoise MTF50 measurement rises rather than falls: the full-strength
-bilateral filter suppresses the noise floor and sharpens the transition, so
-the check is a *loss* bound (no resolution lost), and the measured sign is
-reported honestly. The sharpen overshoot is small but measurable (0.21% of
-edge contrast), as expected at radius 1. The RCCC result is a shape,
+bilateral filter suppresses the noise floor and steepens the transition. The
+criterion is two-sided (absolute change ≤ 20 %), so both smearing and invented
+contrast fail, and the signed change is reported. A separate edge-ringing check
+puts the overshoot and undershoot well below 1 % of contrast. The sharpen
+overshoot is small but measurable (0.21% of edge contrast), as expected at
+radius 1. The RCCC result is a shape,
 constant-preservation, and linearity check only: its clear channel is a
 documented luma placeholder, and the Bayer colour and MTF gates do not apply.
 
@@ -500,21 +517,35 @@ documented luma placeholder, and the Bayer colour and MTF gates do not apply.
 
 | Gate | Recorded result |
 |---|---|
-| `uv run pytest -q` | 1751 passed |
-| `uv run pytest --cov=camsim --cov-fail-under=90` | 1751 passed; 91.82% coverage (required 90%) |
-| `uv run ruff check .` / `ruff format --check .` | clean; 140 files formatted |
-| `uv run mypy src` | no issues in 68 source files |
-| `uv run mkdocs build --strict` | built in 1.73 s |
-| `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.26 ms total (128 × 128) |
-| `uv run python benchmarks/benchmark_pipeline.py` | 115.29 ms total (512 × 512) |
+| `uv run pytest -q` | 1775 passed |
+| `uv run pytest --cov=camsim --cov-fail-under=90` | 1775 passed; 91.73% subject-module coverage (required 90%) |
+| `uv run pytest --cov=camsim --cov-config=coverage-whole.rc` | 1775 passed; 83.55% whole-package coverage including viz |
+| `uv run ruff check .` / `ruff format --check .` | clean; 143 files formatted |
+| `uv run mypy src` | no issues in 69 source files |
+| `uv run mkdocs build --strict` | documentation built |
+| `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.34 ms total (128 × 128) |
+| `uv run python benchmarks/benchmark_pipeline.py` | 114.58 ms total (512 × 512) |
+| `uv run python benchmarks/benchmark_pipeline.py --large` | 453.90 ms total (1024 × 1024, 1× oversampling) |
 | `uv build` | wheel and sdist for `0.1.0.dev0` |
 
 CI runs the same commands on Ubuntu and macOS across Python 3.11, 3.12, and
-3.13. Timings are machine-specific evidence, not guarantees. `make notebooks`
-executes every Jupytext notebook headlessly under a two-minute-per-notebook
-budget, and `make figures` regenerates the committed gallery from examples
-01–04 full mode. Quick-mode artifacts are smoke tests and never overwrite the
-committed full-run JSON or Markdown.
+3.13, and adds `examples` and `notebooks` jobs. **Those workflows were added in
+the fix candidate but cannot be executed from this environment: local
+equivalents passed and CI execution is pending a push.** The owner must accept
+that residual at sign-off; this page does not claim CI is green.
+
+The runners enforce the runtime budgets as subprocess timeouts and fail fast:
+
+| Sweep | Runner | Per-item budget | Local result |
+|---|---|---:|---|
+| Examples 01–04 | `benchmarks/run_examples.py` | 300 s | all pass; 2.07–14.62 s |
+| Notebooks 01–03 | `benchmarks/run_notebooks.py` | 120 s | all pass; 2.57–14.82 s |
+
+`make notebooks` and `make figures` invoke those runners. The per-item times
+are recorded in `results/reports/examples_timings.json` and
+`results/reports/notebooks_timings.json` and repeated in the consolidated G5
+report. Quick-mode artifacts are smoke tests and never overwrite the committed
+full-run JSON or Markdown.
 
 ### Sign-off checklist
 
@@ -531,8 +562,19 @@ committed full-run JSON or Markdown.
       style measurement status.
 - [ ] Owner confirmed the limitations: synthetic CFA re-authoring, in-sample
       calibration, 8× Airy diagnostic, synthetic stage measurements,
-      quick-mode exclusion, extreme-low-light digital-gain noise, and the
-      absence of HDR/3-D/motion blur/autofocus.
+      quick-mode exclusion, extreme-low-light digital-gain noise, the identity
+      default CCM, the absence of HDR/3-D/motion blur/autofocus, no
+      polychromatic PSF or banding, P3 sidecar-only tagging, and the reduced
+      frame contract.
+- [ ] Owner accepted the whole-package coverage exception (subject modules
+      91.73 %, whole package including viz 83.55 %, viz exercised by the
+      executed galleries and notebooks).
+- [ ] Owner accepted that the CI workflows and runner timeouts were added and
+      local equivalents passed, but CI execution is pending a push.
+- [ ] Owner confirmed the two-minute-per-notebook condition: all notebooks ran
+      locally below 120 s and the runner/CI timeout enforces it.
+- [ ] Owner accepted that full 50 MP spectral simulation is not supported at
+      v0.1.0 and that the memory guard rejects oversized cubes.
 - [ ] Owner approved tagging `v0.1.0` on the signed-off commit and starting
       Phase 6 afterwards.
 

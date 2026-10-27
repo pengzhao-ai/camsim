@@ -56,8 +56,18 @@ Non-idealities
 * **PRNU** is a zero-mean multiplicative responsivity deviation:
   ``S * (1 + prnu_pixel)``.
 * **DSNU** is a zero-mean additive dark offset in electrons.
-* **Hot pixels** multiply dark current by ``hot_pixel_dark_multiplier``; the
-  mask is otherwise metadata for the ISP's defect-correction stage.
+* **Dead pixels** have no photoresponse: the expected charge at those sites is
+  zeroed after the dark/DSNU terms and before Poisson sampling, so they read at
+  the black level plus read noise rather than carrying scene signal.
+* **Stuck pixels** are pinned to the ADC white code ``2**bits - 1`` after the
+  ADC and digital gain. The model deliberately pins stuck-high; a real stuck
+  site may be pinned black or white, but the simulator must choose one
+  deterministic convention. The choice is documented in the frame mask and in
+  :mod:`camsim.sensor.defects`.
+* **Hot pixels** multiply dark current by ``hot_pixel_dark_multiplier``. Their
+  site map is carried separately as ``RawFrame.hot_mask``; the union
+  ``RawFrame.defect_mask`` also contains them so DPC replaces their corrupted
+  signal.
 * **PDAF** sites scale the signal by ``qe_factor`` and are flagged, not
   treated as defects.
 * **Spectral crosstalk** is a row-normalised 3x3 channel mixing matrix applied
@@ -122,6 +132,11 @@ from scipy.signal import convolve2d  # type: ignore[import-untyped]
 
 from camsim.config.schema import GainMode, GainModeConfig, SensorConfig
 from camsim.core.frames import RawFrame
+from camsim.core.memory import (
+    ensure_memory_budget,
+    estimate_sensor_peak_bytes,
+    resolve_memory_limit,
+)
 from camsim.core.spectral import SpectralIrradiance, WavelengthGrid
 from camsim.core.units import photon_energy_j
 from camsim.data import data_path
@@ -268,6 +283,8 @@ class Sensor:
         digital_gain: float = 1.0,
         temperature_c: float | None = None,
         seed: int | None = None,
+        *,
+        max_memory_bytes: int | None = None,
     ) -> RawFrame:
         """Integrate one exposure and return a RAW frame.
 
@@ -297,13 +314,22 @@ class Sensor:
             frame stream, so the pixel data are independent of call order;
             ``frame_index`` still records the position in the capture
             sequence.
+        max_memory_bytes:
+            Optional peak-memory budget for this exposure, in bytes. ``None``
+            uses ``CAMSIM_MAX_SIMULATION_BYTES`` when set, otherwise 8 GiB.
+            The guard estimates the float64 cube copies, channel planes, and
+            quantized planes before the integration allocates them; a request
+            above the budget raises a clear ``ValueError``. v0.1.0 does not
+            chunk spectral cubes, so reduce the spatial shape or process the
+            data externally before calling ``expose``.
 
         Returns
         -------
         RawFrame
             ``uint16`` codes including the black-level pedestal, with the CFA
             pattern, gains, mode, temperature, frame seed/index, output pixel
-            pitch, defect/PDAF masks, and a stable configuration hash.
+            pitch, the defect union, the separate hot-pixel subset, the PDAF
+            mask, and a stable configuration hash.
 
         Raises
         ------
@@ -311,7 +337,8 @@ class Sensor:
             If any input is out of range, the cube is not on the sensor grid
             (shape, pitch, or wavelength grid), the binning factor does not
             divide the shape, the crosstalk matrix is incompatible with the
-            CFA, or a noise/gain parameter is non-finite.
+            CFA, a noise/gain parameter is non-finite, or the estimated peak
+            memory exceeds the configured simulation budget.
         """
         if not isinstance(irradiance, SpectralIrradiance):
             raise ValueError(
@@ -328,6 +355,21 @@ class Sensor:
         width = int(irradiance.data.shape[1])
         shape = (height, width)
         plan = binning_plan(self.config.binning, shape)
+        limit_bytes = resolve_memory_limit(max_memory_bytes)
+        estimate_bytes = estimate_sensor_peak_bytes(
+            shape,
+            int(irradiance.data.shape[2]),
+            len(self._channels),
+        )
+        ensure_memory_budget(
+            estimate_bytes,
+            limit_bytes,
+            context="Sensor.expose",
+            guidance=(
+                "Reduce the spatial size of the irradiance cube, or process it in "
+                "chunks outside camsim and integrate each chunk explicitly."
+            ),
+        )
         self._lock_shape(shape)
         patterns = self._patterns_for(shape)
         mean_electrons = self._mean_electrons(irradiance, exposure, patterns)
@@ -352,7 +394,17 @@ class Sensor:
         charges = self._apply_spectral_crosstalk(charges)
         charges = self._apply_spatial_crosstalk(charges)
         charges = self._add_read_and_row_noise(charges, full_well_e, mode_config, rng)
-        dn_planes = self._quantize(charges, mode_config, gain_db, applied_digital_gain, plan)
+        stuck = patterns.defects.stuck
+        if plan.factor > 1:
+            stuck = reduce_mask(stuck, plan.factor)
+        dn_planes = self._quantize(
+            charges,
+            mode_config,
+            gain_db,
+            applied_digital_gain,
+            plan,
+            stuck,
+        )
         data = cast(
             NDArray[np.uint16],
             mosaic_from_channels(
@@ -361,9 +413,11 @@ class Sensor:
             ),
         )
         defect = patterns.defect_union
+        hot = patterns.defects.hot
         pdaf = patterns.pdaf
         if plan.factor > 1:
             defect = reduce_mask(defect, plan.factor)
+            hot = reduce_mask(hot, plan.factor)
             pdaf = reduce_mask(pdaf, plan.factor)
 
         frame = RawFrame(
@@ -380,6 +434,7 @@ class Sensor:
             frame_index=self._frame_index,
             pixel_pitch_um=float(self.config.pixel.pitch_um) * plan.factor,
             defect_mask=defect,
+            hot_mask=hot,
             pdaf_mask=pdaf,
             sensor_config_hash=self._config_hash,
         )
@@ -549,7 +604,17 @@ class Sensor:
         rng: np.random.Generator,
         plan: BinningPlan,
     ) -> NDArray[np.float64]:
-        """Apply PRNU, dark current, DSNU, Poisson sampling, and blooming."""
+        """Apply PRNU, dark current, DSNU, Poisson sampling, and blooming.
+
+        Dead sites have no photoresponse. Their expected charge is zeroed
+        *after* the PRNU, dark-current, and DSNU terms and *before* Poisson
+        sampling, so the sampled charge is exactly zero and the final RAW code
+        is the black level plus read noise. This is deliberately a physical
+        signal behaviour, not a mask-only annotation: a user who enables
+        ``dead_rate`` sees dark pixels in the image. The zeroing happens before
+        analog binning, so a dead native site contributes no charge to its
+        binned bucket.
+        """
         dark_rate = dark_current_e_per_s(
             mode_config.dark_current_e_per_s,
             temperature_c,
@@ -561,11 +626,14 @@ class Sensor:
             1.0,
         )
         dark_mean = dark_rate * exposure_s * hot_multiplier
+        dead = patterns.defects.dead
         planes: list[NDArray[np.float64]] = []
         for channel_index in range(len(self._channels)):
             prnu = patterns.fpn.prnu_fraction
             mean_charge = mean_electrons[channel_index] * (1.0 + prnu)
             mean_charge = mean_charge + dark_mean + patterns.fpn.dsnu_e
+            if bool(dead.any()):
+                mean_charge = np.where(dead, 0.0, mean_charge)
             if plan.mode == "analog" and plan.factor > 1:
                 # Charge is summed on the sense node before sampling. The
                 # caller has already scaled full well by factor**2.
@@ -664,9 +732,19 @@ class Sensor:
         gain_db: float,
         digital_gain: float,
         plan: BinningPlan,
+        stuck_mask: NDArray[np.bool_] | None,
     ) -> list[NDArray[np.uint16]]:
-        """Convert charge to voltage, amplify, and quantize per channel plane."""
+        """Convert charge to voltage, amplify, quantize, and pin stuck sites.
+
+        ``stuck_mask`` is already on the output (possibly binned) grid. Pinning
+        happens after the ADC and the digital gain, because a stuck readout node
+        holds a converter code rather than a charge or voltage: no exposure,
+        gain, dark current, or noise can move it. The model pins stuck-high to
+        ``2**bits - 1``; the alternative stuck-black convention would be equally
+        physical, but one deterministic choice is required and documented.
+        """
         configuration = self.config.adc
+        maximum = (1 << int(configuration.bits)) - 1
         planes: list[NDArray[np.uint16]] = []
         for channel_index in range(len(self._channels)):
             voltage = electrons_to_voltage(
@@ -685,6 +763,9 @@ class Sensor:
                 # reduced by the average but clipping has already happened.
                 averaged = mean_blocks(codes, plan.factor)
                 codes = _round_codes(averaged, int(configuration.bits))
+            if stuck_mask is not None and bool(stuck_mask.any()):
+                codes = np.array(codes, copy=True)
+                codes[stuck_mask] = np.uint16(maximum)
             planes.append(codes)
         return planes
 

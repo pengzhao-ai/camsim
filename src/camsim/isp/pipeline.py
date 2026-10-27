@@ -241,6 +241,7 @@ class ISP:
         cfa = _coerce_cfa(raw.cfa)
         channels: ChannelLayout = "MONO" if cfa is CFAPattern.MONO else "RGB"
         stages: dict[str, StageOutput] | None = {} if trace else None
+        applied_ccm: list[list[float]] | None = None
 
         image: NDArray[np.float32]
         if config.dpc.enabled:
@@ -349,6 +350,7 @@ class ISP:
                     "identity matrix."
                 )
             image = apply_ccm(image, matrix)
+            applied_ccm = [list(row) for row in matrix]
             _record_stage(
                 stages,
                 "ccm",
@@ -452,6 +454,7 @@ class ISP:
                 "pixel_pitch_um": raw.pixel_pitch_um,
                 "awb_gains": None if awb_result is None else list(awb_result.gains),
                 "awb_method": None if awb_result is None else awb_result.method,
+                "ccm_matrix": applied_ccm,
             },
         )
 
