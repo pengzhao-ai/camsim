@@ -107,6 +107,10 @@ class WavelengthGrid:
         wavelengths.setflags(write=False)
         object.__setattr__(self, "nm", wavelengths)
 
+    def __len__(self) -> int:
+        """Return the number of wavelength samples on the grid."""
+        return int(self.nm.size)
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, WavelengthGrid):
             return False

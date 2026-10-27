@@ -30,12 +30,27 @@ own numerics. It is a runtime dependency and is not vendored here.
 - Copyright: Copyright 2013 Colour Developers
 - Maintainer contact: colour-developers@colour-science.org
 
-## ColorChecker 2005 spectral data
+## ColorChecker spectral data
 
-camsim's ColorChecker ground truth is planned to come from the
-`ColorChecker 2005` colour checker dataset distributed with `colour-science`
-(`colour.characterisation.datasets.colour_checkers`). The dataset carries the
-following upstream notices:
+camsim's ColorChecker ground truth comes from the **BabelColor Average**
+dataset distributed with `colour-science`:
+
+- Python path:
+  `colour.characterisation.datasets.colour_checkers.SDS_COLOURCHECKERS["BabelColor Average"]`.
+- Contents: 24 spectral reflectance distributions on a 380-730 nm grid at
+  10 nm. The values are an average derived from measurements of 30
+  *ColorChecker Classic* charts.
+- Original reference data: *ColorChecker Classic* published by GretagMacbeth
+  (2005), as compiled by BabelColor (Danny Pascale).
+- Upstream references: BabelColor, "The ColorChecker (since 1976!)"
+  (<http://www.babelcolor.com/main_level/ColorChecker.htm>) and
+  "ColorChecker RGB and spectra"
+  (<http://www.babelcolor.com/download/ColorChecker_RGB_and_spectra.xls>).
+  The upstream retrieval date recorded by `colour-science` is 2014-09-26.
+- Licence: the `colour-science` distribution is BSD-3-Clause; the bundled
+  BabelColor data carries the permission notice below.
+
+The dataset carries the following upstream notices:
 
 ```text
 Copyright 2013 Colour Developers
@@ -43,16 +58,12 @@ BabelColor ColorChecker data: Copyright (C) 2004-2012 Danny Pascale
 (www.babelcolor.com); used by permission.
 ```
 
-- Original reference data: *ColorChecker Classic* published by GretagMacbeth
-  (2005), as compiled by BabelColor (Danny Pascale).
-- Upstream references: BabelColor, "The ColorChecker (since 1976!)" and
-  "ColorChecker RGB and spectra" (<http://www.babelcolor.com>).
-- Licence of the `colour-science` distribution: BSD-3-Clause.
-
-**Status:** the exact dataset, whether it is loaded from `colour-science` or
-vendored as CSV, and the final citation wording are confirmed in Phase 1
-(Task 6) and then recorded here. No ColorChecker spectra are currently
-committed to this repository.
+camsim reads this dataset at runtime from the installed `colour-science`
+package. **No ColorChecker CSV files or copies of the spectra are committed to
+this repository**, so the source tree does not redistribute the data; it
+relies on the licence terms of the installed distribution. The same source,
+BabelColor notice, and licence are written into every returned
+`ColorCheckerData.provenance` mapping by `camsim.scene.spectral_data`.
 
 *ColorChecker* is a trademark of X-Rite, Incorporated. The name is used
 descriptively to identify the calibration target; camsim is not affiliated with
@@ -75,14 +86,25 @@ camsim source tree.
 If a figure is generated outside Matplotlib or a font file is ever vendored,
 its licence must be added here before the font is redistributed.
 
-## Planned spectral datasets (Phase 1)
+## Spectral datasets (Phase 1)
 
-Task 6 adds CIE 1931 2-degree colour-matching functions, the photopic luminous
-efficiency function V(lambda), and D65, 3000 K, and 4000 K illuminant spectra.
-The intended source is the `colour-science` dataset collection; if any series
-is vendored as CSV, its source URL, retrieval date, copyright, and licence are
-recorded in this file and in the dataset provenance metadata. CIE 15:2004 is
-the normative reference for colorimetry.
+`camsim.scene.illuminants` and `camsim.scene.spectral_data` use the following
+CIE data. All are read at runtime from the installed `colour-science` package
+(BSD-3-Clause, <https://www.colour-science.org/>); **no spectral CSV files are
+vendored in this repository**.
+
+| Data | `colour-science` source | Use |
+|---|---|---|
+| CIE 1931 2-degree colour-matching functions | `colour.colorimetry.MSDS_CMFS["CIE 1931 2 Degree Standard Observer"]` | XYZ integration for the colour ground truth, 360-830 nm at 1 nm, resampled to 5 nm |
+| CIE 1924 photopic luminous efficiency V(lambda) | `colour.colorimetry.datasets.SDS_LEFS_PHOTOPIC["CIE 1924 Photopic Standard Observer"]` | Lux-to-irradiance normalisation, 360-830 nm at 1 nm; V(555 nm) = 1 |
+| CIE standard illuminant D65 | `colour.colorimetry.SDS_ILLUMINANTS["D65"]` | D65 relative SPD, 300-780 nm at 5 nm; constant endpoint extrapolation to 830 nm |
+| 3000 K and 4000 K Planckian spectra | `colour.colorimetry.blackbody.sd_blackbody` (generated, not a stored dataset) | Blackbody SPD from Planck's law with `c2 = 1.4388e-2 m K`, normalised to 100 at 560 nm |
+
+Normative reference for all colorimetry: CIE 15:2004, *Colorimetry*, 3rd
+edition. Upstream BabelColor references and licence notices for the
+ColorChecker spectra are recorded in the preceding section. The exact dataset
+key, source URL, licence, interpolation, and normalisation used for each
+loaded object are recorded in its `provenance` mapping.
 
 ## Documentation and development tools
 

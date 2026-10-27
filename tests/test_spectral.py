@@ -68,6 +68,12 @@ def test_wavelength_grid_is_an_immutable_float64_value() -> None:
     assert grid != WavelengthGrid(np.array([440.0, 540.0, 640.0]))
 
 
+def test_wavelength_grid_length_matches_sample_count() -> None:
+    grid = WavelengthGrid(GRID_NM)
+
+    assert len(grid) == GRID_NM.size
+
+
 def test_spectral_irradiance_rejects_negative() -> None:
     with pytest.raises(ValueError, match="non-negative"):
         SpectralIrradiance.from_array(
