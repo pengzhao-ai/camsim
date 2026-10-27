@@ -13,7 +13,8 @@ spectral irradiance:
 * A lens maps field angle to sensor position. The diagonal field of view is
   :math:`2\\arctan(d / 2f)` radians, converted to degrees by :math:`180/\\pi`.
   A pixel of pitch :math:`p` subtends :math:`\\arctan(p / f)` radians, so
-  angular sampling is :math:`180 / (\\pi \\arctan(p / f))` pixels per degree.
+  angular sampling is :math:`\\pi / (180 \\arctan(p / f))` pixels per degree
+  (99.7 px/degree for the reference lens at 1.12 um pitch).
 * A PSF is the normalized irradiance from a point source. Gaussian,
   diffraction-limited Airy, and square box kernels cover the useful range;
   profiles are normalized to peak one because unit-sum kernels would all look
