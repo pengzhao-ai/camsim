@@ -35,11 +35,11 @@ The sensitivity knobs multiply in this order:
 2. **Analog gain** is applied before the ADC and raises signal and
    input-referred read noise together. It preserves input-referred SNR while
    reducing quantization loss, so it is the second knob. The preset documents a
-   ``step_db`` grid; the policy snaps requests down to that grid so a step can
-   never overshoot the requested correction, and the residual is carried by
-   digital gain. This is the gain-quantization artefact: a coarse step leaves a
-   residual that must go somewhere, and digital gain absorbs it without
-   stalling convergence.
+   ``step_db`` grid; the policy always snaps requests down towards lower gain.
+   A downward snap cannot overshoot an increase; for a reduction it
+   over-attenuates slightly, and digital gain recovers the difference. This is
+   the gain-quantization artefact: a coarse step leaves a residual that must go
+   somewhere, and digital gain absorbs it without stalling convergence.
 3. **Digital gain** multiplies already-quantized codes. It cannot recover
    information and amplifies quantization noise, so it is the last knob.
    Digital gain below one is a last resort for overexposure and is used only
@@ -50,12 +50,13 @@ Dual conversion gain
 HCG trades well capacity for lower input-referred read noise: the reference
 preset has 300 uV/e, 2000 e- full well, and 0.7 e- rms read noise, versus
 100 uV/e, 6000 e-, and 2.0 e- rms in LCG. ``Sensor.expose(mode="auto")`` picks
-HCG below ``auto_hcg_threshold_e`` mean charge. An 18 % target of usable full
-scale can sit above that threshold (it does in this preset), so resolving the
-mode on every probe would flip LCG/HCG and change sensitivity by the ratio of
-conversion gains mid-ramp. Auto-exposure therefore resolves the mode on the
-first probe and locks it for the remaining probes. The lock is what makes the
-returned ``mode`` reproducible; mode flapping is the artefact this avoids.
+HCG below ``auto_hcg_threshold_e`` mean charge. An 18 % target corresponds to
+roughly 480 e- in HCG and 1440 e- in LCG, both above the 200 e- threshold, so
+re-resolving the mode at the target would flip an HCG-started ramp to LCG and
+change sensitivity by the ratio of conversion gains. Auto-exposure therefore
+resolves the mode on the first probe and locks it for the remaining probes. The
+lock is what makes the returned ``mode`` reproducible; mode flapping is the
+artefact this avoids.
 
 Real-world parameter ranges
 ---------------------------
@@ -63,25 +64,28 @@ Phone main cameras expose from about 10 us to 100 ms; the reference preset uses
 100 us to 100 ms with a 10 ms default. Analog gain spans roughly 0-24 dB in
 1 dB steps, digital gain 1-8x, and the metering target is 18 % of usable full
 scale. The flagship sensor quantizes to 10 bits with a 64 DN black level, so one
-signal code is 959/960 of full scale and the meter has about 0.1 % resolution.
+signal code is 1/959 (about 0.1 %) of the usable span and the meter has about
+0.1 % resolution.
 
 Failure artefacts guarded here
 ------------------------------
 Metering without black-level correction (exposing for the pedestal), metering
 only the green channel or the whole frame with equal weights (a dark border
-silently raises the exposure), and clamping only against the ADC ceiling while
-the sensor full well saturates first (both are possible; the preset is
-full-well limited at unity gain). A clipped probe must not ask for more light:
-when more than 1 % of pixels sit at the white span the upward correction is
-capped at a factor of 0.5, so the next probe reduces instead of chasing a
-saturated statistic. Non-convergence is reported rather than hidden, and a
-zero-valued probe is treated as maximally underexposed instead of dividing by
-zero. Gain quantization can leave a residual; digital gain carries it, but a
-digital gain floor stops the policy from requesting an unreachable zero. No
-global random state is used: auto-exposure probe ``i`` is seeded with ``i``, and
-capture without a seed draws from the sensor's frame stream exactly like a
-direct :meth:`~camsim.sensor.Sensor.expose` call, so reseeding the sensor
-replays a capture bit-for-bit within one environment.
+silently raises the exposure), and clipping detection that looks only at the
+ADC's largest code while the sensor full well saturates first (both limits are
+real; the reference preset is full-well limited at unity gain, where the well
+code is 783 of the 1023 possible codes). A clipped probe must not ask for more
+light: when more than 1 % of pixels reach the earlier of the full-well and ADC
+saturation codes, the correction is capped at a factor of 0.5, so the next
+probe reduces instead of chasing a saturated statistic. Non-convergence is
+reported rather than hidden, and a zero-valued probe is treated as maximally
+underexposed instead of dividing by zero. Gain quantization can leave a
+residual; digital gain carries it, but a digital gain floor stops the policy
+from requesting an unreachable zero. No global random state is used:
+auto-exposure probe ``i`` is seeded with ``i``, and capture without a seed draws
+from the sensor's frame stream exactly like a direct
+:meth:`~camsim.sensor.Sensor.expose` call, so reseeding the sensor replays a
+capture bit-for-bit within one environment.
 
 Public API
 ----------
@@ -94,6 +98,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Final, Literal, TypeAlias
 
 import numpy as np
@@ -141,9 +146,15 @@ _ZERO_METER_FACTOR: Final[float] = 8.0
 _DIGITAL_GAIN_FLOOR: Final[float] = 1e-3
 
 # The metering weight is a Gaussian whose sigma is one sixth of the longer
-# frame side: at 64 x 64 the corners still receive about 1.3 % of the centre
-# weight, so the scene centre dominates without ignoring the periphery.
+# frame side: at 64 x 64 the corner weight is about 0.016 % of the centre and
+# the edge midpoint about 1.3 %, so the scene centre dominates without ignoring
+# the periphery.
 _WEIGHT_SIGMA_FRACTION: Final[float] = 1.0 / 6.0
+
+# Weight maps are cached per shape. Eight entries cover the common grid sizes
+# an experiment sweeps without letting an unbounded shape generator retain
+# arrays forever.
+_WEIGHT_CACHE_SIZE: Final[int] = 8
 
 # Residual factors smaller than this are floating-point round-off, not a
 # meaningful correction; treating them as unity avoids a spurious gain step.
@@ -320,8 +331,9 @@ class Camera:
         exposure, analog gain, and digital gain in that order. Each correction
         is damped by raising ``target / metered`` to the power 0.7, so a large
         error is approached geometrically rather than overshooting in one step.
-        A probe with more than 1 % of pixels at the white span caps the
-        correction at 0.5: a clipped statistic must never request more light.
+        A probe with more than 1 % of pixels at the earlier of the full-well
+        and ADC saturation codes caps the correction at 0.5: a clipped
+        statistic must never request more light.
 
         Parameters
         ----------
@@ -400,7 +412,7 @@ class Camera:
                 exposure_s,
                 analog_gain_db,
                 digital_gain,
-                _correction_factor(metered_value, target, _is_clipped(raw)),
+                _correction_factor(metered_value, target, _is_clipped(raw, config)),
                 config,
             )
 
@@ -520,8 +532,11 @@ def _meter_frame(raw: RawFrame) -> float:
 
     The pedestal is subtracted before the mean because it carries no scene
     information; dividing by the usable white span makes the statistic
-    independent of bit depth. The weights are normalized, so the result is a
-    weighted mean in ``[0, 1]`` for an unclipped frame.
+    independent of bit depth. The 2-D weight map is applied as two 1-D
+    contractions (``wy @ signal @ wx``), so metering never allocates a
+    frame-sized weight array. The frame conversion itself is still one float64
+    temporary; a tiled accumulator would bound that too at the cost of extra
+    Python overhead, which is deferred until a 50 MP workload demands it.
     """
     span = float((1 << raw.bit_depth) - 1) - float(raw.black_level_dn)
     if span <= 0.0:
@@ -531,31 +546,74 @@ def _meter_frame(raw: RawFrame) -> float:
             "meter a signal range that does not exist"
         )
     signal = (np.asarray(raw.data, dtype=np.float64) - float(raw.black_level_dn)) / span
-    weights = _center_weights(raw.data.shape)
-    return float(np.sum(signal * weights))
+    weights_y, weights_x = _center_weights_1d(
+        int(raw.data.shape[0]),
+        int(raw.data.shape[1]),
+    )
+    return float(weights_y @ signal @ weights_x)
 
 
-def _center_weights(shape: tuple[int, ...]) -> NDArray[np.float64]:
-    """Return a normalized separable Gaussian weight map centred on a frame.
+@lru_cache(maxsize=_WEIGHT_CACHE_SIZE)
+def _center_weights_1d(
+    height: int,
+    width: int,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Return normalized Gaussian row and column weights, cached by shape.
 
-    The sigma is one sixth of the longer side, so the weight falls to about
-    1.3 % at the corners of a square frame. Normalization makes the statistic a
-    weighted mean rather than a weighted sum, which keeps it independent of
-    frame size.
+    The separable weight map is the outer product of the two arrays. The sigma
+    is one sixth of the longer side, so at 64 x 64 the corner weight is about
+    0.016 % of the centre and the edge midpoint about 1.3 %. Each axis is
+    normalized independently, so their outer product sums to one and the
+    statistic is a weighted mean independent of frame size.
+
+    The arrays are cached and marked read-only; callers must treat them as
+    shared values rather than scratch buffers.
     """
-    height, width = shape
+    sigma = max(height, width) * _WEIGHT_SIGMA_FRACTION
     rows = np.arange(height, dtype=np.float64) - (height - 1) / 2.0
     columns = np.arange(width, dtype=np.float64) - (width - 1) / 2.0
-    sigma = max(height, width) * _WEIGHT_SIGMA_FRACTION
-    squared_radius = rows[:, None] ** 2 + columns[None, :] ** 2
-    weights = np.exp(-squared_radius / (2.0 * sigma * sigma))
-    return weights / float(weights.sum())
+    weights_y = np.exp(-(rows**2) / (2.0 * sigma * sigma))
+    weights_x = np.exp(-(columns**2) / (2.0 * sigma * sigma))
+    weights_y /= float(weights_y.sum())
+    weights_x /= float(weights_x.sum())
+    weights_y.setflags(write=False)
+    weights_x.setflags(write=False)
+    return weights_y, weights_x
 
 
-def _is_clipped(raw: RawFrame) -> bool:
-    """Return ``True`` when more than 1 % of pixels sit at the white span."""
+def _is_clipped(raw: RawFrame, config: SensorConfig) -> bool:
+    """Return ``True`` when more than 1 % of pixels are saturated.
+
+    Saturation can happen in either of two places. The charge-domain full well
+    clips electrons before read noise, and the ADC clips the converted voltage
+    at full scale. The earlier limit is the one that matters, so this function
+    reconstructs both from the frame's recorded readout mode and gains (not
+    from the settings the caller believes were used):
+
+    ``well_code = black + full_well_e * conversion_gain_uv_per_e * gain_linear
+    / adc.full_scale_uv * white_span``
+
+    and compares pixels against ``min(2**bits - 1, floor(well_code))``. When
+    the ADC clips first, the threshold is the largest code and only ADC
+    saturation counts. When the well clips first, the threshold sits below the
+    converter ceiling; for the reference preset at unity gain it is 783, not
+    1023. Because the well clip happens before read noise, a marginal
+    saturated pixel scatters around the well code by the read-noise interval;
+    the 1 % fraction tolerates that statistical edge.
+    """
     largest_code = (1 << raw.bit_depth) - 1
-    clipped = int(np.count_nonzero(raw.data >= largest_code))
+    mode = _frame_mode(raw.mode)
+    mode_config = config.modes[mode]
+    gain_linear = 10.0 ** (float(raw.analog_gain_db) / 20.0) * float(raw.digital_gain)
+    full_well_uv = (
+        float(mode_config.full_well_e) * float(mode_config.conversion_gain_uv_per_e) * gain_linear
+    )
+    white_span = float(largest_code) - float(raw.black_level_dn)
+    well_code = (
+        float(raw.black_level_dn) + (full_well_uv / float(config.adc.full_scale_uv)) * white_span
+    )
+    clip_code = min(largest_code, math.floor(well_code))
+    clipped = int(np.count_nonzero(raw.data >= clip_code))
     return clipped / raw.data.size > _CLIP_FRACTION
 
 
@@ -586,12 +644,14 @@ def _allocate(
 ) -> tuple[float, float, float]:
     """Distribute a correction across exposure, analog gain, and digital gain.
 
-    Exposure absorbs as much of ``factor`` as its limits allow. Analog gain then
-    absorbs the remainder, snapped down to the preset's ``step_db`` grid so a
-    step never overshoots the requested correction. Digital gain carries the
-    residual; snapping down leaves it at or above its previous value while the
-    analog stage still has room, so digital gain below unity appears only when
-    exposure and analog gain are both at their minima.
+    Exposure absorbs as much of ``factor`` as its limits allow. Analog gain
+    then absorbs the remainder, always snapped down (towards lower gain) to the
+    preset's ``step_db`` grid: an increase cannot overshoot, while a reduction
+    over-attenuates slightly and the residual is recovered by digital gain.
+    Because the snap leaves the analog stage at or below the requested
+    correction, the residual is at least one while exposure or gain still has
+    room, so digital gain stays at or above its previous value and falls below
+    unity only when exposure and analog gain are both at their minima.
     """
     minimum_exposure = float(config.exposure.min_s)
     maximum_exposure = float(config.exposure.max_s)

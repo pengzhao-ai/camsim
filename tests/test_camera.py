@@ -24,12 +24,14 @@ import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 import camsim
 from camsim.camera import Camera, ExposureResult, ExposureSettings
+from camsim.camera.camera import _correction_factor, _is_clipped
 from camsim.config.schema import (
     ADCConfig,
     AnalogGainConfig,
@@ -38,6 +40,7 @@ from camsim.config.schema import (
 )
 from camsim.core.frames import RenderedImage
 from camsim.isp.pipeline import ISP
+from camsim.scene.targets import render
 from camsim.sensor import Sensor
 
 # ---------------------------------------------------------------------------
@@ -101,6 +104,44 @@ def test_mode_auto_selects_hcg_in_low_light(camera, very_dark_scene):
     assert res.mode == "HCG"
 
 
+def test_mode_lock_prevents_readout_mode_flapping(camera):
+    """Only the first probe may request ``auto``; the rest reuse its mode.
+
+    At 100 lux the first probe resolves HCG, while the converged settings have
+    a mean charge above the 200 e- auto threshold. Re-resolving the mode at the
+    target would therefore flip to LCG and change conversion gain mid-ramp.
+    """
+    flapping_scene = render(
+        "flat_patch",
+        illuminant="D65",
+        lux=100.0,
+        shape=(64, 64),
+        oversampling=2,
+    )
+    with patch.object(camera.sensor, "expose", wraps=camera.sensor.expose) as spy:
+        res = camera.auto_expose(flapping_scene)
+
+    requested_modes = [recorded.kwargs["mode"] for recorded in spy.call_args_list]
+    assert len(requested_modes) >= 2
+    assert requested_modes[0] == "auto"
+    assert all(mode == "HCG" for mode in requested_modes[1:])
+    assert res.converged
+    assert res.mode == "HCG"
+
+    # Prove the rationale: an unlocked re-resolution at the final settings
+    # would select LCG, because the converged mean charge exceeds the HCG
+    # threshold.
+    unlocked = camera.sensor.expose(
+        flapping_scene.irradiance,
+        res.exposure_s,
+        mode="auto",
+        analog_gain_db=res.analog_gain_db,
+        digital_gain=res.digital_gain,
+        seed=0,
+    )
+    assert unlocked.mode == "LCG"
+
+
 def test_auto_exposure_all_scenes_reach_target(camera, scene, bright_scene, dark_scene):
     for target_scene in (scene, bright_scene, dark_scene):
         res = camera.auto_expose(target_scene)
@@ -122,12 +163,13 @@ def test_auto_exposure_drives_dark_scene_to_the_limits(camera, very_dark_scene):
     assert res.analog_gain_db == pytest.approx(cfg.analog_gain.max_db)
     # Digital gain is the only unbounded knob left, so it carries the residual.
     assert res.digital_gain > 1.0
-    # HCG was selected on the first probe and locked; auto would now say LCG,
-    # but re-selecting would flap the mode by 3x conversion gain mid-ramp.
+    # The first probe resolves HCG and the policy locks it. At this light level
+    # the auto threshold is never crossed, so the lock's actual effect is
+    # covered by test_mode_lock_prevents_readout_mode_flapping.
     assert res.mode == "HCG"
 
 
-def test_digital_gain_below_unity_is_last_resort(camera, bright_scene):
+def test_digital_gain_below_unity_is_last_resort(camera):
     """Digital gain only darkens when exposure and analog gain cannot."""
     narrow = camera.sensor.config.model_copy(
         update={
@@ -136,11 +178,56 @@ def test_digital_gain_below_unity_is_last_resort(camera, bright_scene):
         }
     )
     limited_camera = Camera(camera.lens, Sensor(narrow, seed=1), camera.isp)
-    res = limited_camera.auto_expose(bright_scene)
+    # Bright enough to need an 0.5x correction at the minimum exposure, but
+    # below the 6000 e- well so digital attenuation is a legitimate remedy:
+    # a full-well-saturated scene can never be unclipped digitally.
+    overexposed = render(
+        "flat_patch",
+        illuminant="D65",
+        lux=4_000.0,
+        shape=(64, 64),
+        oversampling=2,
+    )
+    res = limited_camera.auto_expose(overexposed)
     assert res.converged
     assert res.exposure_s == pytest.approx(narrow.exposure.min_s)
     assert res.analog_gain_db == pytest.approx(narrow.analog_gain.min_db)
     assert 0.0 < res.digital_gain < 1.0
+
+
+def test_clipped_probe_caps_the_correction_factor():
+    """The 0.5 cap binds when the damped factor is still above it."""
+    assert _correction_factor(0.3, 0.18, clipped=False) > 0.5
+    assert _correction_factor(0.3, 0.18, clipped=True) == 0.5
+    assert _correction_factor(0.03, 0.18, clipped=True) == 0.5
+
+
+def test_clipping_detects_full_well_saturation(camera):
+    """The well can saturate far below the ADC ceiling and still count."""
+    hot_scene = render(
+        "flat_patch",
+        illuminant="D65",
+        lux=500_000.0,
+        shape=(64, 64),
+        oversampling=2,
+    )
+    raw = camera.sensor.expose(
+        hot_scene.irradiance,
+        0.01,
+        mode="LCG",
+        analog_gain_db=0.0,
+        digital_gain=1.0,
+        seed=0,
+    )
+    largest_code = (1 << raw.bit_depth) - 1
+    assert raw.data.max() < largest_code
+    assert np.count_nonzero(raw.data >= largest_code) == 0
+    assert _is_clipped(raw, camera.sensor.config) is True
+
+    # The full-well-aware guard must not trap the search: AE still converges.
+    res = camera.auto_expose(hot_scene)
+    assert res.converged
+    assert abs(res.metered_value - 0.18) <= 0.02
 
 
 def test_auto_exposure_handles_a_clipped_probe(camera, bright_scene):
@@ -156,6 +243,17 @@ def test_auto_exposure_handles_a_clipped_probe(camera, bright_scene):
         }
     )
     clipped_camera = Camera(camera.lens, Sensor(clipped, seed=1), camera.isp)
+    default_frame = clipped_camera.sensor.expose(
+        bright_scene.irradiance,
+        0.01,
+        mode="LCG",
+        analog_gain_db=0.0,
+        digital_gain=1.0,
+        seed=0,
+    )
+    assert default_frame.data.max() == (1 << default_frame.bit_depth) - 1
+    assert _is_clipped(default_frame, clipped_camera.sensor.config) is True
+
     res = clipped_camera.auto_expose(bright_scene)
     assert res.converged
     assert abs(res.metered_value - 0.18) <= 0.02
