@@ -65,6 +65,8 @@ _SENSOR_KEYS: Final[frozenset[str]] = frozenset(
         "exposure",
         "temperature",
         "defects",
+        "noise",
+        "auto_hcg_threshold_e",
         "pdaf",
         "binning",
         "blooming",

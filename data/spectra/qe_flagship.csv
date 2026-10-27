@@ -1,0 +1,55 @@
+# camsim representative flagship quantum-efficiency curve.
+# Synthetic engineering estimate for a backside-illuminated stacked CMOS phone
+# sensor, NOT vendor-measured data. Peak QE is 0.82 near 490-500 nm; the
+# near-infrared response tapers to 0.16 at 830 nm. Values are dimensionless
+# electrons per incident photon and must lie in [0, 1]. Task 17 replaces this
+# curve with datasheet-grounded measurements and records the final provenance.
+wavelength_nm,qe
+360,0.10
+370,0.18
+380,0.28
+390,0.38
+400,0.48
+410,0.56
+420,0.63
+430,0.69
+440,0.74
+450,0.78
+460,0.80
+470,0.81
+480,0.82
+490,0.82
+500,0.82
+510,0.81
+520,0.81
+530,0.80
+540,0.80
+550,0.79
+560,0.78
+570,0.77
+580,0.75
+590,0.73
+600,0.71
+610,0.68
+620,0.65
+630,0.62
+640,0.58
+650,0.54
+660,0.50
+670,0.46
+680,0.42
+690,0.38
+700,0.35
+710,0.32
+720,0.30
+730,0.28
+740,0.26
+750,0.24
+760,0.23
+770,0.22
+780,0.21
+790,0.20
+800,0.19
+810,0.18
+820,0.17
+830,0.16

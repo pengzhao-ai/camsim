@@ -10,7 +10,9 @@
       "QE curve representative of backside-illuminated silicon",
       "IR-cut cut-on 650 nm",
       "microlens gain 1.15",
-      "dark current is specified at the 25 C reference temperature"
+      "dark current is specified at the 25 C reference temperature",
+      "DSNU, PRNU, row noise, and the hot-pixel dark multiplier are representative engineering assumptions",
+      "auto HCG threshold of 200 e- per pixel is a representative readout crossover"
     ]
   },
   "pixel": {
@@ -76,6 +78,13 @@
     "stuck_rate": 1e-06,
     "seed": 1234
   },
+  "noise": {
+    "dsnu_e": 0.5,
+    "prnu_fraction": 0.005,
+    "row_noise_e_rms": 0.5,
+    "hot_pixel_dark_multiplier": 100.0
+  },
+  "auto_hcg_threshold_e": 200.0,
   "pdaf": {
     "fraction": 0.01,
     "qe_factor": 0.5,

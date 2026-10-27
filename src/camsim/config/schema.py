@@ -254,9 +254,10 @@ class SpectralConfig(ConfigModel):
 
     The CSV paths are strings resolved when a sensor is constructed, so a
     preset can be validated before the data files exist. ``spectral_crosstalk``
-    mixes neighbouring CFA channels in the charge domain; rows sum to one so
-    total signal is conserved. The identity matrix models an ideal sensor with
-    no spectral leakage.
+    mixes neighbouring CFA channels in the charge domain; rows sum to one so a
+    neutral input stays neutral (a doubly stochastic matrix also conserves the
+    channel sum). The identity matrix models an ideal sensor with no spectral
+    leakage.
     """
 
     wavelength_nm: WavelengthRange
@@ -380,6 +381,23 @@ class DefectConfig(ConfigModel):
     seed: NonNegativeInt
 
 
+class NoiseConfig(ConfigModel):
+    """Fixed-pattern and row-noise strengths in the electron domain.
+
+    ``dsnu_e`` is the per-pixel dark-signal offset standard deviation;
+    ``prnu_fraction`` is the dimensionless photo-response deviation (0.005 is
+    0.5 %, not 5 %); ``row_noise_e_rms`` is the common-mode readout sigma per
+    row; and ``hot_pixel_dark_multiplier`` scales dark current at sites flagged
+    by :class:`DefectConfig`. These are the calibratable spatial and row
+    imperfections that differ between nominally identical parts.
+    """
+
+    dsnu_e: NonNegative = 0.5
+    prnu_fraction: Annotated[float, Field(ge=0.0, lt=1.0)] = 0.005
+    row_noise_e_rms: NonNegative = 0.5
+    hot_pixel_dark_multiplier: Annotated[float, Field(ge=1.0)] = 100.0
+
+
 class PDAFConfig(ConfigModel):
     """Phase-detection autofocus pixel layout.
 
@@ -425,7 +443,9 @@ class SensorConfig(ConfigModel):
     Cross-field rules live here because they span sub-models: the mode set must
     be exactly ``LCG``/``HCG``, HCG full well may not exceed LCG full well, and
     the ADC-limited saturation condition becomes a warning from
-    :meth:`validation_warnings`.
+    :meth:`validation_warnings`. ``auto_hcg_threshold_e`` is the mean signal
+    (electrons per pixel, before noise) below which ``mode="auto"`` selects the
+    high-conversion-gain readout.
     """
 
     schema_version: SchemaVersion
@@ -443,6 +463,8 @@ class SensorConfig(ConfigModel):
     pdaf: PDAFConfig
     binning: BinningConfig
     blooming: BloomingConfig
+    noise: NoiseConfig = Field(default_factory=NoiseConfig)
+    auto_hcg_threshold_e: NonNegative = 200.0
 
     @model_validator(mode="after")
     def _validate_modes(self) -> Self:

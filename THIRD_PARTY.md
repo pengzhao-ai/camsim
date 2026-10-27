@@ -131,6 +131,24 @@ loaded object are recorded in its `provenance` mapping.
 | [scikit-image](https://scikit-image.org/) | BSD-3-Clause | Reference cross-checks in tests |
 | [colour-demosaicing](https://github.com/colour-science/colour-demosaicing) | BSD-3-Clause | Reference demosaic cross-checks in tests |
 
+## Synthetic sensor spectral data
+
+`data/spectra/qe_flagship.csv`, `data/spectra/cfa_rggb.csv`, and
+`data/spectra/ir_cut.csv` are **original synthetic engineering estimates**
+authored for this repository. They are not copied from a vendor datasheet, a
+measurement report, or another dataset, and no third-party copyright applies;
+they are distributed under the repository's Apache-2.0 licence.
+
+- Purpose: let the shipped flagship sensor preset construct and run before
+  measured curves are available.
+- Shape: smooth representative QE (peak 0.82), overlapping RGGB colour-filter
+  passbands, and an IR-cut roll-off near 650 nm, interpolated by the sensor
+  onto the preset's 360-830 nm, 5 nm grid.
+- Provenance: the assumptions are repeated in each CSV's comment header and in
+  the preset's `provenance.assumptions`. Task 17 replaces these curves with
+  datasheet-grounded values and records the final source, URL, and retrieval
+  date in this file and in the preset.
+
 ## Adding third-party material
 
 Before adding a dependency, dataset, font, or copied code snippet:

@@ -1,0 +1,54 @@
+# camsim representative IR-cut filter transmittance.
+# Synthetic engineering estimate for a blue-glass / interference IR-cut filter
+# with a 650 nm cut-on and roughly two decades of rejection above 750 nm. The
+# visible band passes at 0.97; values are dimensionless fractions in [0, 1].
+# Task 17 replaces this curve with a datasheet-grounded measurement.
+wavelength_nm,transmittance
+360,0.96
+370,0.97
+380,0.97
+390,0.97
+400,0.97
+410,0.97
+420,0.97
+430,0.97
+440,0.97
+450,0.97
+460,0.97
+470,0.97
+480,0.97
+490,0.97
+500,0.97
+510,0.97
+520,0.97
+530,0.97
+540,0.97
+550,0.97
+560,0.97
+570,0.97
+580,0.97
+590,0.97
+600,0.97
+610,0.96
+620,0.95
+630,0.93
+640,0.90
+650,0.85
+660,0.76
+670,0.62
+680,0.44
+690,0.27
+700,0.14
+710,0.07
+720,0.035
+730,0.02
+740,0.012
+750,0.008
+760,0.006
+770,0.005
+780,0.004
+790,0.0035
+800,0.003
+810,0.0025
+820,0.002
+830,0.0015
