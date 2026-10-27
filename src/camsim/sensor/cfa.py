@@ -23,11 +23,11 @@ the electron rate
 ``electron_rate_c = A * integral P_c(lambda) * E(lambda) * lambda / (h*c) dlambda``
 
 with ``E`` in W/m2/nm, ``A`` the effective pixel area, and ``lambda/(h*c)`` the
-inverse photon energy. Those factors (photon energy, area, exposure, lens
-transmission, microlens gain) are deliberately *not* applied here: this module
-returns the cacheable, dimensionless per-wavelength channel response, so a
-sensor configuration and a scene spectrum can change independently and the
-matrix can be audited against datasheets.
+inverse photon energy. Those factors (wavelength-cell widths, photon energy,
+area, exposure, lens transmission, microlens gain) are deliberately *not*
+applied here: this module returns the cacheable, dimensionless per-wavelength
+channel response, so a sensor configuration and a scene spectrum can change
+independently and the matrix can be audited against datasheets.
 
 Real-world ranges: backside-illuminated CMOS QE peaks around 0.7-0.9 in the
 green, with frontside parts losing blue response; colour-filter peak
@@ -46,12 +46,14 @@ example ``wavelength_nm,R,G,B`` for Bayer or ``wavelength_nm,R,C`` for RCCC.
 Headers are optional; ``#`` comment lines and blank lines are ignored. A
 multi-column CFA file without a header is read in the canonical channel order
 documented below, while a header naming the columns may appear in any order.
-The source curves must cover the target wavelength grid; interpolation is
-linear with endpoint clamping, and clamping only absorbs sub-nanometre
-numerical round-off at the grid edges. Extrapolating a measured QE or filter
-curve beyond its measured range would invent sensitivity the part does not
-have, which is especially damaging in the near infrared where silicon and
-IR-cut curves change by orders of magnitude.
+Every value column is a dimensionless fraction in ``[0, 1]``; a percent-valued
+curve is rejected as a units error rather than silently inflating every
+electron count by 100x. The source curves must cover the target wavelength
+grid; interpolation is linear with endpoint clamping, and clamping only
+absorbs sub-nanometre numerical round-off at the grid edges. Extrapolating a
+measured QE or filter curve beyond its measured range would invent sensitivity
+the part does not have, which is especially damaging in the near infrared where
+silicon and IR-cut curves change by orders of magnitude.
 
 Channel order is fixed and independent of the spatial tile: every Bayer pattern
 returns rows ``R, G, B``, MONO returns ``M``, and RCCC returns ``R, C``. The
@@ -63,11 +65,11 @@ swaps colours; masks that overlap or leave gaps double-count or drop pixels;
 mismatched mosaic plane shapes or missing colour keys silently lose a channel;
 multiplying by QE, CFA, or IR-cut twice produces RAW values that are wrong by
 orders of magnitude; a percent-valued QE curve (for example 85 instead of
-0.85) produces implausibly large projections and is a units error the caller
-must correct; a zero or dead channel, non-monotonic wavelengths, or a
-malformed CSV must raise rather than be coerced. The loader validates
-structure, finiteness, non-negativity, and grid coverage, and the projection
-validates finite, non-negative rows with positive integrated response.
+0.85) is rejected because it would produce 100x non-physical electrons; a zero
+or dead channel, non-monotonic wavelengths, or a malformed CSV must raise
+rather than be coerced. The loader validates structure, finiteness, the
+``[0, 1]`` fraction bound, and grid coverage, and the projection validates
+finite, non-negative rows with positive integrated response.
 """
 
 from __future__ import annotations
@@ -122,6 +124,13 @@ _CHANNELS_BY_PATTERN: Final[dict[CFAPattern, tuple[CFAColor, ...]]] = {
 # floating-point round-off in grids built with np.arange/np.linspace and lets
 # np.interp clamp the last few tenths of a nanometre instead of extrapolating.
 _COVERAGE_TOL_NM: Final[float] = 1e-6
+
+# QE and filter transmittances are dimensionless fractions. Datasheet rounding
+# can leave a value a few parts per million above one, so accept that tiny
+# overhang and clamp it; anything larger is almost always a percent/fraction
+# units error that would inflate every electron count by 100x.
+_MAX_CURVE_VALUE: Final[float] = 1.0
+_CURVE_VALUE_TOLERANCE: Final[float] = 1e-6
 
 
 def _coerce_pattern(pattern: CFAPattern | str) -> CFAPattern:
@@ -353,7 +362,10 @@ def _read_table(
     The first non-comment row is treated as a header when any of its columns
     is non-numeric; otherwise every row is data. Data rows must be rectangular,
     the first column must be a strictly increasing positive wavelength axis,
-    and every value column must be finite and non-negative.
+    and every value column must be a finite fraction in ``[0, 1]``. A value
+    within ``_CURVE_VALUE_TOLERANCE`` above one is accepted as datasheet
+    rounding and clamped; a larger value is rejected as a percent/fraction
+    units error.
     """
     try:
         text = path.read_text(encoding="utf-8-sig")
@@ -417,6 +429,16 @@ def _read_table(
         raise ValueError(f"{description} CSV values must be finite")
     if np.any(values < 0.0):
         raise ValueError(f"{description} CSV values must be non-negative")
+    maximum = float(values.max())
+    if maximum > _MAX_CURVE_VALUE + _CURVE_VALUE_TOLERANCE:
+        raise ValueError(
+            f"{description} CSV values must be dimensionless fractions in [0, 1]; "
+            f"got {maximum:g}. A percent-valued curve (for example 85 instead of "
+            "0.85) must be divided by 100 before use."
+        )
+    # Clamp a sub-tolerance datasheet overhang so the projection cannot exceed
+    # a physical quantum efficiency or transmittance of one.
+    data[:, 1:] = np.minimum(values, _MAX_CURVE_VALUE)
     return header, data
 
 
@@ -514,17 +536,19 @@ def spectral_projection(
     Parameters
     ----------
     qe_csv:
-        Two-column ``wavelength_nm,qe`` CSV. QE is dimensionless, usually in
+        Two-column ``wavelength_nm,qe`` CSV. QE is a dimensionless fraction in
         ``[0, 1]``; a percent-valued file such as ``85`` instead of ``0.85`` is
-        a units error the caller must correct.
+        rejected as a units error.
     cfa_csv:
-        CFA transmittance CSV. For MONO this path is ignored because there is
-        no colour filter. Otherwise it is either two-column (one neutral curve
-        broadcast to every colour) or has one column per colour of the pattern
-        (``R,G,B`` for Bayer, ``R,C`` for RCCC). Columns may be header-named
-        in any order; a headerless multi-column file uses canonical order.
+        CFA transmittance CSV with values in ``[0, 1]``. For MONO this path is
+        ignored because there is no colour filter. Otherwise it is either
+        two-column (one neutral curve broadcast to every colour) or has one
+        column per colour of the pattern (``R,G,B`` for Bayer, ``R,C`` for
+        RCCC). Columns may be header-named in any order; a headerless
+        multi-column file uses canonical order.
     ir_cut_csv:
-        Two-column ``wavelength_nm,transmittance`` CSV for the IR-cut filter.
+        Two-column ``wavelength_nm,transmittance`` CSV for the IR-cut filter,
+        with values in ``[0, 1]``.
     grid:
         The :class:`~camsim.core.spectral.WavelengthGrid` to sample, or an
         array-like of nanometres validated into one. All source curves must
@@ -537,18 +561,19 @@ def spectral_projection(
     A ``(n_channels, n_wavelengths)`` float64 matrix in canonical channel
     order: ``R, G, B`` for every Bayer pattern, ``M`` for MONO, and ``R, C``
     for RCCC. Entries are the dimensionless product
-    ``QE * T_IR * T_CFA`` sampled on ``grid``. Photon energy, pixel area,
-    exposure, lens transmission, and microlens gain are intentionally absent;
-    the sensor applies them when it integrates a scene spectrum.
+    ``QE * T_IR * T_CFA`` sampled on ``grid``. Wavelength-cell widths (Δλ),
+    photon energy, pixel area, exposure, lens transmission, and microlens gain
+    are intentionally absent; the sensor applies them when it integrates a
+    scene spectrum.
 
     Raises
     ------
     ValueError
         If a file cannot be read, has a malformed table or header, contains
-        non-finite, negative, or non-monotonic data, does not cover the target
-        grid, or produces a channel with zero integrated response. These
-        conditions otherwise yield plausible-looking but physically wrong
-        electron counts.
+        non-finite, negative, above-unity, or non-monotonic data, does not
+        cover the target grid, or produces a channel with zero integrated
+        response. These conditions otherwise yield plausible-looking but
+        physically wrong electron counts.
     """
     target = (
         grid

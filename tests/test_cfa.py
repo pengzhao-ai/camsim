@@ -13,11 +13,11 @@ The spectral projection matrix is the radiometric heart of the sensor:
 ``P_c(lambda) = QE(lambda) * T_IR(lambda) * T_CFA,c(lambda)``
 
 Each row is the dimensionless spectral response of one CFA channel; the sensor
-multiplies it by scene irradiance, photon energy, pixel area, and exposure to
-obtain electrons. This module deliberately excludes those factors so the
-matrix can be cached and audited independently. Tests use synthetic CSVs that
-cover the common 360-830 nm grid, keeping the suite independent of the
-flagship preset data that arrives later.
+multiplies it by scene irradiance, the wavelength-cell widths Δλ, photon
+energy, pixel area, and exposure to obtain electrons. This module deliberately
+excludes those factors so the matrix can be cached and audited independently.
+Tests use synthetic CSVs that cover the common 360-830 nm grid, keeping the
+suite independent of the flagship preset data that arrives later.
 
 Failure artefacts guarded here: a transposed or offset Bayer tile swaps red
 and blue; a projection matrix with a negative or dead channel silently biases
@@ -693,6 +693,71 @@ def test_projection_rejects_invalid_curve_values(
 
     with pytest.raises(ValueError, match=r"finite|non-negative|negative"):
         spectral_projection(qe_path, cfa_path, ir_path, GRID, CFAPattern.RGGB)
+
+
+@pytest.mark.parametrize(
+    ("curve_name", "percent_value"),
+    [("qe", 85.0), ("ir", 150.0)],
+)
+def test_projection_rejects_percent_valued_curves(
+    tmp_path: Path,
+    curve_name: str,
+    percent_value: float,
+) -> None:
+    # A vendor curve quoted in percent is 100x too large. Accepting it would
+    # produce non-physical responses above one and clip at full well.
+    kwargs = {curve_name: np.full(GRID_NM.size, percent_value)}
+    qe_path, cfa_path, ir_path, *_ = _projection_files(tmp_path, **kwargs)  # type: ignore[arg-type]
+
+    with pytest.raises(ValueError, match=r"fraction|percent"):
+        spectral_projection(qe_path, cfa_path, ir_path, GRID, CFAPattern.RGGB)
+
+
+def test_projection_rejects_cfa_above_unity(tmp_path: Path) -> None:
+    curves = _cfa_curves()
+    curves["B"] = np.full(GRID_NM.size, 1.2)
+    qe_path, cfa_path, ir_path, *_ = _projection_files(tmp_path, cfa=curves)
+
+    with pytest.raises(ValueError, match=r"fraction|percent"):
+        spectral_projection(qe_path, cfa_path, ir_path, GRID, CFAPattern.RGGB)
+
+
+def test_projection_accepts_unity_rccc_clear_transmission(tmp_path: Path) -> None:
+    qe = _qe_curve()
+    ir = _ir_cut_curve()
+    curves = {"R": _cfa_curves()["R"], "C": np.ones(GRID_NM.size)}
+    qe_path = tmp_path / "qe.csv"
+    cfa_path = tmp_path / "cfa_rccc.csv"
+    ir_path = tmp_path / "ir_cut.csv"
+    _write_curve(qe_path, qe)
+    _write_cfa(cfa_path, curves)
+    _write_curve(ir_path, ir)
+
+    projection = spectral_projection(qe_path, cfa_path, ir_path, GRID, CFAPattern.RCCC)
+
+    assert projection.shape == (2, GRID_NM.size)
+    np.testing.assert_allclose(projection[1], qe * ir, rtol=1e-12, atol=1e-15)
+    assert np.all(projection <= 1.0)
+
+
+def test_projection_clamps_tiny_datasheet_rounding_above_unity(tmp_path: Path) -> None:
+    # Fractions within the documented tolerance are treated as one and clamped
+    # so the projection cannot exceed a physical quantum efficiency of one.
+    qe = _qe_curve()
+    ir = _ir_cut_curve()
+    curves = _cfa_curves()
+    curves["G"] = np.full(GRID_NM.size, 1.0 + 5e-7)
+    qe_path = tmp_path / "qe.csv"
+    cfa_path = tmp_path / "cfa.csv"
+    ir_path = tmp_path / "ir_cut.csv"
+    _write_curve(qe_path, qe)
+    _write_cfa(cfa_path, curves)
+    _write_curve(ir_path, ir)
+
+    projection = spectral_projection(qe_path, cfa_path, ir_path, GRID, CFAPattern.RGGB)
+
+    np.testing.assert_allclose(projection[1], qe * ir, rtol=1e-12, atol=1e-15)
+    assert np.all(projection <= 1.0)
 
 
 def test_projection_rejects_malformed_csvs(tmp_path: Path) -> None:
