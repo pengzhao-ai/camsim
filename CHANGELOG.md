@@ -13,7 +13,8 @@ changes.
 ## [0.1.1] - 2026-10-27
 
 **Status: released.** Documentation-only patch. No library source, presets,
-tests, or validation evidence changed; the 0.1.0 G5 results remain binding.
+or validation evidence changed; only the package-version assertion and release
+metadata were updated. The 0.1.0 G5 results remain binding.
 
 ### Fixed
 

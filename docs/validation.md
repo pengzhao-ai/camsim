@@ -5,8 +5,8 @@ This page is the public index of camsim's phase-gate evidence. The
 committed reports, all G5 cross-cutting checks pass, and G5 was signed off by
 the project owner on 2026-10-27 for v0.1.0. `v0.1.0` is the validated G5
 release; `v0.1.1` is a documentation-only patch that fixes PyPI page rendering
-and changes no code or evidence. A gate is not marked green until its report is
-reproducible from a clean checkout; the signed consolidated report is
+and changes no library code or evidence. A gate is not marked green until its
+report is reproducible from a clean checkout; the signed consolidated report is
 `results/reports/validation_report.md` in the repository.
 
 ## Lines of evidence
@@ -584,11 +584,12 @@ full-run JSON or Markdown.
 
 The sign-off is recorded in the report's checklist block. `v0.1.0` was tagged
 and pushed, and `camsim==0.1.0` was published to PyPI with a clean-install
-verification. The GitHub CI matrix and Docs build passed; the Pages deployment
-still requires GitHub Pages to be enabled in the repository settings.
-`v0.1.1` is a documentation-only patch for PyPI rendering. **No
-machine-vision code has been written**, and Phase 6+ stays deferred until a
-separate plan is reviewed and approved; see [Release](release.md).
+verification. The GitHub CI matrix, Docs build, and Docs Pages deployment
+passed; the live site is <https://pengzhao-ai.github.io/camsim/>. `v0.1.1` is
+a documentation-only patch for PyPI rendering; it changes no library code or
+validation evidence. **No machine-vision code has been written**, and Phase 6+
+stays deferred until a separate plan is reviewed and approved; see
+[Release](release.md).
 
 **No machine-vision code is written before G5 sign-off, and none has been
 written after it.** The CNN task engine, training protocol, and task-accuracy

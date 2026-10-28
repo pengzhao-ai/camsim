@@ -317,8 +317,9 @@ reviewed exception, not a hidden metric. See
 - Version: `0.1.1` (`src/camsim/_version.py` is the single source).
 - G5 was signed off by the project owner on 2026-10-27 for `0.1.0`; `0.1.1`
   is a documentation-only patch that makes the README image and link targets
-  absolute so the PyPI project page renders correctly. No source code,
-  presets, tests, or validation evidence changed.
+  absolute so the PyPI project page renders correctly. No library source,
+  presets, or validation evidence changed; only the version assertion and
+  release metadata were updated.
 - `0.1.1` is published on
   [PyPI](https://pypi.org/project/camsim/0.1.1/); install with
   `pip install camsim==0.1.1`. The release workflow builds the wheel, sdist,
