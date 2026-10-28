@@ -2,7 +2,7 @@
 
 **Status: signed off by the project owner on 2026-10-27; v0.1.0 approved for release.**
 
-This is the consolidated G5 report for the camsim core pipeline. G1-G4 are green, every cross-cutting check below passed on the validated source tree, and the local engineering gates are green. CI workflows for lint, types, tests, coverage, docs, build, examples, and notebooks were added in this candidate; their execution is pending a push, and that residual was accepted by the owner at sign-off. The project owner reviewed this report and the figure gallery, confirmed the scope, assumptions, limitations, and the documented waivers, and approved `v0.1.0` for the initial GitHub and PyPI release. Machine-vision work (Phase 6+) remains deferred and no machine-vision code is present.
+This is the consolidated G5 report for the camsim core pipeline. G1-G4 are green, every cross-cutting check below passed on the validated source tree, and the local engineering gates are green. CI workflows for lint, types, tests, coverage, docs, build, examples, and notebooks were added in this candidate. At sign-off their execution was pending a push; after release, the GitHub CI matrix passed and the Docs build passed. The Docs Pages deployment still needs GitHub Pages enabled in the repository settings. The project owner reviewed this report and the figure gallery, confirmed the scope, assumptions, limitations, and the documented waivers, and approved `v0.1.0` for the initial GitHub and PyPI release. Machine-vision work (Phase 6+) remains deferred and no machine-vision code is present.
 
 ## 1. Scope and architecture
 
@@ -425,7 +425,7 @@ Decision:  [x] approve v0.1.0     [ ] withhold (return to the failing gate)
 Notes:  Accept documented waivers (CI pending push, whole-package coverage 83.55 %, 50 MP spectral limit, identity default CCM, synthetic/in-sample validation). Release v0.1.0 to GitHub and PyPI. Hold ML/Phase 6+.
 ```
 
-**Release record.** The owner approved `v0.1.0` on 2026-10-27. The tag is `v0.1.0` at the commit containing this report; the code commit validated by the evidence is `d5e6abb`. The tag is pushed to `github.com/pengzhao-ai/camsim`; the initial PyPI publication of `camsim==0.1.0` follows the same commit. Machine-vision code remains absent and Phase 6+ remains deferred until a separate plan is reviewed and approved.
+**Release record.** The owner approved `v0.1.0` on 2026-10-27. The tag is `v0.1.0` at the commit containing this report; the code commit validated by the evidence is `d5e6abb`. The tag and branch are pushed to the public repository `github.com/pengzhao-ai/camsim`. `camsim==0.1.0` is published on PyPI at `https://pypi.org/project/camsim/0.1.0/`; a clean virtual-environment install, `import camsim` (0.1.0), `camsim info`, and the installed `camsim render` → `camsim measure` chain were verified. GitHub CI passed; the Docs build passed but the Pages deployment needs GitHub Pages enabled in the repository settings. Machine-vision code remains absent and Phase 6+ remains deferred until a separate plan is reviewed and approved.
 
 ## Appendix A. Cross-cutting detail values
 

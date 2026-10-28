@@ -57,3 +57,34 @@ jobs:
               --title "$GITHUB_REF_NAME" \
               --generate-notes
           fi
+
+  pypi-publish:
+    name: Publish to PyPI (trusted publishing)
+    needs: release
+    runs-on: ubuntu-latest
+    # Configure this environment name and the matching trusted publisher in
+    # the PyPI project settings (Settings -> Publishing). No long-lived PyPI
+    # token is stored in GitHub.
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Check distribution metadata
+        run: uvx twine check dist/*
+
+      - name: Publish to PyPI with OIDC
+        run: uv publish --trusted-publishing always

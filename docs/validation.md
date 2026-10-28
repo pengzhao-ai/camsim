@@ -1,11 +1,11 @@
 # Validation
 
 This page is the public index of camsim's phase-gate evidence. The
-**sensor/ISP/metrics core is validated**: G1–G4 are PASS with committed reports,
-all G5 cross-cutting checks pass, and the **G5 human sign-off is pending**. A
-gate is not marked green until its report is reproducible from a clean
-checkout; the consolidated candidate is
-`results/reports/validation_report.md` in the repository.
+**sensor/ISP/metrics core is validated and released**: G1–G4 are PASS with
+committed reports, all G5 cross-cutting checks pass, and G5 was signed off by
+the project owner on 2026-10-27 for v0.1.0. A gate is not marked green until
+its report is reproducible from a clean checkout; the signed consolidated
+report is `results/reports/validation_report.md` in the repository.
 
 ## Lines of evidence
 

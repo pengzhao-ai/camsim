@@ -16,6 +16,27 @@ release after the deferred Phase 6–9 machine-vision work.
   minor releases add backward-compatible capability, and v1.0.0 is the
   feature-complete release after Phase 6–9.
 - A release tag is `vX.Y.Z` and matches the package version without the `v`.
+- PyPI releases use **Trusted Publishing** (OIDC) from GitHub Actions on a
+  `v*` tag. The first 0.1.0 upload used a one-time account token; future
+  releases require no stored PyPI token.
+
+### PyPI trusted publisher setup
+
+1. On PyPI, open the `camsim` project → **Settings → Publishing → Add a new
+   publisher** and set owner `pengzhao-ai`, repository `camsim`, workflow
+   `release.yml`, environment `pypi`.
+2. In the GitHub repository, create an environment named `pypi`
+   (**Settings → Environments**) and restrict it to the `main` branch/tags if
+   desired.
+3. Under **Settings → Actions → General → Workflow permissions**, allow
+   read and write permissions so the release job can create GitHub release
+   assets. The PyPI job requests `id-token: write` explicitly.
+4. Push a `vX.Y.Z` tag whose version matches `src/camsim/_version.py`. The
+   `Release` workflow runs tests, builds the wheel/sdist, creates the GitHub
+   release assets, and publishes to PyPI with `uv publish
+   --trusted-publishing always`.
+5. Every publication needs a new version; never reuse a version number after
+   PyPI accepts it.
 
 ## Checklist
 

@@ -24,9 +24,10 @@ notebook-only demo.
 > **Status: v0.1.0 released; G5 signed off.** G1–G4 are PASS, all G5
 > cross-cutting checks pass, and the signed validation report is
 > [`results/reports/validation_report.md`](results/reports/validation_report.md).
-> The core sensor/ISP/metrics library is version `0.1.0`; the tag is `v0.1.0`.
-> The initial PyPI publication is the release step in progress. Machine-vision
-> code (`camsim.tasks`) is deliberately gated behind G5 and is not implemented;
+> The core sensor/ISP/metrics library is version `0.1.0`; the tag is `v0.1.0`,
+> and the package is published on
+> [PyPI](https://pypi.org/project/camsim/0.1.0/). Machine-vision code
+> (`camsim.tasks`) is deliberately gated behind G5 and is not implemented;
 > Phase 6+ is deferred.
 
 ## The pipeline
@@ -113,14 +114,22 @@ package and operates on arrays plus metadata.
 - Explicit `numpy.random.Generator` objects, recorded seeds and config hashes,
   no global RNG; bit-identical within one environment, tolerance-based across
   platforms.
-- Phase gates G0–G4 with committed reports and figures; G5 human sign-off is
-  pending; see [Validation](docs/validation.md).
+- Phase gates G0–G5 with committed reports and figures; G5 was signed off on
+  2026-10-27 and v0.1.0 is released. See [Validation](docs/validation.md).
 
 ## Installation
 
 Python 3.11–3.13 is required.
 
-With [uv](https://docs.astral.sh/uv/) (recommended):
+Install the released package:
+
+```bash
+pip install camsim==0.1.0
+# or
+uv add camsim==0.1.0
+```
+
+For development, with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
 git clone https://github.com/pengzhao-ai/camsim.git
@@ -139,8 +148,8 @@ pip install -e ".[all]"
 
 Core dependencies are NumPy, SciPy, Pydantic v2, Matplotlib, Pillow, and
 colour-science. Optional extras: `[ml]` (PyTorch, scikit-learn), `[tune]`
-(Optuna), `[docs]`, `[dev]`, and `[all]`. PyPI publication is deferred to
-v1.0.0; install from a checkout for now.
+(Optuna), `[docs]`, `[dev]`, and `[all]`. `camsim==0.1.0` is available on
+[PyPI](https://pypi.org/project/camsim/0.1.0/).
 
 ## Quickstart
 
@@ -307,10 +316,11 @@ reviewed exception, not a hidden metric. See
 
 - Version: `0.1.0` (`src/camsim/_version.py` is the single source).
 - G5 was signed off by the project owner on 2026-10-27; the tag is `v0.1.0`.
-- The initial `0.1.0` PyPI publication is in progress; verify it at
-  [pypi.org/project/camsim](https://pypi.org/project/camsim/). The release also
-  uploads a wheel, sdist, and `SHA256SUMS` to the GitHub release through
-  `.github/workflows/release.yml`.
+- `0.1.0` is published on
+  [PyPI](https://pypi.org/project/camsim/0.1.0/); install with
+  `pip install camsim==0.1.0`. The release workflow builds the wheel, sdist,
+  and `SHA256SUMS` and uploads the GitHub release assets; future tag releases
+  publish to PyPI through trusted publishing (`.github/workflows/release.yml`).
 - Machine-vision/Phase 6+ work is deferred; no machine-vision code is in
   `0.1.0`.
 - The `pengzhao-ai/camsim` repository and badges are the public release

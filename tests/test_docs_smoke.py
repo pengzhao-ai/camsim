@@ -129,8 +129,11 @@ def test_release_workflow_tag_trigger_and_assets():
     assert "uv build" in text
     assert "twine check" in text
     assert "gh release" in text or "softprops/action-gh-release" in text
-    # PyPI publication is deliberately deferred to v1.0.0.
-    assert "pypi-publish" not in text.lower()
+    # Future tag releases publish through PyPI trusted publishing (OIDC).
+    assert "pypi-publish" in text
+    assert "environment: pypi" in text
+    assert "id-token: write" in text
+    assert "uv publish --trusted-publishing always" in text
 
 
 def test_coverage_gate_is_enforced():

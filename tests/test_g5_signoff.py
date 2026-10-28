@@ -296,7 +296,8 @@ def test_local_gallery_evidence_covers_examples_and_notebook_budgets() -> None:
     assert all(item["seconds"] <= notebooks["timeout_s"] for item in notebooks["items"])
     report = _report().lower()
     assert "two-minute" in report or "120 s" in report
-    assert "ci execution is pending a push" in report
+    assert "github ci matrix passed" in report
+    assert "pages" in report
     assert "local equivalents passed" in report
 
 
