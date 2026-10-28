@@ -3,9 +3,11 @@
 This page is the public index of camsim's phase-gate evidence. The
 **sensor/ISP/metrics core is validated and released**: G1–G4 are PASS with
 committed reports, all G5 cross-cutting checks pass, and G5 was signed off by
-the project owner on 2026-10-27 for v0.1.0. A gate is not marked green until
-its report is reproducible from a clean checkout; the signed consolidated
-report is `results/reports/validation_report.md` in the repository.
+the project owner on 2026-10-27 for v0.1.0. `v0.1.0` is the validated G5
+release; `v0.1.1` is a documentation-only patch that fixes PyPI page rendering
+and changes no code or evidence. A gate is not marked green until its report is
+reproducible from a clean checkout; the signed consolidated report is
+`results/reports/validation_report.md` in the repository.
 
 ## Lines of evidence
 
@@ -111,7 +113,7 @@ uv run python -c "import camsim; print(camsim.__version__)"
 
 Expected: the suite passes, lint and formatting are clean, mypy reports no
 issues under `strict`, the documentation builds with warnings treated as
-errors, and the version prints `0.1.0`. The executable form of this gate
+errors, and the version prints `0.1.1`. The executable form of this gate
 is `tests/test_ci_config.py` plus the CI workflows, and `make gate` runs the
 same commands locally.
 
@@ -527,7 +529,7 @@ documented luma placeholder, and the Bayer colour and MTF gates do not apply.
 | `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.34 ms total (128 × 128) |
 | `uv run python benchmarks/benchmark_pipeline.py` | 114.58 ms total (512 × 512) |
 | `uv run python benchmarks/benchmark_pipeline.py --large` | 453.90 ms total (1024 × 1024, 1× oversampling) |
-| `uv build` | wheel and sdist for `0.1.0` |
+| `uv build` | wheel and sdist for `0.1.1` |
 
 CI runs the same commands on Ubuntu and macOS across Python 3.11, 3.12, and
 3.13, and adds `examples` and `notebooks` jobs. **Those workflows were added in
@@ -550,45 +552,49 @@ full-run JSON or Markdown.
 
 ### Sign-off checklist
 
-- [ ] Owner reviewed `results/reports/validation_report.md` end to end,
+- [x] Owner reviewed `results/reports/validation_report.md` end to end,
       including the G1–G4 verdict tables and the cross-cutting measurements.
-- [ ] Owner reviewed the figure gallery, including `g5_gate_summary.png`,
+- [x] Owner reviewed the figure gallery, including `g5_gate_summary.png`,
       `g5_evidence.png`, the G3 ColorChecker ΔE figure, the RCCC baseline, and
       the G4 analytic MTF curves.
-- [ ] Owner confirmed the validated scope: scene/optics helpers, sensor, ISP,
+- [x] Owner confirmed the validated scope: scene/optics helpers, sensor, ISP,
       metrics, camera orchestration, IO, and CLI; machine vision is out of
       scope for `v0.1.0`.
-- [ ] Owner confirmed the assumptions: simulated flagship preset, provisional
+- [x] Owner confirmed the assumptions: simulated flagship preset, provisional
       synthetic spectral data, in-sample CCM, and uncertified ISO 12233/EMVA-
       style measurement status.
-- [ ] Owner confirmed the limitations: synthetic CFA re-authoring, in-sample
+- [x] Owner confirmed the limitations: synthetic CFA re-authoring, in-sample
       calibration, 8× Airy diagnostic, synthetic stage measurements,
       quick-mode exclusion, extreme-low-light digital-gain noise, the identity
       default CCM, the absence of HDR/3-D/motion blur/autofocus, no
       polychromatic PSF or banding, P3 sidecar-only tagging, and the reduced
       frame contract.
-- [ ] Owner accepted the whole-package coverage exception (subject modules
+- [x] Owner accepted the whole-package coverage exception (subject modules
       91.73 %, whole package including viz 83.55 %, viz exercised by the
       executed galleries and notebooks).
-- [ ] Owner accepted that the CI workflows and runner timeouts were added and
-      local equivalents passed, but CI execution is pending a push.
-- [ ] Owner confirmed the two-minute-per-notebook condition: all notebooks ran
+- [x] Owner accepted that the CI workflows and runner timeouts were added and
+      local equivalents passed, with CI execution pending a push at sign-off.
+      The GitHub CI matrix passed after release.
+- [x] Owner confirmed the two-minute-per-notebook condition: all notebooks ran
       locally below 120 s and the runner/CI timeout enforces it.
-- [ ] Owner accepted that full 50 MP spectral simulation is not supported at
+- [x] Owner accepted that full 50 MP spectral simulation is not supported at
       v0.1.0 and that the memory guard rejects oversized cubes.
-- [ ] Owner approved tagging `v0.1.0` on the signed-off commit and starting
-      Phase 6 afterwards.
+- [x] Owner approved tagging `v0.1.0` on the signed-off commit and holding
+      Phase 6+ machine vision for a separate plan and review.
 
-The sign-off is recorded in the report's checklist block. **No tag exists, no
-push or PyPI publication has occurred, and no machine-vision code has been
-written.** `v0.1.0` is tagged only after the approval above; see
-[Release](release.md).
+The sign-off is recorded in the report's checklist block. `v0.1.0` was tagged
+and pushed, and `camsim==0.1.0` was published to PyPI with a clean-install
+verification. The GitHub CI matrix and Docs build passed; the Pages deployment
+still requires GitHub Pages to be enabled in the repository settings.
+`v0.1.1` is a documentation-only patch for PyPI rendering. **No
+machine-vision code has been written**, and Phase 6+ stays deferred until a
+separate plan is reviewed and approved; see [Release](release.md).
 
-**No machine-vision code is written before this sign-off.** The CNN task
-engine, training protocol, and task-accuracy sweeps in `camsim.tasks` do not
-begin until the project owner explicitly approves the report. Subsequent
-changes to sensor, ISP, or metrics code that invalidate the report require a
-re-run and a new sign-off.
+**No machine-vision code is written before G5 sign-off, and none has been
+written after it.** The CNN task engine, training protocol, and task-accuracy
+sweeps in `camsim.tasks` do not begin until the project owner approves a
+separate Phase 6–9 plan. Subsequent changes to sensor, ISP, or metrics code
+that invalidate the report require a re-run and a new sign-off.
 
 See [Datasheet mapping](datasheet_mapping.md) for how preset values are traced
 to public specifications.

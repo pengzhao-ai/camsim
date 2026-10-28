@@ -6,12 +6,12 @@ abstract: >-
   camsim is a deterministic Python library that simulates a camera from spectral
   scene irradiance through a lens and sensor model to a RAW frame, processes the
   RAW frame through a modular image signal processor, and measures image quality
-  with standard metrics. This 0.1.0 release validates the scene/optics helpers,
+  with standard metrics. This 0.1.x release validates the scene/optics helpers,
   sensor, ISP, metrics, camera orchestration, IO, and CLI. It is a simulated,
   EMVA 1288-style and ISO 12233-style validation, not a certified measurement of
   physical hardware. Machine-vision experiments are gated behind the G5 human
-  sign-off and are not included in 0.1.0.
-version: 0.1.0
+  sign-off and are not included in 0.1.1.
+version: 0.1.1
 date-released: "2026-10-27"
 authors:
   - family-names: Zhao

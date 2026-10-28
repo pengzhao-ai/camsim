@@ -1,17 +1,20 @@
 # Release checklist
 
 This page is the release contract for camsim. v0.1.0 was approved at the G5
-human sign-off on 2026-10-27 and is the first GitHub and PyPI release. The
-checklist below remains the contract for future releases. PyPI publication of
-later feature releases follows the same process; v1.0.0 is the feature-complete
-release after the deferred Phase 6–9 machine-vision work.
+human sign-off on 2026-10-27 and was the first GitHub and PyPI release;
+v0.1.1 is a documentation-only patch that makes the README links absolute so
+the PyPI project page renders. The checklist below remains the contract for
+future releases. PyPI publication of later feature releases follows the same
+process; v1.0.0 is the feature-complete release after the deferred Phase 6–9
+machine-vision work.
 
 ## Versioning policy
 
 - `src/camsim/_version.py` is the single source of truth; `pyproject.toml`
   reads it through hatchling. Do not duplicate the version elsewhere.
 - `0.1.0` is the first pipeline/metrics release, approved at G5 on
-  2026-10-27. Future work uses `X.Y.Z` from this baseline.
+  2026-10-27. `0.1.1` is a documentation-only patch for PyPI rendering.
+  Future work uses `X.Y.Z` from this baseline.
 - Future scope changes follow semantic versioning: patch releases fix defects,
   minor releases add backward-compatible capability, and v1.0.0 is the
   feature-complete release after Phase 6–9.
@@ -60,11 +63,11 @@ repository or the release page; a checked box without evidence is not a pass.
 
 ### 2. Version and metadata
 
-- [x] Release version `0.1.0` recorded in `src/camsim/_version.py`.
+- [x] Release version `0.1.1` recorded in `src/camsim/_version.py`.
 - [ ] Update the version-dependent badges and repository links: replace the
       `pengzhao-ai` repository owner in `README.md` badges/links (already
-      applied for v0.1.0) with the GitHub account or
-      organisation, and enable the CI, Docs, and Release badges.
+      applied) with the GitHub account or organisation, and enable the CI,
+      Docs, and Release badges.
 - [ ] Confirm `requires-python = ">=3.11,<3.14"` and the classifier list still
       describe the supported interpreters.
 - [ ] Confirm the package imports and reports the new version:
@@ -102,16 +105,19 @@ repository or the release page; a checked box without evidence is not a pass.
 - [ ] Confirm the sdist includes `README.md`, `LICENSE`, `NOTICE`,
       `CHANGELOG.md`, `CITATION.cff`, `THIRD_PARTY.md`, `docs/`, `src/`, and
       `tests/` as configured in `pyproject.toml`.
-- [ ] Do **not** upload to PyPI for v0.1.0; publication is deferred to
-      v1.0.0.
+- [ ] Publish through the tag-triggered workflow with OIDC trusted publishing.
+      Do not upload by hand; PyPI versions are permanent and cannot be reused.
 
 ### 5. Tag and publish
 
 - [ ] Create an annotated tag `vX.Y.Z` on the signed-off commit and push it.
       The tag triggers `.github/workflows/release.yml`, which syncs all
       extras, runs the test suite, builds the distributions, runs
-      `twine check`, and attaches the wheel, sdist, and `SHA256SUMS` to a
-      GitHub release.
+      `twine check`, attaches the wheel, sdist, and `SHA256SUMS` to a GitHub
+      release, and publishes to PyPI with `uv publish
+      --trusted-publishing always`. `v0.1.0` was tagged and pushed manually
+      during the initial repository setup; `v0.1.1` is the first release
+      exercised end to end by the workflow.
 - [ ] Verify the GitHub release page shows the expected assets and release
       notes.
 - [ ] Confirm GitHub Pages deployed from `main` with the Docs workflow and
@@ -123,10 +129,12 @@ repository or the release page; a checked box without evidence is not a pass.
 ## What the release workflow does
 
 The workflow is triggered by a `v*` tag and has `contents: write` so it can
-create or update the GitHub release. It runs:
+create or update the GitHub release; the PyPI job has `id-token: write` for
+OIDC. It runs:
 
 ```text
-checkout → uv sync --all-extras → pytest → uv build → uvx twine check → gh release
+checkout → uv sync --all-extras → pytest → uv build → uvx twine check
+         → gh release → uv publish --trusted-publishing always
 ```
 
 It does **not** publish to PyPI. A failed test or `twine check` stops the job

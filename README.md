@@ -4,7 +4,7 @@
 [![Docs](https://github.com/pengzhao-ai/camsim/actions/workflows/docs.yml/badge.svg)](https://github.com/pengzhao-ai/camsim/actions/workflows/docs.yml)
 [![Release](https://github.com/pengzhao-ai/camsim/actions/workflows/release.yml/badge.svg)](https://github.com/pengzhao-ai/camsim/actions/workflows/release.yml)
 [![Python 3.11–3.13](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/pengzhao-ai/camsim/blob/main/LICENSE)
 
 Deterministic camera sensor and ISP simulation with image-quality metrics.
 
@@ -16,17 +16,17 @@ who need a reproducible, physically grounded testbed rather than a
 notebook-only demo.
 
 <p align="center">
-  <img src="results/figures/02_isp_stage_contact_sheet.png"
+  <img src="https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/02_isp_stage_contact_sheet.png"
        alt="ISP stage contact sheet: RAW, black-level correction, demosaic, colour correction, tone"
        width="900">
 </p>
 
-> **Status: v0.1.0 released; G5 signed off.** G1–G4 are PASS, all G5
+> **Status: v0.1.1 released; G5 signed off.** G1–G4 are PASS, all G5
 > cross-cutting checks pass, and the signed validation report is
-> [`results/reports/validation_report.md`](results/reports/validation_report.md).
-> The core sensor/ISP/metrics library is version `0.1.0`; the tag is `v0.1.0`,
+> [`results/reports/validation_report.md`](https://github.com/pengzhao-ai/camsim/blob/main/results/reports/validation_report.md).
+> The core sensor/ISP/metrics library is version `0.1.1`; the tag is `v0.1.1`,
 > and the package is published on
-> [PyPI](https://pypi.org/project/camsim/0.1.0/). Machine-vision code
+> [PyPI](https://pypi.org/project/camsim/0.1.1/). Machine-vision code
 > (`camsim.tasks`) is deliberately gated behind G5 and is not implemented;
 > Phase 6+ is deferred.
 
@@ -115,7 +115,7 @@ package and operates on arrays plus metadata.
   no global RNG; bit-identical within one environment, tolerance-based across
   platforms.
 - Phase gates G0–G5 with committed reports and figures; G5 was signed off on
-  2026-10-27 and v0.1.0 is released. See [Validation](docs/validation.md).
+  2026-10-27 and v0.1.1 is the current release. See [Validation](https://github.com/pengzhao-ai/camsim/blob/main/docs/validation.md).
 
 ## Installation
 
@@ -124,9 +124,9 @@ Python 3.11–3.13 is required.
 Install the released package:
 
 ```bash
-pip install camsim==0.1.0
+pip install camsim==0.1.1
 # or
-uv add camsim==0.1.0
+uv add camsim==0.1.1
 ```
 
 For development, with [uv](https://docs.astral.sh/uv/) (recommended):
@@ -148,8 +148,8 @@ pip install -e ".[all]"
 
 Core dependencies are NumPy, SciPy, Pydantic v2, Matplotlib, Pillow, and
 colour-science. Optional extras: `[ml]` (PyTorch, scikit-learn), `[tune]`
-(Optuna), `[docs]`, `[dev]`, and `[all]`. `camsim==0.1.0` is available on
-[PyPI](https://pypi.org/project/camsim/0.1.0/).
+(Optuna), `[docs]`, `[dev]`, and `[all]`. `camsim==0.1.1` is available on
+[PyPI](https://pypi.org/project/camsim/0.1.1/).
 
 ## Quickstart
 
@@ -200,7 +200,7 @@ the scene's own painted cells and spectrally computed Lab reference, so the
 shape and oversampling cannot drift. The shipped ISP preset has an identity
 CCM, so its delta-E is a baseline, not a colour-accuracy claim: fit a matrix
 with `camsim.isp.ccm.fit_ccm` and place it in `ccm.matrix`. See
-[ISP stages](docs/isp_stages.md) and [Metrics](docs/metrics.md) for the full
+[ISP stages](https://github.com/pengzhao-ai/camsim/blob/main/docs/isp_stages.md) and [Metrics](https://github.com/pengzhao-ai/camsim/blob/main/docs/metrics.md) for the full
 walkthroughs.
 
 Command-line checks:
@@ -219,13 +219,13 @@ calibrated commercial camera.
 
 | | |
 |---|---|
-| ![Illuminant spectra](results/figures/01_illuminant_spds.png) **Illuminants.** D65 and warm white on the 360–830 nm grid. | ![Scene contact sheet](results/figures/01_scene_contact_sheet.png) **Scene render.** ColorChecker and slanted edge at the sensor plane. |
-| ![Optics MTF](results/figures/01_mtf_curves.png) **Optics.** Gaussian, Airy, and box MTFs with MTF50/MTF20. | ![Sensor PTC](results/figures/01_sensor_ptc.png) **Sensor PTC.** Photon-transfer curve and system gain. |
-| ![Sensor SNR](results/figures/01_sensor_snr.png) **Sensor SNR.** Read-noise and shot-noise regimes. | ![ISP stage contact sheet](results/figures/02_isp_stage_contact_sheet.png) **ISP stages.** Each intermediate buffer, stage by stage. |
-| ![Demosaic comparison](results/figures/02_isp_demosaic_comparison.png) **Demosaicing.** Bilinear versus Malvar-He-Cutler on a star. | ![Colour error](results/figures/02_isp_colorchecker_delta_e.png) **Colour error.** Per-patch ΔE2000 under D65 and 3000 K. |
-| ![AWB gains](results/figures/02_isp_awb_gains.png) **White balance.** Measured versus analytic gains. | ![RCCC baseline](results/figures/02_isp_rccc_baseline.png) **RCCC baseline.** Monochrome-plus-red sensor output. |
-| ![Measured MTF](results/figures/03_mtf_curves.png) **e-SFR.** Measured MTF against the analytic reference. | ![SNR vs lux](results/figures/03_snr_vs_lux.png) **SNR vs lux.** Read-noise-limited to shot-noise-limited. |
-| ![Delta-E heatmap](results/figures/03_delta_e_heatmap.png) **ΔE heatmap.** Per-patch colour error across a chart. | ![Acutance vs blur](results/figures/03_acutance_vs_blur.png) **Acutance.** Sharpness proxy versus Gaussian blur. |
+| ![Illuminant spectra](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/01_illuminant_spds.png) **Illuminants.** D65 and warm white on the 360–830 nm grid. | ![Scene contact sheet](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/01_scene_contact_sheet.png) **Scene render.** ColorChecker and slanted edge at the sensor plane. |
+| ![Optics MTF](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/01_mtf_curves.png) **Optics.** Gaussian, Airy, and box MTFs with MTF50/MTF20. | ![Sensor PTC](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/01_sensor_ptc.png) **Sensor PTC.** Photon-transfer curve and system gain. |
+| ![Sensor SNR](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/01_sensor_snr.png) **Sensor SNR.** Read-noise and shot-noise regimes. | ![ISP stage contact sheet](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/02_isp_stage_contact_sheet.png) **ISP stages.** Each intermediate buffer, stage by stage. |
+| ![Demosaic comparison](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/02_isp_demosaic_comparison.png) **Demosaicing.** Bilinear versus Malvar-He-Cutler on a star. | ![Colour error](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/02_isp_colorchecker_delta_e.png) **Colour error.** Per-patch ΔE2000 under D65 and 3000 K. |
+| ![AWB gains](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/02_isp_awb_gains.png) **White balance.** Measured versus analytic gains. | ![RCCC baseline](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/02_isp_rccc_baseline.png) **RCCC baseline.** Monochrome-plus-red sensor output. |
+| ![Measured MTF](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/03_mtf_curves.png) **e-SFR.** Measured MTF against the analytic reference. | ![SNR vs lux](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/03_snr_vs_lux.png) **SNR vs lux.** Read-noise-limited to shot-noise-limited. |
+| ![Delta-E heatmap](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/03_delta_e_heatmap.png) **ΔE heatmap.** Per-patch colour error across a chart. | ![Acutance vs blur](https://raw.githubusercontent.com/pengzhao-ai/camsim/main/results/figures/03_acutance_vs_blur.png) **Acutance.** Sharpness proxy versus Gaussian blur. |
 
 ## Validation status
 
@@ -234,35 +234,35 @@ phase reports; this README deliberately does not restate them.
 
 | Gate | Scope | Status | Evidence |
 |---|---|---|---|
-| G0 | install, lint, typecheck, tests, docs | Green locally; CI workflows added, execution pending a push | [Validation](docs/validation.md) |
-| G1 | scene, illuminants, optics | **PASS** | [`results/reports/g1_scene_optics.md`](results/reports/g1_scene_optics.md) |
-| G2 | sensor model and EMVA characterization | **PASS** | [`results/reports/g2_sensor.md`](results/reports/g2_sensor.md) |
-| G3 | ISP stages and pipeline | **PASS** | [`results/reports/g3_isp.md`](results/reports/g3_isp.md) |
-| G4 | metrics harness | **PASS** | [`results/reports/g4_metrics.md`](results/reports/g4_metrics.md) |
-| G5 | consolidated human sign-off | **Signed off — v0.1.0** | [`results/reports/validation_report.md`](results/reports/validation_report.md) |
+| G0 | install, lint, typecheck, tests, docs | Green locally and in GitHub CI | [Validation](https://github.com/pengzhao-ai/camsim/blob/main/docs/validation.md) |
+| G1 | scene, illuminants, optics | **PASS** | [`results/reports/g1_scene_optics.md`](https://github.com/pengzhao-ai/camsim/blob/main/results/reports/g1_scene_optics.md) |
+| G2 | sensor model and EMVA characterization | **PASS** | [`results/reports/g2_sensor.md`](https://github.com/pengzhao-ai/camsim/blob/main/results/reports/g2_sensor.md) |
+| G3 | ISP stages and pipeline | **PASS** | [`results/reports/g3_isp.md`](https://github.com/pengzhao-ai/camsim/blob/main/results/reports/g3_isp.md) |
+| G4 | metrics harness | **PASS** | [`results/reports/g4_metrics.md`](https://github.com/pengzhao-ai/camsim/blob/main/results/reports/g4_metrics.md) |
+| G5 | consolidated human sign-off | **Signed off — v0.1.0** | [`results/reports/validation_report.md`](https://github.com/pengzhao-ai/camsim/blob/main/results/reports/validation_report.md) |
 
 The validation is simulated: it is not a certified ISO 12233 or EMVA 1288
 measurement, and the flagship preset is a representative engineering design
 point, not a measurement of a specific commercial part. See
-[Datasheet mapping](docs/datasheet_mapping.md) for how public datasheet
+[Datasheet mapping](https://github.com/pengzhao-ai/camsim/blob/main/docs/datasheet_mapping.md) for how public datasheet
 parameters become preset fields and which values are assumptions.
 
 ## Documentation
 
-- [Concepts](docs/concepts.md) — the imaging chain, units, linear-space
+- [Concepts](https://github.com/pengzhao-ai/camsim/blob/main/docs/concepts.md) — the imaging chain, units, linear-space
   invariant, and determinism contract.
-- [Architecture](docs/architecture.md) — package layout, data contracts, and
+- [Architecture](https://github.com/pengzhao-ai/camsim/blob/main/docs/architecture.md) — package layout, data contracts, and
   dependency rules.
-- [ISP stages](docs/isp_stages.md) — the fixed chain, every stage's role and
+- [ISP stages](https://github.com/pengzhao-ai/camsim/blob/main/docs/isp_stages.md) — the fixed chain, every stage's role and
   parameters, traces, and MONO/RCCC behaviour.
-- [Metrics](docs/metrics.md) — chart layouts, e-SFR, SNR, ΔE, acutance, and
+- [Metrics](https://github.com/pengzhao-ai/camsim/blob/main/docs/metrics.md) — chart layouts, e-SFR, SNR, ΔE, acutance, and
   reports.
-- [Validation](docs/validation.md) — gate evidence, measured results, coverage
+- [Validation](https://github.com/pengzhao-ai/camsim/blob/main/docs/validation.md) — gate evidence, measured results, coverage
   policy, and the G5 sign-off conditions.
-- [Datasheet mapping](docs/datasheet_mapping.md) — datasheet parameters to
+- [Datasheet mapping](https://github.com/pengzhao-ai/camsim/blob/main/docs/datasheet_mapping.md) — datasheet parameters to
   validated JSON fields.
-- [API reference](docs/api.md) — the public modules and types.
-- [Release](docs/release.md) — the release checklist and versioning policy.
+- [API reference](https://github.com/pengzhao-ai/camsim/blob/main/docs/api.md) — the public modules and types.
+- [Release](https://github.com/pengzhao-ai/camsim/blob/main/docs/release.md) — the release checklist and versioning policy.
 
 The MkDocs site is built from `docs/` with `uv run mkdocs build --strict` and
 deployed to GitHub Pages by the Docs workflow.
@@ -300,7 +300,7 @@ uv run python benchmarks/benchmark_pipeline.py --large
 ```
 
 Timings are machine-specific and are printed, never committed as claims.
-Full 50 MP spectral simulation is not supported at v0.1.0: the memory guard
+Full 50 MP spectral simulation is not supported at v0.1.x: the memory guard
 rejects a 38 GB cube with guidance to reduce the grid or process externally.
 
 The coverage gate is statement and branch coverage of the simulation, metrics,
@@ -310,22 +310,24 @@ plotting layer is exercised by the executed examples and notebooks that
 generate the committed gallery rather than by unit tests. The 90 % threshold
 applies to the numerical subject modules; the lower whole-package number is a
 reviewed exception, not a hidden metric. See
-[Validation](docs/validation.md) for the policy and the sign-off item.
+[Validation](https://github.com/pengzhao-ai/camsim/blob/main/docs/validation.md) for the policy and the sign-off item.
 
 ## Release status
 
-- Version: `0.1.0` (`src/camsim/_version.py` is the single source).
-- G5 was signed off by the project owner on 2026-10-27; the tag is `v0.1.0`.
-- `0.1.0` is published on
-  [PyPI](https://pypi.org/project/camsim/0.1.0/); install with
-  `pip install camsim==0.1.0`. The release workflow builds the wheel, sdist,
-  and `SHA256SUMS` and uploads the GitHub release assets; future tag releases
+- Version: `0.1.1` (`src/camsim/_version.py` is the single source).
+- G5 was signed off by the project owner on 2026-10-27 for `0.1.0`; `0.1.1`
+  is a documentation-only patch that makes the README image and link targets
+  absolute so the PyPI project page renders correctly. No source code,
+  presets, tests, or validation evidence changed.
+- `0.1.1` is published on
+  [PyPI](https://pypi.org/project/camsim/0.1.1/); install with
+  `pip install camsim==0.1.1`. The release workflow builds the wheel, sdist,
+  and `SHA256SUMS` and uploads the GitHub release assets; tag releases
   publish to PyPI through trusted publishing (`.github/workflows/release.yml`).
 - Machine-vision/Phase 6+ work is deferred; no machine-vision code is in
-  `0.1.0`.
+  `0.1.1`.
 - The `pengzhao-ai/camsim` repository and badges are the public release
-  location; the [release checklist](docs/release.md) records the remaining
-  operational steps.
+  location; the [release checklist](https://github.com/pengzhao-ai/camsim/blob/main/docs/release.md) records the operational steps.
 
 ## Repository conventions
 
@@ -335,17 +337,17 @@ reviewed exception, not a hidden metric. See
   committed.
 - Stochastic routines use explicit NumPy generators and seeds; the pipeline is
   deterministic within one environment.
-- Phase gates G0–G5 are documented in [docs/validation.md](docs/validation.md);
+- Phase gates G0–G5 are documented in [docs/validation.md](https://github.com/pengzhao-ai/camsim/blob/main/docs/validation.md);
   no machine-vision code lands before the G5 human sign-off.
-- Citation metadata lives in [CITATION.cff](CITATION.cff). The design spec
+- Citation metadata lives in [CITATION.cff](https://github.com/pengzhao-ai/camsim/blob/main/CITATION.cff). The design spec
   lives at `docs/superpowers/specs/`. The superseded reference plan is kept in
   `docs/reference/` for provenance and is not part of the documentation site.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. The
-project follows the [Contributor Covenant](CODE_OF_CONDUCT.md), records changes
-in [CHANGELOG.md](CHANGELOG.md), and documents third-party material in
-[THIRD_PARTY.md](THIRD_PARTY.md).
+Read [CONTRIBUTING.md](https://github.com/pengzhao-ai/camsim/blob/main/CONTRIBUTING.md) before opening a pull request. The
+project follows the [Contributor Covenant](https://github.com/pengzhao-ai/camsim/blob/main/CODE_OF_CONDUCT.md), records changes
+in [CHANGELOG.md](https://github.com/pengzhao-ai/camsim/blob/main/CHANGELOG.md), and documents third-party material in
+[THIRD_PARTY.md](https://github.com/pengzhao-ai/camsim/blob/main/THIRD_PARTY.md).
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/pengzhao-ai/camsim/blob/main/LICENSE).

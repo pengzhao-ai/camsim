@@ -4,18 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo status
 
-Phase 5 consolidation is complete and the repository is at the **G5 human
-sign-off gate**: G1–G4 pass with committed evidence, the consolidated G5
-candidate report is available, and the `v0.1.0` tag has not been created. CI
-workflows (including examples and notebooks) exist, but CI execution is pending
-a push; the local equivalents pass. Machine-vision code remains gated.
+Phase 5 consolidation is complete. G5 was signed off on 2026-10-27 and the
+validated sensor/ISP/metrics core is released: `v0.1.0` was the first GitHub
+and PyPI release, and `v0.1.1` is a documentation-only patch that fixes the
+PyPI README rendering. GitHub CI passed. Machine vision remains deferred until
+a separate Phase 6–9 plan is reviewed and approved.
 
 - **Authoritative spec:** `docs/superpowers/specs/2026-10-26-camsim-design.md` — read it before building anything.
 - **Implementation plan:** `docs/superpowers/plans/2026-10-26-camsim-core-pipeline.md` — task-by-task requirements and gates.
 - **Superseded plan:** `docs/reference/Only for reference - iq_for_machine_vision_project_plan_revised.md`. Kept for provenance only; do not implement from it.
 - `archives/` is gitignored superseded material. Keep it on disk; do not delete or commit it.
 
-Do not write machine-vision code before the G5 human sign-off.
+Machine vision remains gated: do not write any machine-vision code until a
+separate Phase 6–9 plan has been reviewed and approved by the owner.
 
 ## What this repo is
 
@@ -48,7 +49,7 @@ uv run jupytext --to ipynb --execute notebooks/NN_name.py --output /tmp/NN.ipynb
 - Python 3.11–3.13, `uv` with a committed `uv.lock`; the pip/venv fallback is documented in the README.
 - `make notebooks` executes every Jupytext notebook headlessly through `benchmarks/run_notebooks.py` with a 120 s per-notebook timeout; `make figures` runs every example through `benchmarks/run_examples.py` with a 300 s per-example timeout. Both runners fail fast and write per-item timing evidence under `results/reports/`.
 - The CLI entry point is `camsim = "camsim.cli:main"` with `validate`, `schema`, `info`, `render`, `characterize`, `measure`, and `figures` subcommands.
-- `scene.render` and `Sensor.expose` enforce a configurable simulation-memory budget (8 GiB default; `CAMSIM_MAX_SIMULATION_BYTES` or `max_memory_bytes=`). Full 50 MP spectral simulation is not supported at v0.1.0.
+- `scene.render` and `Sensor.expose` enforce a configurable simulation-memory budget (8 GiB default; `CAMSIM_MAX_SIMULATION_BYTES` or `max_memory_bytes=`). Full 50 MP spectral simulation is not supported at v0.1.x.
 
 ## Package architecture
 

@@ -15,12 +15,14 @@ balance, demosaicing, colour correction, denoise, sharpen, and tone. The figure
 mirrors `results/figures/02_isp_stage_contact_sheet.png` in the repository.*
 
 !!! note "Project status"
-    **v0.1.0 released; G5 signed off.** G1–G4 are PASS with committed
+    **v0.1.1 released; G5 signed off.** G1–G4 are PASS with committed
     validation reports, all G5 cross-cutting checks pass, and the signed
     report is `results/reports/validation_report.md` in the repository. The
-    version is `0.1.0`, the tag is `v0.1.0`, and the package is published on
-    [PyPI](https://pypi.org/project/camsim/0.1.0/). Machine-vision code is
-    gated behind G5 and is not implemented; Phase 6+ is deferred.
+    version is `0.1.1`, the tag is `v0.1.1`, and the package is published on
+    [PyPI](https://pypi.org/project/camsim/0.1.1/). `0.1.0` was the validated
+    G5 release; `0.1.1` is a documentation-only patch for PyPI rendering.
+    Machine-vision code is gated behind G5 and is not implemented; Phase 6+
+    is deferred.
 
 ## Three clean layers
 

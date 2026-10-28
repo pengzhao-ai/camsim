@@ -5,9 +5,30 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The `[0.1.0]` release was approved by the project owner on 2026-10-27 after
-the G5 review recorded in `results/reports/validation_report.md`. The
-distribution version is `0.1.0`. A fresh `Unreleased` section opens for future
+the G5 review recorded in `results/reports/validation_report.md`; `[0.1.1]`
+is a documentation-only patch for the PyPI project page. The current
+distribution version is `0.1.1`. A fresh `Unreleased` section opens for future
 changes.
+
+## [0.1.1] - 2026-10-27
+
+**Status: released.** Documentation-only patch. No library source, presets,
+tests, or validation evidence changed; the 0.1.0 G5 results remain binding.
+
+### Fixed
+
+- README images now use absolute `raw.githubusercontent.com` URLs, and
+  repository links use absolute `github.com/.../blob/main` URLs. The PyPI
+  project page can render the hero image, gallery, and documentation links;
+  relative paths previously resolved against the PyPI page and broke.
+- Release status, citation metadata, and version references now identify
+  `0.1.1`.
+
+### Changed
+
+- `v0.1.1` is the first tag release published to PyPI through GitHub Actions
+  OIDC trusted publishing (`.github/workflows/release.yml`) rather than a
+  one-time account token.
 
 ## [0.1.0] - 2026-10-27
 
@@ -101,8 +122,8 @@ the validation report and the release checklist.
 
 ### Validation
 
-- G0: quality-gate commands pass locally; CI workflows (including examples
-  and notebooks) were added but execution is pending a push.
+- G0: quality-gate commands pass locally and in the GitHub CI matrix;
+  examples and notebooks also run in CI.
 - G1: 7/7 checks; G2: 16/16; G3: 21/21; G4: 31/31; G5 cross-cutting: 16/16.
 - Test suite: all tests pass; subject-module coverage is 91.73% against the
   90% gate with the documented `*/camsim/viz/*` omission, and whole-package
@@ -114,3 +135,4 @@ the validation report and the release checklist.
   gated docstring-only namespace.
 
 [0.1.0]: https://github.com/pengzhao-ai/camsim/releases/tag/v0.1.0
+[0.1.1]: https://github.com/pengzhao-ai/camsim/releases/tag/v0.1.1

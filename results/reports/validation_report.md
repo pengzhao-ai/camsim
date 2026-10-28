@@ -427,6 +427,8 @@ Notes:  Accept documented waivers (CI pending push, whole-package coverage 83.55
 
 **Release record.** The owner approved `v0.1.0` on 2026-10-27. The tag is `v0.1.0` at the commit containing this report; the code commit validated by the evidence is `d5e6abb`. The tag and branch are pushed to the public repository `github.com/pengzhao-ai/camsim`. `camsim==0.1.0` is published on PyPI at `https://pypi.org/project/camsim/0.1.0/`; a clean virtual-environment install, `import camsim` (0.1.0), `camsim info`, and the installed `camsim render` → `camsim measure` chain were verified. GitHub CI passed; the Docs build passed but the Pages deployment needs GitHub Pages enabled in the repository settings. Machine-vision code remains absent and Phase 6+ remains deferred until a separate plan is reviewed and approved.
 
+**Patch release.** `camsim==0.1.1` (2026-10-27) is a documentation-only patch. The README image and repository-link targets were made absolute so the PyPI project page renders correctly; no source code, preset, test, or validation evidence changed, and the 0.1.0 results above remain binding. `0.1.1` is published to PyPI through the tag-triggered trusted-publishing workflow.
+
 ## Appendix A. Cross-cutting detail values
 
 ### denoise
