@@ -1,22 +1,20 @@
 # Architecture
 
-camsim has completed Phase 5 consolidation: the simulation pipeline (G1–G4),
-camera orchestration, IO, and CLI are implemented, and the G5 human sign-off
-is pending. Machine-vision code is gated behind G5. This page describes the
-package layout, data contracts, and dependency rules that the code enforces.
+`camsim` is organized into independent layers with explicit data contracts and
+a small dependency surface. This page describes the package layout, the
+contracts exchanged between layers, and the rules the code enforces.
 
 ## Layers and dependency rules
 
-| Layer | Packages | Depends on | Status |
-|---|---|---|---|
-| Core contracts | `camsim.core` | NumPy, SciPy, Pydantic, colour-science | implemented |
-| Simulation | `camsim.scene`, `camsim.optics`, `camsim.sensor`, `camsim.isp` | Core contracts | implemented |
-| Characterization | `camsim.characterization` | Sensor, ISP, core contracts | implemented |
-| Metrics | `camsim.metrics` | Core contracts only | implemented |
-| Orchestration | `camsim.camera` | Scene, optics, sensor, ISP | implemented |
-| Machine vision | `camsim.tasks` | PyTorch | gated behind G5 |
-| Presentation | `camsim.viz`, `camsim.config` | Core types | implemented |
-| File I/O | `camsim.io` | Core types | implemented |
+| Layer | Packages | Depends on |
+|---|---|---|
+| Core contracts | `camsim.core` | NumPy, SciPy, Pydantic, colour-science |
+| Simulation | `camsim.scene`, `camsim.optics`, `camsim.sensor`, `camsim.isp` | Core contracts |
+| Characterization | `camsim.characterization` | Sensor, ISP, core contracts |
+| Metrics | `camsim.metrics` | Core contracts only |
+| Orchestration | `camsim.camera` | Scene, optics, sensor, ISP |
+| Presentation | `camsim.viz`, `camsim.config` | Core types |
+| File I/O | `camsim.io` | Core types |
 
 Two rules are non-negotiable:
 
@@ -49,13 +47,12 @@ src/camsim/
 ├── metrics/             # e-SFR/MTF, SNR, colour, acutance, measure_all()
 ├── viz/                 # plotting helpers
 ├── camera/              # capture orchestration and auto-exposure
-├── io/                  # RAW and rendered-image IO with sidecars
-└── tasks/               # machine-vision experiments (gated)
+└── io/                  # RAW and rendered-image IO with sidecars
 ```
 
-The implemented public API is indexed in the [API reference](api.md).
-`camsim.camera` and `camsim.io` are implemented and covered by the validation
-gates; `camsim.tasks` does not exist as working code until G5 is signed off.
+The public API is indexed in the [API reference](api.md). `camsim.camera` and
+`camsim.io` are part of the public pipeline and covered by the validation
+suite.
 
 ## Data contracts
 
@@ -67,14 +64,14 @@ gates; `camsim.tasks` does not exist as working code until G5 is signed off.
 - **`RawFrame`** — `uint16` data plus every piece of metadata the ISP needs
   (CFA, bit depth, black level, gains, mode, temperature, geometry, the defect
   union, a separate hot-pixel mask, PDAF mask, and configuration hash). No
-  hidden globals. The reduced v0.1.0 contract omits wall-clock timestamp and
-  package version; those belong to the surrounding experiment record.
+  hidden globals. The frame contract omits wall-clock timestamp and package
+  version; those belong to the surrounding experiment record.
 - **`RenderedImage`** — display-referred `float32` image in `[0, 1]` with colour
   space, channel layout, optional linear RGB, and stage traces. The
   `linear_rgb` buffer is the unclipped pre-tone data that resolution and noise
   metrics consume; its primaries follow `color_space` (linear Display P3 for a
   P3 image), and `measure_all` converts it to linear sRGB before applying
-  Rec. 709 luma. The reduced v0.1.0 contract has no `linear_xyz`, timestamp, or
+  Rec. 709 luma. The image contract has no `linear_xyz`, timestamp, or
   package-version field.
 - **`MetricReport`** — frozen dataclass with optional metric groups, layout id,
   units, and provenance; serializes to dict/JSON with non-finite values as
@@ -113,41 +110,37 @@ limitations.
 file naming, and figure styling. It is exercised by the example scripts and
 notebooks that generate the committed gallery, not by the unit suite. The
 statement-and-branch coverage gate in `pyproject.toml` therefore omits
-`camsim.viz`; the numerical subject modules remain under the 90 % threshold.
-The measured subject-module coverage is **91.73 %**; the whole-package figure
-including viz is **83.55 %** and is a reviewed exception, measured with
-`coverage-whole.rc`. This is a deliberate split between correctness logic,
-which unit tests must cover, and plotting code, which the executed gallery
-demonstrates. See [Validation](validation.md) for the policy and evidence.
+`camsim.viz`; the numerical modules must meet the 90 % threshold. This is a
+deliberate split between correctness logic, which unit tests must cover, and
+plotting code, which the executed gallery demonstrates. See
+[Validation](validation.md) for the policy and evidence.
 
 ## Repository artifacts
 
-- `results/reports/` holds the G1–G4 Markdown reports and, for G2–G4,
-  machine-readable JSON. They are repository artifacts, not pages on the
-  documentation site.
+- `results/reports/` holds the committed validation reports and, where
+  applicable, machine-readable JSON. They are repository artifacts, not pages
+  on the documentation site.
 - `results/figures/` holds the committed PNG gallery, regenerated by
   `make figures`.
 - `docs/images/` mirrors selected committed figures so the MkDocs build is
   self-contained and strict-buildable. Copies must stay byte-identical to
   their source.
-- `benchmarks/` holds the G1 report generator and the pipeline benchmark; the
-  benchmark prints environment and timing tables and does not commit
-  machine-specific numbers.
+- `benchmarks/` holds the validation report generators and the pipeline
+  benchmark; the benchmark prints environment and timing tables and does not
+  commit machine-specific numbers.
 - `.github/workflows/` holds CI (including headless examples and notebooks
   jobs), the Pages deployment, and the tag-triggered release workflow that
-  attaches wheel and sdist assets to a GitHub release. CI execution is pending
-  a push in this candidate; the local runner equivalents are recorded in the
-  G5 evidence.
+  attaches wheel and sdist assets to a GitHub release.
 - `scene.render` and `Sensor.expose` enforce a configurable simulation-memory
   budget (8 GiB default via `CAMSIM_MAX_SIMULATION_BYTES` or
-  `max_memory_bytes=`), because v0.1.0 does not chunk spectral cubes. Full
-  50 MP spectral simulation is not supported.
+  `max_memory_bytes=`) because the current implementation does not chunk
+  spectral cubes. Full 50 MP spectral simulation is not supported.
 
-The release contract is in [Release](release.md).
+The release process is described in [Release process](release.md).
 
-## Quality gates
+## Validation
 
-Phase gates validate each layer before the next begins:
+The validation suite covers:
 
 - analytic invariants (units, energy conservation, linear scaling, Poisson
   variance, clipping, known-PSF MTF);
@@ -156,16 +149,7 @@ Phase gates validate each layer before the next begins:
   `scikit-image`);
 - import-independence and determinism tests.
 
-The gate definitions, current status, coverage policy, and reproduction
-commands live in [Validation](validation.md). How public datasheet parameters
-become validated preset fields is documented in
+The measured results, tolerances, coverage policy, and reproduction commands
+live in [Validation](validation.md). How public datasheet parameters become
+validated preset fields is documented in
 [Datasheet mapping](datasheet_mapping.md).
-
-Machine-vision work does not begin until the pipeline and metrics pass the G5
-human sign-off.
-
-## Process material
-
-The design spec and implementation plans live under `docs/superpowers/`. The
-superseded reference plan is kept in `docs/reference/` for provenance. Both are
-excluded from the published documentation site.

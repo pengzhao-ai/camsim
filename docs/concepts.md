@@ -75,12 +75,12 @@ sensor or ISP. It consumes arrays plus metadata (`ChartLayout`,
 `ColorReference`) and must not import `camsim.sensor`, `camsim.isp`,
 `camsim.scene`, or `camsim.optics`. An import-independence test enforces this.
 
-## Validation contract
+## Validation approach
 
-Phases end at formal gates: G0 (install, lint, typecheck, tests, docs), G1
-(scene/optics), G2 (sensor), G3 (ISP), G4 (metrics), and G5 (human sign-off).
-A gate is evidence, not a checklist: each one is backed by an analytic
-invariant, a round-trip characterization, a reference-library cross-check, or a
-datasheet plausibility argument. The current status, tolerances, and
-reproduction commands are indexed on the [Validation](validation.md) page.
-Machine-vision experiments do not begin until G5 is signed off.
+The pipeline is validated with analytic invariants (units, energy conservation,
+linearity, noise variance, clipping), EMVA 1288-style sensor characterization,
+ISO 12233-style e-SFR/MTF, colour and SNR checks, reference-library
+cross-checks, and datasheet plausibility. Determinism is tested within one
+environment; cross-platform comparisons use tolerances. The measured values,
+assumptions, and reproduction commands are indexed on the
+[Validation](validation.md) page.

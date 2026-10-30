@@ -31,7 +31,7 @@ nav:
   - Validation: validation.md
   - Datasheet mapping: datasheet_mapping.md
   - API reference: api.md
-  - Release: release.md
+  - Release process: release.md
 
 plugins:
   - search

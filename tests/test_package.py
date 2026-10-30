@@ -34,7 +34,7 @@ PACKAGED_SPECTRA = ("qe_flagship.csv", "cfa_rggb.csv", "ir_cut.csv")
 
 
 def test_import_and_version() -> None:
-    assert camsim.__version__ == "0.1.1"
+    assert camsim.__version__ == "0.1.2"
     assert hasattr(camsim, "__all__")
 
 

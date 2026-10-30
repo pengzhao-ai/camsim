@@ -36,7 +36,7 @@ DPC, BLC, LSC, AWB, demosaic, CCM, denoise, and sharpen all operate on
 **linear float32** values proportional to radiance. The CCM output is clamped
 at zero so out-of-gamut colours stay physical; that non-negativity clamp is the
 one bounded exception to the invariant, and it is inactive on in-gamut data.
-The G3 linearity check runs with AWB enabled and a fitted CCM and reports the
+The ISP linearity check runs with AWB enabled and a fitted CCM and reports the
 pre-clamp minimum explicitly. The tone stage is the first intentionally
 non-linear step: it applies a linear exposure trim, a change of primaries when
 Display P3 is selected, a display clamp, and the sRGB opto-electronic transfer
@@ -124,7 +124,7 @@ estimation. The recorded `confidence` falls as the required correction grows.
 ![AWB gains](images/02_isp_awb_gains.png)
 
 *Measured gray-world gains against the analytic expectation for D65 and
-3000 K; the G3 report states the relative-error tolerances.*
+3000 K; the ISP validation report states the relative-error tolerances.*
 
 ### Demosaicing
 
@@ -156,12 +156,12 @@ frame with CCM enabled but no matrix raises.
 baseline for measuring optics, sensor, and stage behaviour, not a
 colour-accurate camera profile. A default ColorChecker render is roughly 40
 mean ΔE2000 at the preset's default exposure (about 11 when well exposed),
-while the G3 fitted matrix reaches 0.9 under D65. Colour work must fit a matrix
+while a fitted validation matrix reaches 0.9 under D65. Colour work must fit a matrix
 with `fit_ccm` and supply it in `ccm.matrix`; `measure_all` records an
 identity-CCM warning in its metadata when colour is measured through the
 default. The matrix is fitted on a specific illuminant and scene, so applying a
 D65 matrix to a tungsten capture or evaluating it on held-out patches measures
-something other than what was calibrated; G3 records the in-sample limitation.
+something other than what was calibrated; the ISP validation records the in-sample limitation.
 
 ### Denoise and sharpen
 
@@ -231,7 +231,7 @@ pipeline records it as an RGB image so downstream metrics can still consume it.*
 
 *Per-patch CIEDE2000 after the in-sample 3×3 CCM at D65 and 3000 K. The metric
 and its limitations are described on the [Metrics](metrics.md) page; the full
-measured values are in `results/reports/g3_isp.md`.*
+measured values are in the ISP validation report (`results/reports/g3_isp.md`).*
 
 ## Reproducing this page
 
@@ -243,5 +243,5 @@ uv run jupytext --to ipynb --execute notebooks/02_isp_color_fundamentals.py \
 ```
 
 The figures above are copies of committed files under `results/figures/`; the
-full list and measured values are in the G3 report. The validation is
-simulated, not a certified measurement of a commercial ISP.
+full list and measured values are in the ISP validation report. The validation
+is simulated, not a certified measurement of a commercial ISP.

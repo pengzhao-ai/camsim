@@ -4,11 +4,25 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-The `[0.1.0]` release was approved by the project owner on 2026-10-27 after
-the G5 review recorded in `results/reports/validation_report.md`; `[0.1.1]`
-is a documentation-only patch for the PyPI project page. The current
-distribution version is `0.1.1`. A fresh `Unreleased` section opens for future
-changes.
+The `[0.1.0]` release established the validated scene/optics, sensor, ISP, and
+metrics pipeline. `[0.1.1]` fixed PyPI page rendering. `[0.1.2]` refreshes the
+public README and documentation presentation. The current distribution version
+is `0.1.2`.
+
+## [0.1.2] - 2026-10-30
+
+**Status: released.** Documentation and presentation refresh. No library
+source, presets, or validation evidence changed.
+
+### Changed
+
+- README and documentation site now present the pipeline as a product:
+  removed internal phase, gate, and review-process language from public pages,
+  added project and documentation links, and clarified installation.
+- Package metadata now lists Peng Zhao as author, uses the Beta development
+  status, and adds project URLs for PyPI.
+- Version metadata updated to `0.1.2`; the `0.1.0` / `0.1.1` validation
+  evidence is unchanged.
 
 ## [0.1.1] - 2026-10-27
 
@@ -137,3 +151,4 @@ the validation report and the release checklist.
 
 [0.1.0]: https://github.com/pengzhao-ai/camsim/releases/tag/v0.1.0
 [0.1.1]: https://github.com/pengzhao-ai/camsim/releases/tag/v0.1.1
+[0.1.2]: https://github.com/pengzhao-ai/camsim/releases/tag/v0.1.2

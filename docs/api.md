@@ -6,10 +6,9 @@ basis, parameter ranges, and the failure artefacts it guards against.
 
 !!! note "Scope"
     `camsim.camera`, `camsim.io`, and the `render`, `characterize`, `measure`,
-    and `figures` CLI commands are implemented and exercised by the validation
-    gates. `camsim.tasks` is gated behind the G5 human sign-off and is not
-    documented or advertised as implemented. A module that appears here is
-    importable, tested, and used by the validation gates.
+    and `figures` CLI commands are part of the public pipeline and are exercised
+    by the validation suite. A module that appears here is importable, tested,
+    and used by the validation checks.
 
 ## Top-level package
 
@@ -192,7 +191,7 @@ contract.
 ## Characterization
 
 EMVA 1288-style sensor measurements and the machine-readable measurement
-functions behind the G2–G4 reports.
+functions behind the sensor, ISP, and metrics validation reports.
 
 ::: camsim.characterization
 
@@ -207,8 +206,8 @@ the definitions and limitations.
 ## Camera
 
 Fixed-exposure capture and the opt-in auto-exposure policy. The camera binds a
-lens, sensor, and ISP; see the G5 report for the convergence and limit
-evidence.
+lens, sensor, and ISP; the convergence and limit evidence is recorded in the
+camera validation tests and the committed validation reports.
 
 ::: camsim.camera
 

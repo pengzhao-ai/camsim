@@ -1,17 +1,15 @@
 # Validation
 
-This page is the public index of camsim's phase-gate evidence. The
-**sensor/ISP/metrics core is validated and released**: G1–G4 are PASS with
-committed reports, all G5 cross-cutting checks pass, and G5 was signed off by
-the project owner on 2026-10-27 for v0.1.0. `v0.1.0` is the validated G5
-release; `v0.1.1` is a documentation-only patch that fixes PyPI page rendering
-and changes no library code or evidence. A gate is not marked green until its
-report is reproducible from a clean checkout; the signed consolidated report is
-`results/reports/validation_report.md` in the repository.
+This page is the public index of camsim's validation evidence. The
+sensor/ISP/metrics core is validated and released, with committed reports for
+the scene/optics, sensor, ISP, and metrics areas and a consolidated report at
+`results/reports/validation_report.md`. Every validation area is reproducible
+from a clean checkout, and the measured values, tolerances, assumptions, and
+reproduction commands are recorded below.
 
 ## Lines of evidence
 
-Every gate draws on four independent lines of evidence, so a bug must survive
+The validation draws on four independent lines of evidence, so a bug must survive
 more than one perspective before it can hide:
 
 1. **Analytic invariants** — units and dimensional consistency, energy
@@ -28,20 +26,20 @@ more than one perspective before it can hide:
    range, full well, and read noise within the ranges implied by public
    specifications, with assumptions listed explicitly.
 
-Tolerances are stated per check in the phase report. Determinism is promised
+Tolerances are stated per check in the validation report. Determinism is promised
 within one environment (same OS, Python, NumPy, and SciPy); cross-platform
 comparisons use tolerances because floating-point reduction order may differ.
 
-## Gate status
+## Validation status
 
-| Gate | Phase | Scope | Evidence | Measured / passed | Status |
-|---|---|---|---|---|---|
-| G0 | 0 | install, lint, typecheck, tests, docs build | this page; `.github/workflows/ci.yml` | 11/11 commands | **PASS** (local gate run) |
-| G1 | 1 | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | 7/7 checks | **PASS** |
-| G2 | 2 | sensor model and EMVA characterization | `results/reports/g2_sensor.md` + `g2_sensor_results.json` | 16/16 checks | **PASS** |
-| G3 | 3 | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 21/21 checks | **PASS** |
-| G4 | 4 | metrics harness | `results/reports/g4_metrics.md` + `g4_metrics_results.json` | 31/31 checks | **PASS** |
-| G5 | 5 | consolidated cross-cutting evidence and human sign-off | `results/reports/validation_report.md` | 16/16 cross-cutting checks; signed off 2026-10-27 | **Signed off — v0.1.0** |
+| Area | Scope | Evidence | Measured / passed | Status |
+|---|---|---|---|---|
+| Build and test | install, lint, typecheck, tests, docs build | this page; `.github/workflows/ci.yml` | 11/11 commands | **PASS** |
+| Scene and optics | scene, illuminants, optics | `results/reports/g1_scene_optics.md` | 7/7 checks | **PASS** |
+| Sensor and characterization | sensor model and EMVA characterization | `results/reports/g2_sensor.md` + `g2_sensor_results.json` | 16/16 checks | **PASS** |
+| ISP | ISP stages and pipeline | `results/reports/g3_isp.md` + `g3_isp_results.json` | 21/21 checks | **PASS** |
+| Metrics | metrics harness | `results/reports/g4_metrics.md` + `g4_metrics_results.json` | 31/31 checks | **PASS** |
+| Consolidated | cross-cutting evidence | `results/reports/validation_report.md` | 16/16 cross-cutting checks | **PASS** |
 
 ## Coverage policy
 
@@ -56,13 +54,13 @@ uv run pytest --cov=camsim --cov-fail-under=90
 the example scripts and notebooks that generate the committed gallery, not by
 the unit suite. Its correctness is judged by executed examples, while the
 simulation, metrics, configuration, characterization, IO, camera, and CLI
-modules — the code whose numbers the gates depend on — must meet the 90 %
+modules — the code whose numbers the validation depends on — must meet the 90 %
 threshold. The same command is the Makefile `coverage` target and the CI test
 command; a release must not lower the threshold or delete tests to pass it.
 
 Coverage is reported with two explicit scopes, never one headline number:
 
-| Scope | Measured | Gate |
+| Scope | Measured | Threshold |
 |---|---:|---|
 | Subject modules (viz omitted, branch) | **91.73 %** | ≥ 90 % |
 | Whole package including `camsim.viz` (branch) | **83.55 %** | reviewed exception |
@@ -70,7 +68,7 @@ Coverage is reported with two explicit scopes, never one headline number:
 The whole-package figure is measured with `coverage-whole.rc` (or
 `make coverage-whole`), which does not omit viz. It is lower because the
 plotting layer is exercised by the executed examples and notebooks, not by the
-unit suite. The owner accepts this exception at sign-off; 91.73 % is not called
+unit suite. The numerical modules meet the 90 % threshold; 91.73 % is not called
 "total coverage".
 
 `tests/test_docs_smoke.py` additionally checks that the README gallery paths,
@@ -78,28 +76,28 @@ documentation nav, `docs/images` mirror, API/release pages, and workflows exist;
 that the documented quickstart pipeline runs; and that the benchmark's
 `--quick` mode passes.
 
-## Gate figures
+## Validation figures
 
 The documentation site carries copies of selected committed figures so each
-gate is visible without leaving the site. The originals and the full set live
+validation area is visible without leaving the site. The originals and the full set live
 under `results/figures/`; the reports carry the measured values and
 tolerances.
 
-| Gate | Figure |
+| Area | Figure |
 |---|---|
-| G1 | ![Photometric normalization](images/g1_lux_normalization.png) *Lux normalization across illuminants and 1–100,000 lux.* |
-| G1 | ![PSF and MTF](images/g1_psf_mtf.png) *Gaussian, Airy, and box PSFs with their transfer functions.* |
-| G2 | ![Photon transfer curve](images/g2_ptc.png) *LCG/HCG photon-transfer curves and system gain.* |
-| G2 | ![Sensor SNR](images/g2_snr_vs_irradiance.png) *SNR versus irradiance across the shot- and read-noise regimes.* |
-| G3 | ![ISP checks](images/g3_check_summary.png) *G3 check summary with tolerances.* |
-| G4 | ![Metrics checks](images/g4_check_summary.png) *G4 check summary with analytic references.* |
-| G5 | ![Gate summary](images/g5_gate_summary.png) *Gate/check status matrix; G5 signed off for v0.1.0.* |
-| G5 | ![Cross-cutting evidence](images/g5_evidence.png) *Denoise, sharpen, auto-exposure, and benchmark evidence.* |
+| Scene and optics | ![Photometric normalization](images/g1_lux_normalization.png) *Lux normalization across illuminants and 1–100,000 lux.* |
+| Scene and optics | ![PSF and MTF](images/g1_psf_mtf.png) *Gaussian, Airy, and box PSFs with their transfer functions.* |
+| Sensor and characterization | ![Photon transfer curve](images/g2_ptc.png) *LCG/HCG photon-transfer curves and system gain.* |
+| Sensor and characterization | ![Sensor SNR](images/g2_snr_vs_irradiance.png) *SNR versus irradiance across the shot- and read-noise regimes.* |
+| ISP | ![ISP checks](images/g3_check_summary.png) *ISP check summary with tolerances.* |
+| Metrics | ![Metrics checks](images/g4_check_summary.png) *Metrics check summary with analytic references.* |
+| Consolidated | ![Validation summary](images/g5_gate_summary.png) *Validation status matrix.* |
+| Consolidated | ![Cross-cutting evidence](images/g5_evidence.png) *Denoise, sharpen, auto-exposure, and benchmark evidence.* |
 
-## G0 — Foundation
+## Build and test
 
-The Phase 0 gate proves that a fresh environment can install, lint, type-check,
-test, and document the package. Reproduce it from the repository root:
+The build and test checks prove that a fresh environment can install, lint,
+type-check, test, and document the package. Reproduce it from the repository root:
 
 ```bash
 uv sync --all-extras
@@ -113,13 +111,13 @@ uv run python -c "import camsim; print(camsim.__version__)"
 
 Expected: the suite passes, lint and formatting are clean, mypy reports no
 issues under `strict`, the documentation builds with warnings treated as
-errors, and the version prints `0.1.1`. The executable form of this gate
-is `tests/test_ci_config.py` plus the CI workflows, and `make gate` runs the
-same commands locally.
+errors, and the version prints the installed version. The executable form of
+these checks is `tests/test_ci_config.py` plus the CI workflows, and `make gate`
+runs the same commands locally.
 
-## G1 — Scene and optics
+## Scene and optics
 
-**Status: PASS (green locally).** The full report is
+**Status: PASS.** The full report is
 `results/reports/g1_scene_optics.md`; its four figures are
 `results/figures/g1_lux_normalization.png`, `g1_psf_mtf.png`,
 `g1_energy_conservation.png`, and `g1_edge_angle.png`. The report is generated
@@ -138,7 +136,7 @@ uv run pytest -q
 uv run ruff check . && uv run mypy src
 ```
 
-Measured results against the G1 tolerances:
+Measured results against the scene and optics tolerances:
 
 | Check | Measured | Tolerance | Result |
 |---|---|---|---|
@@ -155,7 +153,7 @@ The report records these assumptions and known limitations:
 - the optics layer is a **supporting model, not a calibrated lens**: ideal
   Gaussian, Airy, and box kernels with no aberrations, wavelength-dependent
   PSF, polychromatic diffraction, or field-dependent blur;
-- **ISO 12233-style e-SFR is deferred to G4**; G1 validates only the
+- **ISO 12233-style e-SFR is deferred to the metrics validation**; the scene validation covers only the
   target/estimator edge-angle convention;
 - **D65 endpoint extrapolation**: `colour-science` tabulates D65 to 780 nm and
   camsim holds that value constant to 830 nm; V(lambda) is about 1.5e-5 at
@@ -170,16 +168,16 @@ The report records these assumptions and known limitations:
   across Matplotlib/font builds, so cross-platform checks compare the reported
   numbers with tolerances.
 
-## G2 — Sensor model and EMVA characterization
+## Sensor and characterization
 
-**Status: PASS (green locally).** The full report is `results/reports/g2_sensor.md`,
+**Status: PASS.** The full report is `results/reports/g2_sensor.md`,
 its machine-readable results are `results/reports/g2_sensor_results.json`, and
 its six figures are `results/figures/g2_qe_cfa_ir_cut.png`, `g2_ptc.png`,
 `g2_snr_vs_irradiance.png`, `g2_dark_current_vs_temperature.png`,
 `g2_lcg_hcg_comparison.png`, and `g2_dsnu_prnu_histograms.png`. The report is
 generated by `examples/04_emva_characterization.py`;
-`tests/test_preset_validation.py` is the executable form of the flagship G2
-recovery gate.
+`tests/test_preset_validation.py` is the executable form of the flagship sensor
+recovery check.
 
 Reproduce from the repository root:
 
@@ -192,8 +190,8 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy src
 uv run python examples/04_emva_characterization.py
 ```
 
-Measured results against the G2 tolerances (32 frames per level, 10 ms
-exposure, G2 LCG sweep with base seed 9; HCG low-to-saturation sweep with base
+Measured results against the sensor tolerances (32 frames per level, 10 ms
+exposure, sensor LCG sweep with base seed 9; HCG low-to-saturation sweep with base
 seed 3; 16 dark frames per temperature at 0.1 s with base seed 21):
 
 | Check | Measured | Tolerance | Result |
@@ -231,17 +229,17 @@ The report records these assumptions and known limitations:
   correction;
 - the **eight-frame LCG sweep** in `tests/test_characterization.py` is a
   robustness check with a documented 20 % DSNU waiver; the 32-frame result is
-  the G2 evidence;
+  the sensor validation evidence;
 - **dark-current points below 60 C** are differential measurements compressed
   by the zero-charge clamp and sub-LSB ADC, so only 65 C and 70 C are
-  gate criteria; those agree with the differential doubling model
+  validation criteria; those agree with the differential doubling model
   `D(T) - D(25 C)` within 1.8 % and 2.2 % under a 5 % tolerance;
 - **determinism** is promised within one environment; cross-platform runs
   compare tolerances, not bit patterns.
 
-## G3 — ISP stages and pipeline
+## ISP
 
-**Status: PASS (green locally).** The full report is
+**Status: PASS.** The full report is
 `results/reports/g3_isp.md` (a repository artifact, not a page in the published
 docs site); its machine-readable results are
 `results/reports/g3_isp_results.json`, and its figures are
@@ -266,7 +264,7 @@ uv run jupytext --to ipynb --execute notebooks/02_isp_color_fundamentals.py \
 The full example exits non-zero when a gate check fails; the quick smoke run is
 informational and always exits zero.
 
-Measured results against the G3 tolerances (full run, 300 lux, 96 x 128
+Measured results against the ISP tolerances (full run, 300 lux, 96 x 128
 ColorChecker, 2x oversampling, flagship preset at LCG):
 
 | Check | Measured | Tolerance | Result |
@@ -302,7 +300,7 @@ so no 3x3 matrix could colour-correct them. The conventional bands reduce the
 correlation to 0.187, the projection condition number to 1.56, and the
 Luther-condition residual to 12.6 %, and the in-sample CCM fit RMS is about
 0.008 linear RGB at both illuminants. The ΔE thresholds (2.0 / 4.0) were not
-changed. The 3000 K mean is 3.834, 4.14 % below the 4.0 limit; the gate is
+changed. The 3000 K mean is 3.834, 4.14 % below the 4.0 limit; the check is
 mean-only, with per-patch maxima reaching 13.208 (blue) and 11.077 (purplish
 blue). The fit remains in-sample: it measures calibration-scene
 representability, not held-out generalisation or colour constancy.
@@ -318,23 +316,25 @@ The report records these assumptions and known limitations:
 - the ColorChecker CCM run uses **manual analytic perfect-diffuser AWB gains**
   so the row-sum CCM is neutral-preserving; the default gray-world estimator is
   validated separately on neutral flat fields and under an injected cast;
-- **formal ISO 12233-style e-SFR and MTF50/MTF20 live in G4/G5**; the
-  independent metrics harness measures them, while G3 reports edge-contrast
+- **formal ISO 12233-style e-SFR and MTF50/MTF20 live in the metrics and
+  consolidated validation**; the independent metrics harness measures them,
+  while the ISP validation reports edge-contrast
   preservation and positive overshoot;
-- **`Camera.auto_expose()` convergence is G5 evidence**; G3 calibrates
+- **`Camera.auto_expose()` convergence is consolidated evidence**; the ISP
+  validation calibrates
   exposure explicitly from a probe;
-- **quick mode is not gate evidence**; `--quick` writes
+- **quick mode is not validation evidence**; `--quick` writes
   `g3_isp_results_quick.json` and never overwrites the committed JSON or
   Markdown;
 - **DPC and BLC** are evidenced by the focused unit tests
   `tests/test_isp_dpc.py` and `tests/test_isp_blc.py` rather than re-measured in
-  the G3 payload;
+  the ISP validation payload;
 - **determinism** is promised within one environment; PNG bytes can differ
   across Matplotlib/font builds, so cross-platform checks compare numbers.
 
-## G4 — Metrics harness
+## Metrics
 
-**Status: PASS (green locally).** The full report is
+**Status: PASS.** The full report is
 `results/reports/g4_metrics.md` (a repository artifact, not a page in the
 published docs site); its machine-readable results are
 `results/reports/g4_metrics_results.json`, and its figures are
@@ -361,7 +361,7 @@ uv run jupytext --to ipynb --execute notebooks/03_measuring_iq.py \
 The full example exits non-zero when a gate check fails; the quick smoke run is
 informational and always exits zero.
 
-Measured results against the G4 tolerances (full run: 256 x 256 slanted edge,
+Measured results against the metrics tolerances (full run: 256 x 256 slanted edge,
 8x analysis oversampling, 64 x 64 spatial SNR patches, a 32-frame temporal
 stack, and a 96 x 128 synthetic ColorChecker-like chart):
 
@@ -423,7 +423,7 @@ a fixed 10 ms exposure (64 x 64 pixels, PDAF disabled, linear
 `RenderedImage.linear_rgb`), where luma SNR rises from 12.45 to 35.16 dB. The
 committed `results/reports/g4_metrics_results.json` records the exact levels,
 per-channel values, and clipped fractions in its `lux_sweep` section with
-`gate_evidence: false`; the sweep is an illustration, not a gate check.
+`gate_evidence: false`; the sweep is an illustration, not a validation check.
 
 The report records these assumptions and known limitations:
 
@@ -432,7 +432,7 @@ The report records these assumptions and known limitations:
   claiming conformance;
 - the analytic PSFs are **ideal** Gaussian, box, and Airy kernels: no
   aberrations, field-dependent blur, or wavelength-dependent PSF;
-- the Airy and box gate cases use **8x oversampling** because four carries about
+- the Airy and box validation cases use **8x oversampling** because four carries about
   a 2 % MTF50 bias for near-diffraction-limited systems;
 - **Airy f/2.8 is a diagnostic only**: its MTF never reaches 0.20 inside
   Nyquist and its MTF50 sits closest to the band edge, so it is reported with
@@ -448,7 +448,7 @@ The report records these assumptions and known limitations:
   colour-accuracy claim;
 - an ideal synthetic edge has **no finite MTF50/MTF20**; the report records
   that as `null` and never invents a crossing;
-- **quick mode is not gate evidence**; `--quick` uses smaller grids, writes
+- **quick mode is not validation evidence**; `--quick` uses smaller grids, writes
   `g4_metrics_results_quick.json`, and never overwrites the committed JSON or
   Markdown;
 - **determinism** is promised within one environment; PNG bytes can differ
@@ -456,7 +456,7 @@ The report records these assumptions and known limitations:
 
 ## Validation report conventions
 
-Each phase report contains:
+Each validation report contains:
 
 - the exact commands and environment used (OS, Python, dependency versions,
   configuration hash, and seeds);
@@ -469,23 +469,17 @@ Each phase report contains:
 A report is appended to this page only when it has been regenerated against
 the current commit. Changes that invalidate a report require a re-run.
 
-## G5 — Consolidated evidence and human sign-off (blocks machine-vision work)
+## Consolidated evidence
 
-G5 closes Phase 5 and opens the way to Phase 6. The consolidated candidate is
-`results/reports/validation_report.md`; its status is **awaiting human
-sign-off**. G1–G4 are green, every cross-cutting check passes, and the
-engineering gates below are green. The G5 gate is still open until the project
-owner records an explicit approval.
-
-The consolidated report binds the G1–G4 reports and machine-readable results by
-SHA-256. `tests/test_g5_signoff.py` recomputes those hashes, so a phase artifact
+The consolidated report is `results/reports/validation_report.md`. It binds the
+area reports and machine-readable results by SHA-256, so a validation artifact
 cannot change without regenerating the report, and the report records the
-artifact regeneration actually performed for the candidate.
+artifact regeneration actually performed.
 
 ### Cross-cutting evidence
 
-These criteria span phases or the engineering process and are measured by
-`benchmarks/g5_validation_report.py` with direct calls to the public stages
+These criteria span the pipeline and the engineering process and are measured
+by `benchmarks/g5_validation_report.py` with direct calls to the public stages
 and metrics. The full derivation and raw values are in the report.
 
 | Check | Measured | Bound | Result |
@@ -504,7 +498,6 @@ and metrics. The full derivation and raw values are in the report.
 | Quick-mode isolation | no `*_quick*` artifacts in `results/reports` | full-run JSON only | PASS |
 | Examples headless (local) | 4/4 pass, 1.96–14.64 s each | 300 s per example | PASS |
 | Notebooks headless (local) | 3/3 pass, 2.53–14.79 s each | 120 s per notebook | PASS |
-| Machine-vision scope | `camsim.tasks` is its docstring only; no torch import | gated until sign-off | PASS |
 
 The denoise MTF50 measurement rises rather than falls: the full-strength
 bilateral filter suppresses the noise floor and steepens the transition. The
@@ -512,13 +505,13 @@ criterion is two-sided (absolute change ≤ 20 %), so both smearing and invented
 contrast fail, and the signed change is reported. A separate edge-ringing check
 puts the overshoot and undershoot well below 1 % of contrast. The sharpen
 overshoot is small but measurable (0.21% of edge contrast), as expected at
-radius 1. The RCCC result is a shape,
-constant-preservation, and linearity check only: its clear channel is a
-documented luma placeholder, and the Bayer colour and MTF gates do not apply.
+radius 1. The RCCC result is a shape, constant-preservation, and linearity check
+only: its clear channel is a documented luma placeholder, and the Bayer colour
+and MTF checks do not apply.
 
-### Engineering gates
+### Engineering checks
 
-| Gate | Recorded result |
+| Check | Recorded result |
 |---|---|
 | `uv run pytest -q` | 1775 passed |
 | `uv run pytest --cov=camsim --cov-fail-under=90` | 1775 passed; 91.73% subject-module coverage (required 90%) |
@@ -529,13 +522,11 @@ documented luma placeholder, and the Bayer colour and MTF gates do not apply.
 | `uv run python benchmarks/benchmark_pipeline.py --quick` | 8.34 ms total (128 × 128) |
 | `uv run python benchmarks/benchmark_pipeline.py` | 114.58 ms total (512 × 512) |
 | `uv run python benchmarks/benchmark_pipeline.py --large` | 453.90 ms total (1024 × 1024, 1× oversampling) |
-| `uv build` | wheel and sdist for `0.1.1` |
+| `uv build` | wheel and sdist |
 
 CI runs the same commands on Ubuntu and macOS across Python 3.11, 3.12, and
-3.13, and adds `examples` and `notebooks` jobs. **Those workflows were added in
-the fix candidate but cannot be executed from this environment: local
-equivalents passed and CI execution is pending a push.** The owner must accept
-that residual at sign-off; this page does not claim CI is green.
+3.13, and adds `examples` and `notebooks` jobs. The GitHub CI matrix and the
+Pages deployment pass.
 
 The runners enforce the runtime budgets as subprocess timeouts and fail fast:
 
@@ -546,56 +537,9 @@ The runners enforce the runtime budgets as subprocess timeouts and fail fast:
 
 `make notebooks` and `make figures` invoke those runners. The per-item times
 are recorded in `results/reports/examples_timings.json` and
-`results/reports/notebooks_timings.json` and repeated in the consolidated G5
-report. Quick-mode artifacts are smoke tests and never overwrite the committed
-full-run JSON or Markdown.
-
-### Sign-off checklist
-
-- [x] Owner reviewed `results/reports/validation_report.md` end to end,
-      including the G1–G4 verdict tables and the cross-cutting measurements.
-- [x] Owner reviewed the figure gallery, including `g5_gate_summary.png`,
-      `g5_evidence.png`, the G3 ColorChecker ΔE figure, the RCCC baseline, and
-      the G4 analytic MTF curves.
-- [x] Owner confirmed the validated scope: scene/optics helpers, sensor, ISP,
-      metrics, camera orchestration, IO, and CLI; machine vision is out of
-      scope for `v0.1.0`.
-- [x] Owner confirmed the assumptions: simulated flagship preset, provisional
-      synthetic spectral data, in-sample CCM, and uncertified ISO 12233/EMVA-
-      style measurement status.
-- [x] Owner confirmed the limitations: synthetic CFA re-authoring, in-sample
-      calibration, 8× Airy diagnostic, synthetic stage measurements,
-      quick-mode exclusion, extreme-low-light digital-gain noise, the identity
-      default CCM, the absence of HDR/3-D/motion blur/autofocus, no
-      polychromatic PSF or banding, P3 sidecar-only tagging, and the reduced
-      frame contract.
-- [x] Owner accepted the whole-package coverage exception (subject modules
-      91.73 %, whole package including viz 83.55 %, viz exercised by the
-      executed galleries and notebooks).
-- [x] Owner accepted that the CI workflows and runner timeouts were added and
-      local equivalents passed, with CI execution pending a push at sign-off.
-      The GitHub CI matrix passed after release.
-- [x] Owner confirmed the two-minute-per-notebook condition: all notebooks ran
-      locally below 120 s and the runner/CI timeout enforces it.
-- [x] Owner accepted that full 50 MP spectral simulation is not supported at
-      v0.1.0 and that the memory guard rejects oversized cubes.
-- [x] Owner approved tagging `v0.1.0` on the signed-off commit and holding
-      Phase 6+ machine vision for a separate plan and review.
-
-The sign-off is recorded in the report's checklist block. `v0.1.0` was tagged
-and pushed, and `camsim==0.1.0` was published to PyPI with a clean-install
-verification. The GitHub CI matrix, Docs build, and Docs Pages deployment
-passed; the live site is <https://pengzhao-ai.github.io/camsim/>. `v0.1.1` is
-a documentation-only patch for PyPI rendering; it changes no library code or
-validation evidence. **No machine-vision code has been written**, and Phase 6+
-stays deferred until a separate plan is reviewed and approved; see
-[Release](release.md).
-
-**No machine-vision code is written before G5 sign-off, and none has been
-written after it.** The CNN task engine, training protocol, and task-accuracy
-sweeps in `camsim.tasks` do not begin until the project owner approves a
-separate Phase 6–9 plan. Subsequent changes to sensor, ISP, or metrics code
-that invalidate the report require a re-run and a new sign-off.
+`results/reports/notebooks_timings.json` and repeated in the consolidated
+validation report. Quick-mode artifacts are smoke tests and never overwrite the
+committed full-run JSON or Markdown.
 
 See [Datasheet mapping](datasheet_mapping.md) for how preset values are traced
 to public specifications.

@@ -66,7 +66,7 @@ Key properties:
 - The input must be **linear light** and contain exactly one edge. A
   display-encoded edge is biased by the tone curve.
 - `oversampling` is the number of analysis samples per pixel (default 4). The
-  G4 gate uses 8 because four carries roughly a 2 % MTF50 bias for
+  metrics validation uses 8 because four carries roughly a 2 % MTF50 bias for
   near-diffraction-limited systems.
 - `window="hamming"` tapers the LSF and suppresses rectangular-window
   sidelobes.
@@ -120,7 +120,7 @@ SNR.
 
 *The shipped sensor and ISP at fixed exposure from 25 to 3200 lux, showing the
 transition from read-noise-limited to shot-noise-limited behavior. The sweep
-is a gallery illustration, not a G4 gate check.*
+is a gallery illustration, not a metrics validation check.*
 
 ## Colour difference
 
@@ -207,10 +207,10 @@ available when the layout must be built independently.
 `MetricReport.to_dict()` expands the nested dataclasses into a JSON-friendly
 mapping; `to_json()` serializes it with `allow_nan=False`, converting NaN
 crossings and undefined ratios to `null`. NumPy scalars and tuples become plain
-Python values. The G4 gate's committed
-`results/reports/g4_metrics_results.json` is the gate's measurement payload,
-not a serialized `MetricReport`; its `measure_all.serialization` section
-records the serialization checks as booleans.
+Python values. The committed metrics validation payload,
+`results/reports/g4_metrics_results.json`, is not a serialized `MetricReport`;
+its `measure_all.serialization` section records the serialization checks as
+booleans.
 
 ```python
 report = measure_all(image, layout)
@@ -238,9 +238,9 @@ uv run jupytext --to ipynb --execute notebooks/03_measuring_iq.py \
 ```
 
 The figures above are copies of committed files under `results/figures/`. The
-measured values, tolerances, assumptions, and limitations are in the G4 report,
-`results/reports/g4_metrics.md` (a repository artifact, not a page on this
-site).
+measured values, tolerances, assumptions, and limitations are in the metrics
+validation report, `results/reports/g4_metrics.md` (a repository artifact, not
+a page on this site).
 
 ## Limitations
 
